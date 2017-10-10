@@ -1,0 +1,58 @@
+#include <jni.h>
+#include <string>
+
+extern "C"
+JNIEXPORT jstring
+JNICALL
+Java_com_dozingcatsoftware_boojiecam_MainActivity_stringFromJNI(
+        JNIEnv *env,
+        jobject /* this */) {
+    std::string hello = "Hello from C++";
+    return env->NewStringUTF(hello.c_str());
+}
+
+static inline int32_t toUInt(jbyte jb) {
+    return jb & 0xff;
+}
+
+extern "C"
+JNIEXPORT void
+JNICALL
+Java_com_dozingcatsoftware_boojiecam_WireframeImageGenerator_computeEdgesNative(
+        JNIEnv *env, jobject thiz,
+        jbyteArray jbright, jint width, jint height, jint minRow, jint maxRow,
+        jintArray jcolorTable, jintArray joutput) {
+    jbyte *bright = env->GetByteArrayElements(jbright, 0);
+    jint *colorTable = env->GetIntArrayElements(jcolorTable, 0);
+    jint *output = env->GetIntArrayElements(joutput, 0);
+
+    for (int32_t y = minRow; y < maxRow; y++) {
+        if (y == 0 || y == height - 1) {
+            int32_t minOffset = y * width;
+            int32_t maxOffset = minOffset + width;
+            for (int32_t i = minOffset; i < maxOffset; i++) {
+                output[i] = colorTable[0];
+            }
+        }
+        else {
+            int32_t minIndex = y * width + 1;
+            int32_t maxIndex = minIndex + width - 2;
+            output[minIndex - 1] = colorTable[0];
+            for (int32_t index = minIndex; index < maxIndex; index++) {
+                int32_t up = index - width;
+                int32_t down = index + width;
+                int32_t edgeStrength = 8 * toUInt(bright[index]) - (
+                        toUInt(bright[up-1]) + toUInt(bright[up]) + toUInt(bright[up+1]) +
+                        toUInt(bright[index-1]) + toUInt(bright[index+1]) +
+                        toUInt(bright[down-1]) + toUInt(bright[down]) + toUInt(bright[down+1]));
+                int32_t b = std::min(255, std::max(0, 2 * (edgeStrength >= 0 ? edgeStrength : -edgeStrength)));
+                output[index] = colorTable[b];
+            }
+            output[maxIndex] = colorTable[0];
+        }
+    }
+
+    env->ReleaseByteArrayElements(jbright, bright, 0);
+    env->ReleaseIntArrayElements(jcolorTable, colorTable, 0);
+    env->ReleaseIntArrayElements(joutput, output, 0);
+}
