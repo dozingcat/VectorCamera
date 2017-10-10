@@ -1,5 +1,6 @@
 package com.dozingcatsoftware.boojiecam
 
+import android.graphics.Bitmap
 import android.util.Log
 import org.json.JSONObject
 import org.json.JSONStringer
@@ -13,7 +14,8 @@ import java.util.zip.GZIPOutputStream
  * Created by brian on 10/9/17.
  */
 class PhotoLibrary(val rootDirectory: File) {
-    val PHOTO_ID_FORMAT = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS")
+
+    val thumbnailDirectory = File(rootDirectory, "thumbnails")
 
     init {
         PHOTO_ID_FORMAT.timeZone = TimeZone.getTimeZone("UTC")
@@ -25,6 +27,9 @@ class PhotoLibrary(val rootDirectory: File) {
         try {
             Log.i(TAG, "savePhoto start")
             val sourceImage = processedBitmap.sourceImage
+            val width = sourceImage.image.width
+            val height = sourceImage.image.height
+
             val photoId = PHOTO_ID_FORMAT.format(Date(sourceImage.timestamp))
             val photoDir = File(rootDirectory, photoId)
             photoDir.mkdirs()
@@ -35,14 +40,14 @@ class PhotoLibrary(val rootDirectory: File) {
                     writeBufferToOuptutStream(plane.buffer, it)
                 }
             })
-            val uncompressedSize = sourceImage.image.width * sourceImage.image.height * 3 / 2
+            val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
             val compressedSize = rawImageFile.length()
             val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
             Log.i(TAG, "Wrote $compressedSize bytes, compressed to $compressedPercent")
 
             val metadata = mapOf(
-                    "width" to sourceImage.image.width,
-                    "height" to sourceImage.image.height,
+                    "width" to width,
+                    "height" to height,
                     "timestamp" to sourceImage.timestamp
             )
             val json = JSONObject(metadata).toString(2)
@@ -50,7 +55,24 @@ class PhotoLibrary(val rootDirectory: File) {
                 it.write(json.toByteArray(Charsets.UTF_8))
             })
 
-            // TODO: Write full size image and thumbnail.
+            // Write full size image and thumbnail.
+            // TODO: Scan PNG file, ensure .nomedia file exists in thumbnails dir.
+            run {
+                val resultBitmap = processedBitmap.renderBitmap(width, height)
+                val pngOutputStream = FileOutputStream(File(rootDirectory, photoId + ".png"))
+                pngOutputStream.use({
+                    resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                })
+            }
+            run {
+                thumbnailDirectory.mkdirs()
+                val thumbnailOutputStream =
+                        FileOutputStream(File(thumbnailDirectory, photoId + ".png"))
+                val thumbnailBitmap = processedBitmap.renderBitmap(thumbnailWidth, thumbnailHeight)
+                thumbnailOutputStream.use({
+                    thumbnailBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                })
+            }
 
             successFn(photoId)
         }
@@ -61,5 +83,8 @@ class PhotoLibrary(val rootDirectory: File) {
 
     companion object {
         val TAG = "PhotoLibrary"
+        val PHOTO_ID_FORMAT = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS")
+        val thumbnailWidth = 320
+        val thumbnailHeight = 240
     }
 }
