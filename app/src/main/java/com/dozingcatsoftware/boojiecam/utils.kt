@@ -4,6 +4,10 @@ import android.graphics.ImageFormat
 import java.io.OutputStream
 import java.nio.ByteBuffer
 
+inline fun toUInt(b: Byte): Int {
+    return b.toInt() and 0xff
+}
+
 fun getBufferBytes(buffer: ByteBuffer): ByteArray {
     if (buffer.hasArray() && buffer.arrayOffset() == 0) {
         val arr = buffer.array()

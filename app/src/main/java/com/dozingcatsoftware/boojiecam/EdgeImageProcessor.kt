@@ -31,7 +31,7 @@ class EdgeImageProcessor(private val colorTable: IntArray,
         for (i in 0 until maxThreads) {
             val minRow = height * i / maxThreads
             val maxRow = height * (i + 1) / maxThreads
-            tasks.add(Callable {computeEdges(bright, width, height, minRow, maxRow, rowStride, colorTable, pixels)})
+            tasks.add(Callable {computeEdgesNative(bright, width, height, minRow, maxRow, rowStride, colorTable, pixels)})
         }
         threadPool.invokeAll(tasks)
 
@@ -82,6 +82,7 @@ class EdgeImageProcessor(private val colorTable: IntArray,
 
     external private fun computeEdgesNative(bright: ByteArray,
                                             width: Int, height: Int, minRow: Int, maxRow: Int,
+                                            rowStride: Int,
                                             colorTable: IntArray, pixels: IntArray)
 
     companion object {

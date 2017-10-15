@@ -128,10 +128,6 @@ abstract class CameraImageProcessor {
         var DEBUG = false
         var TIMING = false
 
-        inline fun toUInt(b: Byte): Int {
-            return b.toInt() and 0xff
-        }
-
         fun debugLog(msg: String) {
             if (DEBUG) {
                 Log.i(TAG, msg)

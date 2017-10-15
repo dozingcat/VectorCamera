@@ -34,6 +34,7 @@ class MainActivity : Activity() {
             EdgeImageProcessor.withFixedColors(0xffffff, 0x000000),
             EdgeImageProcessor.withLinearGradient(0x000000, 0xff0000, 0x0000ff),
             EdgeImageProcessor.withRadialGradient(0x191970, 0xffff00, 0xff4500),
+            AsciiImageProcessor(),
             GrayscaleImageGenerator()
     )
 
