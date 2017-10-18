@@ -1,19 +1,21 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.graphics.Bitmap
-import android.renderscript.*
+import android.renderscript.Allocation
+import android.renderscript.Element
+import android.renderscript.RenderScript
+import android.renderscript.Type
 
 /**
- * Created by brian on 10/16/17.
+ * Created by brian on 10/18/17.
  */
-class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) {
-
+class EdgeAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) {
     private var outputAllocation: Allocation? = null
-    private var script: ScriptC_edge_color? = null
+    private var script: ScriptC_edge? = null
 
     override fun createBitmap(camAllocation: CameraAllocation): Bitmap {
         if (script == null) {
-            script = ScriptC_edge_color(rs)
+            script = ScriptC_edge(rs)
         }
         val allocation = camAllocation.allocation
         script!!._gYuvInput = allocation
@@ -31,7 +33,7 @@ class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(
                     Allocation.USAGE_SCRIPT)
         }
 
-        script!!.forEach_setBrightnessToEdgeStrength(outputAllocation)
+        script!!.forEach_computeEdge(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
                 allocation.type.x, allocation.type.y, Bitmap.Config.ARGB_8888)

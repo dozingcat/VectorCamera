@@ -6,8 +6,9 @@ int gMultiplier = 2;
 int gWidth;
 int gHeight;
 rs_allocation gYuvInput;
+rs_allocation gColorMap;
 
-uchar4 RS_KERNEL setBrightnessToEdgeStrength(uint32_t x, uint32_t y) {
+uchar4 RS_KERNEL computeEdge(uint32_t x, uint32_t y) {
   int edge = 0;
   if (x > 0 && x < gWidth - 1 && y > 0 && y < gHeight - 1) {
       edge = 8 * rsGetElementAtYuv_uchar_Y(gYuvInput, x, y) -
@@ -20,9 +21,10 @@ uchar4 RS_KERNEL setBrightnessToEdgeStrength(uint32_t x, uint32_t y) {
                  rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y) -
                  rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y + 1);
   }
-
-  uchar yy = clamp(gMultiplier * edge, 0, 255);
-  uchar uu = rsGetElementAtYuv_uchar_U(gYuvInput, x, y);
-  uchar vv = rsGetElementAtYuv_uchar_V(gYuvInput, x, y);
-  return rsYuvToRGBA_uchar4(yy, uu, vv);
+  uchar4 out;
+  out.a = 255;
+  out.g = clamp(gMultiplier * edge, 0, 255);
+  out.r = 0;
+  out.b = 0;
+  return out;
 }

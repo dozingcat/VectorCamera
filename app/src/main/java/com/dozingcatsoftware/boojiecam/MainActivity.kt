@@ -42,8 +42,10 @@ class MainActivity : Activity() {
             GrayscaleImageGenerator()
     )
     private val allAllocationProcessors = arrayOf(
-            {rs: RenderScript -> EdgeColorAllocationProcessor(rs)}
+            {rs: RenderScript -> EdgeColorAllocationProcessor(rs)},
+            {rs: RenderScript -> EdgeAllocationProcessor(rs)}
     )
+    private var allocationProcessorIndex = 0;
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -223,6 +225,10 @@ class MainActivity : Activity() {
         imageProcessor.pause()
         val index = allImageProcessors.indexOf(imageProcessor)
         imageProcessor = allImageProcessors[(index + 1) % allImageProcessors.size]
+
+        allocationProcessor.pause()
+        allocationProcessorIndex = (allocationProcessorIndex + 1) % allAllocationProcessors.size
+        allocationProcessor = allAllocationProcessors[allocationProcessorIndex](rs)
     }
 
     private fun takePicture(view: View) {
