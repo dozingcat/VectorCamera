@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
+import android.renderscript.RenderScript
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Size
@@ -22,10 +23,13 @@ class MainActivity : Activity() {
     private lateinit var cameraImageGenerator: CameraImageGenerator
 
     private lateinit var imageProcessor: CameraImageProcessor
+    private lateinit var allocationProcessor: CameraAllocationProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
     private val photoLibrary = PhotoLibrary(
             File(Environment.getExternalStorageDirectory(), "BoojieCam"))
+
+    private lateinit var rs: RenderScript
 
     private val allImageProcessors = arrayOf(
             EdgeColorImageProcessor(),
@@ -37,15 +41,22 @@ class MainActivity : Activity() {
             AsciiImageProcessor(),
             GrayscaleImageGenerator()
     )
+    private val allAllocationProcessors = arrayOf(
+            {rs: RenderScript -> EdgeColorAllocationProcessor(rs)}
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_main)
 
+        // Use PROFILE type only on first run?
+        rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
+
         cameraSelector = CameraSelector(this)
-        cameraImageGenerator = cameraSelector.createImageGenerator()
+        cameraImageGenerator = cameraSelector.createImageGenerator(rs)
         imageProcessor = allImageProcessors[0]
+        allocationProcessor = allAllocationProcessors[0](rs)
 
         switchCameraButton.setOnClickListener(this::switchToNextCamera)
         switchResolutionButton.setOnClickListener(this::switchResolution)
@@ -101,7 +112,8 @@ class MainActivity : Activity() {
             cameraImageGenerator.start(
                     CameraStatus.CAPTURING_PREVIEW,
                     this.targetCameraImageSize(),
-                    this::handleImageFromCamera)
+                    this::handleImageFromCamera,
+                    this::handleAllocationFromCamera)
         }
         else {
             PermissionsChecker.requestCameraAndStoragePermissions(this)
@@ -109,10 +121,11 @@ class MainActivity : Activity() {
     }
 
     private fun handleGeneratedBitmap(processedBitmap: ProcessedBitmap) {
-        handler.post({
+        handler.post(fun() {
             overlayView.processedBitmap = processedBitmap
             overlayView.invalidate()
-            if (processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
+            if (processedBitmap.sourceImage != null &&
+                    processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Saving picture")
                 Thread({
                     photoLibrary.savePhoto(processedBitmap,
@@ -128,7 +141,7 @@ class MainActivity : Activity() {
     }
 
     private fun handleImageFromCamera(image: CameraImage) {
-        handler.post({
+        handler.post(fun() {
             imageProcessor.start(this::handleGeneratedBitmap)
             // Log.i(TAG, "Received image from camera")
             if (image.status == CameraStatus.CAPTURING_PHOTO) {
@@ -154,13 +167,33 @@ class MainActivity : Activity() {
         })
     }
 
+    private fun handleAllocationFromCamera(allocation: CameraAllocation) {
+        handler.post(fun() {
+            // allocation.allocation.ioReceive()
+
+            // TODO: Handle saving images.
+            Log.i(TAG, "*** Received CameraAllocation")
+
+            if (allocationProcessor == null) {
+                allocation.allocation.ioReceive()
+                return
+            }
+            allocationProcessor.start(this::handleGeneratedBitmap)
+            if (allocationProcessor != null) {
+                allocationProcessor.queueAllocation(allocation)
+            }
+
+        })
+    }
+
     private fun restartCameraImageGenerator() {
         // cameraImageGenerator?.pause()
         Log.i(TAG, "recreateCameraImageGenerator: " + this.targetCameraImageSize())
         cameraImageGenerator.start(
                 CameraStatus.CAPTURING_PREVIEW,
                 this.targetCameraImageSize(),
-                this::handleImageFromCamera)
+                this::handleImageFromCamera,
+                this::handleAllocationFromCamera)
     }
 
     private fun switchToNextCamera(view: View) {
@@ -170,7 +203,7 @@ class MainActivity : Activity() {
         imageProcessor.pause()
         cameraSelector.selectNextCamera()
         cameraImageGenerator.stop()
-        cameraImageGenerator = cameraSelector.createImageGenerator()
+        cameraImageGenerator = cameraSelector.createImageGenerator(rs)
         restartCameraImageGenerator()
     }
 
@@ -200,7 +233,8 @@ class MainActivity : Activity() {
         cameraImageGenerator.start(
                 CameraStatus.CAPTURING_PHOTO,
                 this.cameraImageSizeForSavedPicture(),
-                this::handleImageFromCamera)
+                this::handleImageFromCamera,
+                this::handleAllocationFromCamera)
     }
 
     /**

@@ -95,7 +95,7 @@ abstract class CameraImageProcessor {
                 val bitmap = createBitmapFromImage(image!!.image)
                 val backgroundPaintFn = createPaintFn(image!!.image)
                 image!!.close()
-                callback(ProcessedBitmap(image!!, bitmap, backgroundPaintFn))
+                callback(ProcessedBitmap(image!!, null, bitmap, backgroundPaintFn))
                 image = null
             }
             catch (ex: Exception) {
@@ -118,6 +118,10 @@ abstract class CameraImageProcessor {
     }
 
     abstract fun createBitmapFromImage(image: PlanarImage): Bitmap
+
+    open fun createBitmapFromAllocation(allocation: CameraAllocation): Bitmap? {
+        return null
+    }
 
     open fun createPaintFn(image: PlanarImage): (RectF) -> Paint? {
         return {null}

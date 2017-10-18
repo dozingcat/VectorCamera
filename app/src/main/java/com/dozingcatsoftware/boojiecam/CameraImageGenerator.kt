@@ -5,13 +5,17 @@ import android.graphics.ImageFormat
 import android.hardware.camera2.*
 import android.media.ImageReader
 import android.os.Handler
+import android.renderscript.Allocation
+import android.renderscript.Element
+import android.renderscript.RenderScript
+import android.renderscript.Type
 import android.util.Log
 import android.util.Size
 
 /**
  * Created by brian on 9/20/17.
  */
-class CameraImageGenerator(val context: Context,
+class CameraImageGenerator(val context: Context, val rs: RenderScript,
                            val cameraManager: CameraManager, val cameraId: String,
                            val timestampFn: () -> Long = System::currentTimeMillis) {
 
@@ -23,9 +27,12 @@ class CameraImageGenerator(val context: Context,
     var status = CameraStatus.CLOSED
     private var targetStatus = CameraStatus.CLOSED
     private var imageCallback: ((CameraImage) -> Unit)? = null
+    private var imageAllocationCallback: ((CameraAllocation) -> Unit)? = null
     private var handler = Handler()
 
     private val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
+
+    private var allocation: Allocation? = null
 
     // https://stackoverflow.com/questions/33902832/upside-down-camera-preview-byte-array
     // https://www.reddit.com/r/Android/comments/3rjbo8/nexus5x_marshmallow_camera_problem/cwqzqgh
@@ -41,24 +48,16 @@ class CameraImageGenerator(val context: Context,
         }
     }()
 
-    fun isCapturing(): Boolean {
-        return this.status.isCapturing()
-    }
-
-    /*
-    private val cameraSize = pickBestSize(
-            cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                                 .getOutputSizes(ImageFormat.YUV_420_888),
-            imageWidth, imageHeight)
-            */
-
-    fun start(targetStatus: CameraStatus, targetSize: Size, callback: (CameraImage) -> Unit) {
+    fun start(targetStatus: CameraStatus, targetSize: Size,
+              imageCallback: ((CameraImage) -> Unit)?,
+              imageAllocationCallback: ((CameraAllocation) -> Unit)? = null) {
         this.captureSize = pickBestSize(
                 cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                         .getOutputSizes(ImageFormat.YUV_420_888),
                 targetSize)
         this.targetStatus = targetStatus
-        this.imageCallback = callback
+        this.imageCallback = imageCallback
+        this.imageAllocationCallback = imageAllocationCallback
 
         if (this.status.isCapturing()) {
             Log.i(TAG, "Restarting capture")
@@ -148,11 +147,16 @@ class CameraImageGenerator(val context: Context,
                 }
                 if (image != null) {
                     if (captureSession != null) {
-                        this.imageCallback!!(CameraImage(
-                                PlanarImage.fromMediaImage(image),
-                                imageOrientation,
-                                this.status,
-                                this.timestampFn()))
+                        if (this.imageCallback != null) {
+                            this.imageCallback!!(CameraImage(
+                                    PlanarImage.fromMediaImage(image),
+                                    imageOrientation,
+                                    this.status,
+                                    this.timestampFn()))
+                        }
+                        else {
+                            image.close()
+                        }
                     }
                     else {
                         Log.i(TAG, "captureSession is null, closing image")
@@ -161,8 +165,25 @@ class CameraImageGenerator(val context: Context,
                 }
             }, null)
 
+            allocation = createRenderscriptAllocation(size)
+            allocation!!.setOnBufferAvailableListener({
+                Log.i(TAG, "Got RS buffer")
+                if (captureSession != null) {
+                    if (this.imageAllocationCallback != null) {
+                        this.imageAllocationCallback!!(CameraAllocation(
+                                allocation!!,
+                                imageOrientation,
+                                this.status,
+                                this.timestampFn()))
+                    }
+                }
+                else {
+                    Log.i(TAG, "captureSession is null, closing image")
+                }
+            })
+
             camera!!.createCaptureSession(
-                    listOf(imageReader!!.surface),
+                    listOf(imageReader!!.surface, allocation!!.surface),
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) {
                             captureSession = session
@@ -197,7 +218,8 @@ class CameraImageGenerator(val context: Context,
                 throw IllegalStateException("Invalid status: " + this.status)
             }
         }
-        request.addTarget(imageReader!!.surface)
+        //request.addTarget(imageReader!!.surface)
+        request.addTarget(allocation!!.surface)
         if (this.targetStatus == CameraStatus.CAPTURING_PHOTO) {
             captureSession!!.capture(request.build(), null, null)
         }
@@ -220,6 +242,15 @@ class CameraImageGenerator(val context: Context,
         stopCaptureSession()
         camera?.close()
         camera = null
+    }
+
+    private fun createRenderscriptAllocation(size: Size): Allocation {
+        val yuvTypeBuilder = Type.Builder(rs, Element.YUV(rs))
+        yuvTypeBuilder.setX(size.width)
+        yuvTypeBuilder.setY(size.height)
+        yuvTypeBuilder.setYuvFormat(ImageFormat.YUV_420_888)
+        return Allocation.createTyped(rs, yuvTypeBuilder.create(),
+                Allocation.USAGE_IO_INPUT or Allocation.USAGE_SCRIPT)
     }
 
     companion object {

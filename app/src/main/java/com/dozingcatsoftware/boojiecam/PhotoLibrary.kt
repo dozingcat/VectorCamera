@@ -26,7 +26,8 @@ class PhotoLibrary(val rootDirectory: File) {
                   errorFn: (Exception) -> Unit) {
         try {
             Log.i(TAG, "savePhoto start")
-            val sourceImage = processedBitmap.sourceImage
+            // TODO: Support allocations.
+            val sourceImage = processedBitmap.sourceImage!!
             val width = sourceImage.image.width
             val height = sourceImage.image.height
 

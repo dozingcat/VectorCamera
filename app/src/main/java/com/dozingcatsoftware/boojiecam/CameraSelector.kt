@@ -2,6 +2,7 @@ package com.dozingcatsoftware.boojiecam
 
 import android.content.Context
 import android.hardware.camera2.CameraManager
+import android.renderscript.RenderScript
 
 
 enum class ImageSize {
@@ -24,7 +25,7 @@ class CameraSelector(val context: Context) {
         selectedCameraIndex = (1 + selectedCameraIndex) % cameraCount
     }
 
-    fun createImageGenerator(): CameraImageGenerator {
-        return CameraImageGenerator(context, cameraManager, cameraIds[selectedCameraIndex])
+    fun createImageGenerator(rs: RenderScript): CameraImageGenerator {
+        return CameraImageGenerator(context, rs, cameraManager, cameraIds[selectedCameraIndex])
     }
 }

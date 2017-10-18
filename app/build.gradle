@@ -11,6 +11,7 @@ android {
         applicationId "com.dozingcatsoftware.boojiecam"
         minSdkVersion 21
         targetSdkVersion 26
+        renderscriptTargetApi 21
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
