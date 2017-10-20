@@ -9,7 +9,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-abstract class CameraImageProcessor {
+abstract class CameraImageProcessor: AbstractImageProcessor {
     private var consumerThread: Thread? = null
     private var nextImage: CameraImage? = null
     private val threadLock = ReentrantLock()
@@ -27,7 +27,7 @@ abstract class CameraImageProcessor {
 
     }
 
-    fun pause() {
+    override fun pause() {
         debugLog("CameraImageProcessor.pause")
         threadLock.withLock({
             consumerThread = null

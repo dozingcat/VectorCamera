@@ -22,8 +22,7 @@ class MainActivity : Activity() {
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraImageGenerator: CameraImageGenerator
 
-    private lateinit var imageProcessor: CameraImageProcessor
-    private lateinit var allocationProcessor: CameraAllocationProcessor
+    private lateinit var imageProcessor: AbstractImageProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
     private val photoLibrary = PhotoLibrary(
@@ -31,6 +30,7 @@ class MainActivity : Activity() {
 
     private lateinit var rs: RenderScript
 
+    /*
     private val allImageProcessors = arrayOf(
             EdgeColorImageProcessor(),
             EdgeImageProcessor.withFixedColors(0x000000, 0x00ff00),
@@ -41,11 +41,15 @@ class MainActivity : Activity() {
             AsciiImageProcessor(),
             GrayscaleImageGenerator()
     )
-    private val allAllocationProcessors = arrayOf(
-            {rs: RenderScript -> EdgeColorAllocationProcessor(rs)},
-            {rs: RenderScript -> EdgeAllocationProcessor(rs)}
+    */
+    private val allImageProcessors = arrayOf(
+            {EdgeColorAllocationProcessor(rs)},
+            {EdgeAllocationProcessor(rs)},
+            {EdgeImageProcessor.withRadialGradient(0x191970, 0xffff00, 0xff4500)},
+            {AsciiImageProcessor()},
+            {GrayscaleImageGenerator()}
     )
-    private var allocationProcessorIndex = 0;
+    private var processorIndex = 0;
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,8 +61,7 @@ class MainActivity : Activity() {
 
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
-        imageProcessor = allImageProcessors[0]
-        allocationProcessor = allAllocationProcessors[0](rs)
+        imageProcessor = allImageProcessors[0]()
 
         switchCameraButton.setOnClickListener(this::switchToNextCamera)
         switchResolutionButton.setOnClickListener(this::switchResolution)
@@ -144,7 +147,12 @@ class MainActivity : Activity() {
 
     private fun handleImageFromCamera(image: CameraImage) {
         handler.post(fun() {
-            imageProcessor.start(this::handleGeneratedBitmap)
+            val processor = this.imageProcessor
+            if (processor !is CameraImageProcessor) {
+                image.close()
+                return
+            }
+            processor.start(this::handleGeneratedBitmap)
             // Log.i(TAG, "Received image from camera")
             if (image.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
@@ -161,28 +169,28 @@ class MainActivity : Activity() {
                                 image.image.width, image.image.height),
                         image.orientation, image.status, image.timestamp)
                 image.close()
-                imageProcessor.queueImage(inMemoryImage)
+                processor.queueImage(inMemoryImage)
             }
             else {
-                imageProcessor.queueImage(image)
+                processor.queueImage(image)
             }
         })
     }
 
     private fun handleAllocationFromCamera(allocation: CameraAllocation) {
         handler.post(fun() {
+            val processor = this.imageProcessor
+            if (processor !is CameraAllocationProcessor) {
+                allocation.allocation.ioReceive()
+                return
+            }
             // allocation.allocation.ioReceive()
 
             // TODO: Handle saving images.
             Log.i(TAG, "*** Received CameraAllocation")
-
-            if (allocationProcessor == null) {
-                allocation.allocation.ioReceive()
-                return
-            }
-            allocationProcessor.start(this::handleGeneratedBitmap)
-            if (allocationProcessor != null) {
-                allocationProcessor.queueAllocation(allocation)
+            processor.start(this::handleGeneratedBitmap)
+            if (processor != null) {
+                processor.queueAllocation(allocation)
             }
 
         })
@@ -223,12 +231,9 @@ class MainActivity : Activity() {
 
     private fun switchEffect(view: View) {
         imageProcessor.pause()
-        val index = allImageProcessors.indexOf(imageProcessor)
-        imageProcessor = allImageProcessors[(index + 1) % allImageProcessors.size]
 
-        allocationProcessor.pause()
-        allocationProcessorIndex = (allocationProcessorIndex + 1) % allAllocationProcessors.size
-        allocationProcessor = allAllocationProcessors[allocationProcessorIndex](rs)
+        processorIndex = (processorIndex + 1) % allImageProcessors.size
+        imageProcessor = allImageProcessors[processorIndex]()
     }
 
     private fun takePicture(view: View) {

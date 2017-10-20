@@ -13,7 +13,7 @@ import kotlin.concurrent.withLock
 /**
  * Created by brian on 10/15/17.
  */
-abstract class CameraAllocationProcessor(val rs: RenderScript) {
+abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImageProcessor {
     private var consumerThread: Thread? = null
     private var receivedCameraAllocation: CameraAllocation? = null
     private var lastAllocationRef: WeakReference<Allocation>? = null
@@ -31,7 +31,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
         })
     }
 
-    fun pause() {
+    override fun pause() {
         threadLock.withLock({
             consumerThread = null
         })

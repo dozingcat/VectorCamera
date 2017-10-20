@@ -218,7 +218,8 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                 throw IllegalStateException("Invalid status: " + this.status)
             }
         }
-        //request.addTarget(imageReader!!.surface)
+        // TODO: Only add the target we actually need.
+        request.addTarget(imageReader!!.surface)
         request.addTarget(allocation!!.surface)
         if (this.targetStatus == CameraStatus.CAPTURING_PHOTO) {
             captureSession!!.capture(request.build(), null, null)
