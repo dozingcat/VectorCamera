@@ -92,7 +92,7 @@ class EdgeImageProcessor(private val colorTable: IntArray,
 
         fun withLinearGradient(minEdgeColor: Int, gradientStartColor: Int, gradientEndColor: Int)
                 : EdgeImageProcessor {
-            val paintFn = fun(image: PlanarImage, rect: RectF): Paint {
+            val paintFn = fun(_: PlanarImage, rect: RectF): Paint {
                 val p = Paint()
                 p.shader = LinearGradient(
                         rect.left, rect.top, rect.right, rect.bottom,
@@ -105,7 +105,7 @@ class EdgeImageProcessor(private val colorTable: IntArray,
 
         fun withRadialGradient(minEdgeColor: Int, centerColor: Int, outerColor: Int)
                 : EdgeImageProcessor {
-            val paintFn = fun(image: PlanarImage, rect: RectF): Paint {
+            val paintFn = fun(_: PlanarImage, rect: RectF): Paint {
                 val p = Paint()
                 p.shader = RadialGradient(
                         rect.width() / 2, rect.height() / 2,
@@ -116,15 +116,17 @@ class EdgeImageProcessor(private val colorTable: IntArray,
             return EdgeImageProcessor(makeAlphaColorMap(minEdgeColor), paintFn)
         }
 
-        private fun makeRangeColorMap(minEdgeColor: Int, maxEdgeColor: Int): IntArray {
+        private fun makeRangeColorMap(
+                minEdgeColor: Int, maxEdgeColor: Int, size: Int=256): IntArray {
             val r0 = (minEdgeColor shr 16) and 0xff
             val g0 = (minEdgeColor shr 8) and 0xff
             val b0 = (minEdgeColor) and 0xff
             val r1 = (maxEdgeColor shr 16) and 0xff
             val g1 = (maxEdgeColor shr 8) and 0xff
             val b1 = (maxEdgeColor) and 0xff
-            return IntArray(256, fun(index): Int {
-                val fraction = index / 255f
+            val sizef = size.toFloat()
+            return IntArray(size, fun(index): Int {
+                val fraction = index / sizef
                 val r = Math.round(r0 + (r1 - r0) * fraction)
                 val g = Math.round(g0 + (g1 - g0) * fraction)
                 val b = Math.round(b0 + (b1 - b0) * fraction)
@@ -135,10 +137,6 @@ class EdgeImageProcessor(private val colorTable: IntArray,
         private fun makeAlphaColorMap(color: Int): IntArray {
             val colorWithoutAlpha = 0xffffff and color
             return IntArray(256, {i -> ((255 - i) shl 24) or colorWithoutAlpha})
-        }
-
-        private fun addAlpha(color: Int): Int {
-            return 0xff000000.toInt() or color
         }
     }
 }

@@ -167,7 +167,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
             allocation = createRenderscriptAllocation(size)
             allocation!!.setOnBufferAvailableListener({
-                Log.i(TAG, "Got RS buffer")
+                // Log.i(TAG, "Got RS buffer")
                 if (captureSession != null) {
                     if (this.imageAllocationCallback != null) {
                         this.imageAllocationCallback!!(CameraAllocation(

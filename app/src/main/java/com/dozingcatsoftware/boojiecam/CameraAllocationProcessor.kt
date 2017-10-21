@@ -39,7 +39,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
             if (lastAllocationRef != null) {
                 val lastAllocation = lastAllocationRef!!.get()
                 for (i in 0 until allocationUpdateCount) {
-                    lastAllocation!!.ioReceive()
+                    ioReceiveIfInput(lastAllocation)
                 }
                 lastAllocationRef = null
                 allocationUpdateCount = 0
@@ -50,7 +50,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
     fun queueAllocation(cameraAllocation: CameraAllocation) {
         threadLock.withLock({
             if (consumerThread == null) {
-                cameraAllocation.allocation.ioReceive()
+                ioReceiveIfInput(cameraAllocation.allocation)
                 return
             }
         })
@@ -64,7 +64,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
                 }
                 else {
                     for (i in 0 until allocationUpdateCount) {
-                        prevAllocation!!.ioReceive()
+                        ioReceiveIfInput(prevAllocation)
                     }
                     lastAllocationRef = WeakReference(allocation)
                     allocationUpdateCount = 1
@@ -76,7 +76,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
             }
             this.receivedCameraAllocation = cameraAllocation
             allocationAvailable.signal()
-            Log.i(TAG, "queueAllocation, count=" + allocationUpdateCount)
+            debugLog("queueAllocation, count=" + allocationUpdateCount)
         })
     }
 
@@ -99,9 +99,9 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
                         allocationAvailable.awaitNanos(250000000)
                     }
                     else {
-                        Log.i(TAG, "Calling ioReceive, count="+allocationUpdateCount)
+                        debugLog("Calling ioReceive, count="+allocationUpdateCount)
                         for (i in 0 until allocationUpdateCount) {
-                            currentCamAllocation!!.allocation.ioReceive()
+                            ioReceiveIfInput(currentCamAllocation!!.allocation)
                         }
                         allocationUpdateCount = 0
                         receivedCameraAllocation = null

@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.graphics.ImageFormat
+import android.renderscript.Allocation
 import java.io.OutputStream
 import java.nio.ByteBuffer
 
@@ -18,6 +19,10 @@ fun getBufferBytes(buffer: ByteBuffer): ByteArray {
     val arr = ByteArray(buffer.limit())
     buffer.get(arr)
     return arr
+}
+
+inline fun addAlpha(color: Int): Int {
+    return 0xff000000.toInt() or color
 }
 
 fun flattenedYuvImageBytes(image: PlanarImage): ByteArray {
@@ -56,5 +61,11 @@ fun writeBufferToOuptutStream(buffer: ByteBuffer, output: OutputStream) {
         val arr = ByteArray(buffer.limit())
         buffer.get(arr)
         output.write(arr)
+    }
+}
+
+fun ioReceiveIfInput(alloc: Allocation?) {
+    if (alloc != null && (alloc.usage and Allocation.USAGE_IO_INPUT != 0)) {
+        alloc.ioReceive()
     }
 }

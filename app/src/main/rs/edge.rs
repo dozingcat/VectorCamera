@@ -5,10 +5,12 @@
 int gMultiplier = 2;
 int gWidth;
 int gHeight;
+// Created from camera input.
 rs_allocation gYuvInput;
+// Element.RGBA_8888, created from packed RGBA byte array.
 rs_allocation gColorMap;
 
-uchar4 RS_KERNEL computeEdge(uint32_t x, uint32_t y) {
+uchar4 RS_KERNEL computeEdgeWithColorMap(uint32_t x, uint32_t y) {
   int edge = 0;
   if (x > 0 && x < gWidth - 1 && y > 0 && y < gHeight - 1) {
       edge = 8 * rsGetElementAtYuv_uchar_Y(gYuvInput, x, y) -
@@ -21,10 +23,6 @@ uchar4 RS_KERNEL computeEdge(uint32_t x, uint32_t y) {
                  rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y) -
                  rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y + 1);
   }
-  uchar4 out;
-  out.a = 255;
-  out.g = clamp(gMultiplier * edge, 0, 255);
-  out.r = 0;
-  out.b = 0;
-  return out;
+  int index = clamp(gMultiplier * edge, 0, 255);
+  return rsGetElementAt_uchar4(gColorMap, index);
 }

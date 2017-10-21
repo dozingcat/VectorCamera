@@ -19,7 +19,7 @@ class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(
         script!!._gYuvInput = allocation
         script!!._gWidth = allocation.type.x
         script!!._gHeight = allocation.type.y
-        script!!._gMultiplier = minOf(4, maxOf(2, Math.round(allocation.type.x / 480f))).toInt()
+        script!!._gMultiplier = minOf(4, maxOf(2, Math.round(allocation.type.x / 480f)))
 
         if (outputAllocation == null ||
                 outputAllocation!!.type.x != allocation.type.x ||
@@ -39,4 +39,4 @@ class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(
 
         return resultBitmap
     }
-}
+ }

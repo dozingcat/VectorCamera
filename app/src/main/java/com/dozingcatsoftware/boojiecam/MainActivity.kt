@@ -44,8 +44,10 @@ class MainActivity : Activity() {
     */
     private val allImageProcessors = arrayOf(
             {EdgeColorAllocationProcessor(rs)},
-            {EdgeAllocationProcessor(rs)},
-            {EdgeImageProcessor.withRadialGradient(0x191970, 0xffff00, 0xff4500)},
+            {EdgeAllocationProcessor.withFixedColors(rs, 0x000000, 0x00ffff)},
+            {EdgeAllocationProcessor.withFixedColors(rs, 0x004080, 0xffa000)},
+            {EdgeAllocationProcessor.withLinearGradient(rs, 0x000000, 0x00ff00, 0x0000ff)},
+            {EdgeAllocationProcessor.withRadialGradient(rs, 0x191970, 0xffff00, 0xff4500)},
             {AsciiImageProcessor()},
             {GrayscaleImageGenerator()}
     )
@@ -159,7 +161,8 @@ class MainActivity : Activity() {
                 cameraImageGenerator.start(
                         CameraStatus.CAPTURING_PREVIEW,
                         this.targetCameraImageSize(),
-                        this::handleImageFromCamera)
+                        this::handleImageFromCamera,
+                        this::handleAllocationFromCamera)
                 // We're going to save the raw data from the camera image, so extract it now.
                 // (If we wait until handleGeneratedBitmap is called, the underlying
                 // android.media.Image will have been closed).
@@ -177,22 +180,30 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun handleAllocationFromCamera(allocation: CameraAllocation) {
+    private fun handleAllocationFromCamera(camAllocation: CameraAllocation) {
         handler.post(fun() {
             val processor = this.imageProcessor
             if (processor !is CameraAllocationProcessor) {
-                allocation.allocation.ioReceive()
+                camAllocation.allocation.ioReceive()
                 return
             }
             // allocation.allocation.ioReceive()
 
-            // TODO: Handle saving images.
-            Log.i(TAG, "*** Received CameraAllocation")
             processor.start(this::handleGeneratedBitmap)
-            if (processor != null) {
-                processor.queueAllocation(allocation)
+            processor.queueAllocation(camAllocation)
+            if (camAllocation.status == CameraStatus.CAPTURING_PHOTO) {
+                Log.i(TAG, "Saving allocation")
+                Log.i(TAG, "type.count: " + camAllocation.allocation.type.count)
+                Log.i(TAG, "size: " + camAllocation.allocation.bytesSize)
+                Log.i(TAG, "x: " + camAllocation.allocation.type.x)
+                Log.i(TAG, "y: " + camAllocation.allocation.type.y)
+                Log.i(TAG, "z: " + camAllocation.allocation.type.y)
+                cameraImageGenerator.start(
+                        CameraStatus.CAPTURING_PREVIEW,
+                        this.targetCameraImageSize(),
+                        this::handleImageFromCamera,
+                        this::handleAllocationFromCamera)
             }
-
         })
     }
 
