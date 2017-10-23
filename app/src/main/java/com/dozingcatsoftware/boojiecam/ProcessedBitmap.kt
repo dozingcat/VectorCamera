@@ -17,8 +17,8 @@ data class ProcessedBitmap(
         val scaledWidth = bitmap.width * scaleFactor
         val scaledHeight = bitmap.height * scaleFactor
 
-        val flipHorizontal = (sourceImage.orientation == ImageOrientation.ROTATED_180)
-        val flipVertical = (sourceImage.orientation == ImageOrientation.ROTATED_180)
+        val flipHorizontal = sourceImage.orientation.isXFlipped()
+        val flipVertical = sourceImage.orientation.isYFlipped()
         var xOffset = (width - scaledWidth) / 2
         var yOffset = (height - scaledHeight) / 2
 

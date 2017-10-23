@@ -46,6 +46,8 @@ class PhotoLibrary(val rootDirectory: File) {
             val metadata = mapOf(
                     "width" to width,
                     "height" to height,
+                    "xFlipped" to sourceImage.orientation.isXFlipped(),
+                    "yFlipped" to sourceImage.orientation.isYFlipped(),
                     "timestamp" to sourceImage.timestamp
             )
             val json = JSONObject(metadata).toString(2)

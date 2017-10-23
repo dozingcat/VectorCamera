@@ -19,6 +19,7 @@ fun getBufferBytes(buffer: ByteBuffer): ByteArray {
             return arr
         }
     }
+    buffer.position(0)
     val arr = ByteArray(buffer.limit())
     buffer.get(arr)
     return arr
