@@ -27,7 +27,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     var status = CameraStatus.CLOSED
     private var targetStatus = CameraStatus.CLOSED
     private var imageCallback: ((CameraImage) -> Unit)? = null
-    private var imageAllocationCallback: ((CameraAllocation) -> Unit)? = null
+    private var imageAllocationCallback: ((CameraImage) -> Unit)? = null
     private var handler = Handler()
 
     private val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
@@ -50,7 +50,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
     fun start(targetStatus: CameraStatus, targetSize: Size,
               imageCallback: ((CameraImage) -> Unit)?,
-              imageAllocationCallback: ((CameraAllocation) -> Unit)? = null) {
+              imageAllocationCallback: ((CameraImage) -> Unit)? = null) {
         this.captureSize = pickBestSize(
                 cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                         .getOutputSizes(ImageFormat.YUV_420_888),
@@ -148,7 +148,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                 if (image != null) {
                     if (captureSession != null) {
                         if (this.imageCallback != null) {
-                            this.imageCallback!!(CameraImage(
+                            this.imageCallback!!(CameraImage.withImage(
                                     PlanarImage.fromMediaImage(image),
                                     imageOrientation,
                                     this.status,
@@ -170,7 +170,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                 // Log.i(TAG, "Got RS buffer")
                 if (captureSession != null) {
                     if (this.imageAllocationCallback != null) {
-                        this.imageAllocationCallback!!(CameraAllocation(
+                        this.imageAllocationCallback!!(CameraImage.withAllocation(
                                 allocation!!,
                                 imageOrientation,
                                 this.status,
@@ -250,6 +250,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         yuvTypeBuilder.setX(size.width)
         yuvTypeBuilder.setY(size.height)
         yuvTypeBuilder.setYuvFormat(ImageFormat.YUV_420_888)
+        // yuvTypeBuilder.setYuvFormat(ImageFormat.NV21)
         return Allocation.createTyped(rs, yuvTypeBuilder.create(),
                 Allocation.USAGE_IO_INPUT or Allocation.USAGE_SCRIPT)
     }

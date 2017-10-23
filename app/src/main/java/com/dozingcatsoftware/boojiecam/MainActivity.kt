@@ -147,11 +147,12 @@ class MainActivity : Activity() {
         })
     }
 
+    // Combine handleImageFromCamera and handleAllocationFromCamera?
     private fun handleImageFromCamera(image: CameraImage) {
         handler.post(fun() {
             val processor = this.imageProcessor
             if (processor !is CameraImageProcessor) {
-                image.close()
+                image.closeImage()
                 return
             }
             processor.start(this::handleGeneratedBitmap)
@@ -163,47 +164,30 @@ class MainActivity : Activity() {
                         this.targetCameraImageSize(),
                         this::handleImageFromCamera,
                         this::handleAllocationFromCamera)
-                // We're going to save the raw data from the camera image, so extract it now.
-                // (If we wait until handleGeneratedBitmap is called, the underlying
-                // android.media.Image will have been closed).
-                val yuvBytes = flattenedYuvImageBytes(image.image)
-                val inMemoryImage = CameraImage(
-                        PlanarImage.fromFlattenedYuvBytes(yuvBytes,
-                                image.image.width, image.image.height),
-                        image.orientation, image.status, image.timestamp)
-                image.close()
-                processor.queueImage(inMemoryImage)
             }
-            else {
-                processor.queueImage(image)
-            }
+            processor.queueImage(image)
         })
     }
 
-    private fun handleAllocationFromCamera(camAllocation: CameraAllocation) {
+    private fun handleAllocationFromCamera(camAllocation: CameraImage) {
         handler.post(fun() {
             val processor = this.imageProcessor
             if (processor !is CameraAllocationProcessor) {
-                camAllocation.allocation.ioReceive()
+                camAllocation.allocation!!.ioReceive()
                 return
             }
             // allocation.allocation.ioReceive()
 
             processor.start(this::handleGeneratedBitmap)
-            processor.queueAllocation(camAllocation)
             if (camAllocation.status == CameraStatus.CAPTURING_PHOTO) {
-                Log.i(TAG, "Saving allocation")
-                Log.i(TAG, "type.count: " + camAllocation.allocation.type.count)
-                Log.i(TAG, "size: " + camAllocation.allocation.bytesSize)
-                Log.i(TAG, "x: " + camAllocation.allocation.type.x)
-                Log.i(TAG, "y: " + camAllocation.allocation.type.y)
-                Log.i(TAG, "z: " + camAllocation.allocation.type.y)
+                Log.i(TAG, "Restarting preview capture")
                 cameraImageGenerator.start(
                         CameraStatus.CAPTURING_PREVIEW,
                         this.targetCameraImageSize(),
                         this::handleImageFromCamera,
                         this::handleAllocationFromCamera)
             }
+            processor.queueAllocation(camAllocation)
         })
     }
 

@@ -1,11 +1,7 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.graphics.*
-import android.media.Image
 import android.util.Log
-import java.io.ByteArrayOutputStream
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -33,7 +29,7 @@ abstract class CameraImageProcessor: AbstractImageProcessor {
             consumerThread = null
         })
         imageLock.withLock({
-            nextImage?.close()
+            nextImage?.closeImage()
             nextImage = null
         })
     }
@@ -41,7 +37,7 @@ abstract class CameraImageProcessor: AbstractImageProcessor {
     fun queueImage(image: CameraImage) {
         threadLock.withLock({
             if (consumerThread == null) {
-                image.close()
+                image.closeImage()
                 return
             }
         })
@@ -49,7 +45,7 @@ abstract class CameraImageProcessor: AbstractImageProcessor {
             debugLog("Setting image: " + image.hashCode())
             if (nextImage != null) {
                 debugLog("Closing previous: " + nextImage!!.hashCode())
-                nextImage!!.close()
+                nextImage!!.closeImage()
                 nextImage = image
             }
             else {
@@ -87,15 +83,20 @@ abstract class CameraImageProcessor: AbstractImageProcessor {
             }
             if (!shouldCurrentThreadContinue()) {
                 debugLog("Closing image before thread exits: " + image!!.hashCode())
-                image!!.close()
+                image!!.closeImage()
                 image = null
                 return
             }
             try {
-                val bitmap = createBitmapFromImage(image!!.image)
-                val backgroundPaintFn = createPaintFn(image!!.image)
-                image!!.close()
-                callback(ProcessedBitmap(image!!, null, bitmap, backgroundPaintFn))
+                val planarImage = image!!.image!!
+                val bitmap = createBitmapFromImage(planarImage)
+                val backgroundPaintFn = createPaintFn(planarImage)
+                var yuvBytes: ByteArray? = null
+                if (image!!.status == CameraStatus.CAPTURING_PHOTO) {
+                    yuvBytes = flattenedYuvImageBytes(planarImage)
+                }
+                image!!.closeImage()
+                callback(ProcessedBitmap(image!!, bitmap, backgroundPaintFn, yuvBytes))
                 image = null
             }
             catch (ex: Exception) {
@@ -110,7 +111,7 @@ abstract class CameraImageProcessor: AbstractImageProcessor {
             finally {
                 if (image != null) {
                     debugLog("Closing image after processing: " + (image?.hashCode()))
-                    image?.close()
+                    image?.closeImage()
                     image = null
                 }
             }
@@ -118,10 +119,6 @@ abstract class CameraImageProcessor: AbstractImageProcessor {
     }
 
     abstract fun createBitmapFromImage(image: PlanarImage): Bitmap
-
-    open fun createBitmapFromAllocation(allocation: CameraAllocation): Bitmap? {
-        return null
-    }
 
     open fun createPaintFn(image: PlanarImage): (RectF) -> Paint? {
         return {null}

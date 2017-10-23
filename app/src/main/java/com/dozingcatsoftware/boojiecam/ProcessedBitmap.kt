@@ -3,20 +3,10 @@ package com.dozingcatsoftware.boojiecam
 import android.graphics.*
 
 data class ProcessedBitmap(
-        val sourceImage: CameraImage?,
-        val sourceAllocation: CameraAllocation?,
+        val sourceImage: CameraImage,
         val bitmap: Bitmap,
-        val backgroundPaintFn: (RectF) -> Paint?) {
-
-    fun orientation(): ImageOrientation {
-        if (sourceImage != null) {
-            return sourceImage!!.orientation
-        }
-        if (sourceAllocation != null) {
-            return sourceAllocation!!.orientation
-        }
-        throw IllegalStateException("No source")
-    }
+        val backgroundPaintFn: (RectF) -> Paint?,
+        val yuvBytes: ByteArray? = null) {
 
     fun renderToCanvas(canvas: Canvas, width: Int, height: Int, outsidePaint: Paint? = null,
                        tmpRect: RectF? = null, tmpMatrix: Matrix? = null) {
@@ -27,9 +17,8 @@ data class ProcessedBitmap(
         val scaledWidth = bitmap.width * scaleFactor
         val scaledHeight = bitmap.height * scaleFactor
 
-        // TODO: Support allocations.
-        val flipHorizontal = (orientation() == ImageOrientation.ROTATED_180)
-        val flipVertical = (orientation() == ImageOrientation.ROTATED_180)
+        val flipHorizontal = (sourceImage.orientation == ImageOrientation.ROTATED_180)
+        val flipVertical = (sourceImage.orientation == ImageOrientation.ROTATED_180)
         var xOffset = (width - scaledWidth) / 2
         var yOffset = (height - scaledHeight) / 2
 

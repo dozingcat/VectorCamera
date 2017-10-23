@@ -11,11 +11,11 @@ class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge_color? = null
 
-    override fun createBitmap(camAllocation: CameraAllocation): Bitmap {
+    override fun createBitmap(camAllocation: CameraImage): Bitmap {
         if (script == null) {
             script = ScriptC_edge_color(rs)
         }
-        val allocation = camAllocation.allocation
+        val allocation = camAllocation.allocation!!
         script!!._gYuvInput = allocation
         script!!._gWidth = allocation.type.x
         script!!._gHeight = allocation.type.y

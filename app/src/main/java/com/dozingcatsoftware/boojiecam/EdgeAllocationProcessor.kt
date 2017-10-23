@@ -11,16 +11,16 @@ import android.renderscript.Type
  */
 class EdgeAllocationProcessor(rs: RenderScript,
                               private val colorTable: Allocation,
-                              private val paintFn: (CameraAllocation, RectF) -> Paint?):
+                              private val paintFn: (CameraImage, RectF) -> Paint?):
         CameraAllocationProcessor(rs) {
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge? = null
 
-    override fun createBitmap(camAllocation: CameraAllocation): Bitmap {
+    override fun createBitmap(camAllocation: CameraImage): Bitmap {
         if (script == null) {
             script = ScriptC_edge(rs)
         }
-        val allocation = camAllocation.allocation
+        val allocation = camAllocation.allocation!!
         script!!._gYuvInput = allocation
         script!!._gWidth = allocation.type.x
         script!!._gHeight = allocation.type.y
@@ -46,7 +46,7 @@ class EdgeAllocationProcessor(rs: RenderScript,
         return resultBitmap
     }
 
-    override fun createPaintFn(camAllocation: CameraAllocation): (RectF) -> Paint? {
+    override fun createPaintFn(camAllocation: CameraImage): (RectF) -> Paint? {
         return {rect -> paintFn(camAllocation, rect)}
     }
 
@@ -60,7 +60,7 @@ class EdgeAllocationProcessor(rs: RenderScript,
         fun withLinearGradient(
                 rs: RenderScript, minEdgeColor: Int,
                 gradientStartColor: Int, gradientEndColor: Int): EdgeAllocationProcessor {
-            val paintFn = fun(_: CameraAllocation, rect: RectF): Paint {
+            val paintFn = fun(_: CameraImage, rect: RectF): Paint {
                 val p = Paint()
                 p.shader = LinearGradient(
                         rect.left, rect.top, rect.right, rect.bottom,
@@ -74,7 +74,7 @@ class EdgeAllocationProcessor(rs: RenderScript,
         fun withRadialGradient(
                 rs: RenderScript, minEdgeColor: Int,
                 centerColor: Int, outerColor: Int): EdgeAllocationProcessor {
-            val paintFn = fun(_: CameraAllocation, rect: RectF): Paint {
+            val paintFn = fun(_: CameraImage, rect: RectF): Paint {
                 val p = Paint()
                 p.shader = RadialGradient(
                         rect.width() / 2, rect.height() / 2,

@@ -3,7 +3,6 @@ package com.dozingcatsoftware.boojiecam
 import android.graphics.Bitmap
 import android.util.Log
 import org.json.JSONObject
-import org.json.JSONStringer
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -27,9 +26,9 @@ class PhotoLibrary(val rootDirectory: File) {
         try {
             Log.i(TAG, "savePhoto start")
             // TODO: Support allocations.
-            val sourceImage = processedBitmap.sourceImage!!
-            val width = sourceImage.image.width
-            val height = sourceImage.image.height
+            val sourceImage = processedBitmap.sourceImage
+            val width = sourceImage.width()
+            val height = sourceImage.height()
 
             val photoId = PHOTO_ID_FORMAT.format(Date(sourceImage.timestamp))
             val photoDir = File(rootDirectory, photoId)
@@ -37,9 +36,7 @@ class PhotoLibrary(val rootDirectory: File) {
 
             val rawImageFile = File(photoDir, "image.gz")
             GZIPOutputStream(FileOutputStream(rawImageFile)).use({
-                for (plane in sourceImage.image.planes) {
-                    writeBufferToOuptutStream(plane.buffer, it)
-                }
+                it.write(processedBitmap.yuvBytes)
             })
             val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
             val compressedSize = rawImageFile.length()

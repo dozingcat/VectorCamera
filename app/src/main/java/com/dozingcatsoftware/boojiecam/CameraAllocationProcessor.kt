@@ -15,7 +15,7 @@ import kotlin.concurrent.withLock
  */
 abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImageProcessor {
     private var consumerThread: Thread? = null
-    private var receivedCameraAllocation: CameraAllocation? = null
+    private var receivedCameraAllocation: CameraImage? = null
     private var lastAllocationRef: WeakReference<Allocation>? = null
     private var allocationUpdateCount = 0
     private val threadLock = ReentrantLock()
@@ -47,7 +47,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
         })
     }
 
-    fun queueAllocation(cameraAllocation: CameraAllocation) {
+    fun queueAllocation(cameraAllocation: CameraImage) {
         threadLock.withLock({
             if (consumerThread == null) {
                 ioReceiveIfInput(cameraAllocation.allocation)
@@ -56,7 +56,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
         })
 
         allocationLock.withLock({
-            val allocation = cameraAllocation.allocation
+            val allocation = cameraAllocation.allocation!!
             if (lastAllocationRef != null) {
                 val prevAllocation = lastAllocationRef!!.get()
                 if (prevAllocation == allocation) {
@@ -87,7 +87,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
     }
 
     private fun threadEntry(callback: (ProcessedBitmap) -> Unit) {
-        var currentCamAllocation: CameraAllocation? = null
+        var currentCamAllocation: CameraImage? = null
         while (true) {
             while (currentCamAllocation == null) {
                 if (!shouldCurrentThreadContinue()) {
@@ -111,14 +111,19 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
 
             val bitmap = createBitmap(currentCamAllocation!!)
             val backgroundPaintFn = createPaintFn(currentCamAllocation!!)
-            callback(ProcessedBitmap(null, currentCamAllocation, bitmap, backgroundPaintFn))
+            var yuvBytes: ByteArray? = null
+            if (currentCamAllocation!!.status == CameraStatus.CAPTURING_PHOTO) {
+                yuvBytes = flattenedYuvImageBytes(rs, currentCamAllocation!!.allocation!!)
+            }
+            callback(ProcessedBitmap(
+                    currentCamAllocation!!, bitmap, backgroundPaintFn, yuvBytes))
             currentCamAllocation = null
         }
     }
 
-    abstract fun createBitmap(camAllocation: CameraAllocation): Bitmap
+    abstract fun createBitmap(camAllocation: CameraImage): Bitmap
 
-    open fun createPaintFn(camAllocation: CameraAllocation): (RectF) -> Paint? {
+    open fun createPaintFn(camAllocation: CameraImage): (RectF) -> Paint? {
         return {null}
     }
 
