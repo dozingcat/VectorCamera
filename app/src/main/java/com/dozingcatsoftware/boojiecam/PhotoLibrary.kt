@@ -25,7 +25,6 @@ class PhotoLibrary(val rootDirectory: File) {
                   errorFn: (Exception) -> Unit) {
         try {
             Log.i(TAG, "savePhoto start")
-            // TODO: Support allocations.
             val sourceImage = processedBitmap.sourceImage
             val width = sourceImage.width()
             val height = sourceImage.height()
@@ -56,21 +55,25 @@ class PhotoLibrary(val rootDirectory: File) {
             })
 
             // Write full size image and thumbnail.
-            // TODO: Scan PNG file, ensure .nomedia file exists in thumbnails dir.
+            // TODO: Scan image with MediaConnectionScanner
             run {
                 val resultBitmap = processedBitmap.renderBitmap(width, height)
-                val pngOutputStream = FileOutputStream(File(rootDirectory, photoId + ".png"))
+                val pngOutputStream = FileOutputStream(File(rootDirectory, photoId + ".jpg"))
                 pngOutputStream.use({
-                    resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
                 })
             }
             run {
                 thumbnailDirectory.mkdirs()
+                val noMediaFile = File(thumbnailDirectory, ".nomedia")
+                if (!noMediaFile.exists()) {
+                    noMediaFile.createNewFile()
+                }
                 val thumbnailOutputStream =
-                        FileOutputStream(File(thumbnailDirectory, photoId + ".png"))
+                        FileOutputStream(File(thumbnailDirectory, photoId + ".jpg"))
                 val thumbnailBitmap = processedBitmap.renderBitmap(thumbnailWidth, thumbnailHeight)
                 thumbnailOutputStream.use({
-                    thumbnailBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
                 })
             }
 
