@@ -56,7 +56,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript): AbstractImagePro
         })
 
         allocationLock.withLock({
-            val allocation = cameraAllocation.allocation!!
+            val allocation = cameraAllocation.allocation
             if (lastAllocationRef != null) {
                 val prevAllocation = lastAllocationRef!!.get()
                 if (prevAllocation == allocation) {

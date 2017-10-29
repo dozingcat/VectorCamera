@@ -18,7 +18,6 @@ import java.io.File
 class MainActivity : Activity() {
 
     private val handler = Handler()
-    private val lifeGenerator = LifeBitmapGenerator()
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraImageGenerator: CameraImageGenerator
 
@@ -47,9 +46,9 @@ class MainActivity : Activity() {
             {EdgeAllocationProcessor.withFixedColors(rs, 0x000000, 0x00ffff)},
             {EdgeAllocationProcessor.withFixedColors(rs, 0x004080, 0xffa000)},
             {EdgeAllocationProcessor.withLinearGradient(rs, 0x000000, 0x00ff00, 0x0000ff)},
-            {EdgeAllocationProcessor.withRadialGradient(rs, 0x191970, 0xffff00, 0xff4500)},
-            {AsciiImageProcessor()},
-            {GrayscaleImageGenerator()}
+            {EdgeAllocationProcessor.withRadialGradient(rs, 0x191970, 0xffff00, 0xff4500)}
+            //{AsciiImageProcessor()},
+            //{GrayscaleImageGenerator()}
     )
     private var processorIndex = 0;
 
@@ -79,7 +78,6 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
-        lifeGenerator.pause()
         imageProcessor.pause()
         cameraImageGenerator.stop()
         super.onPause()
@@ -108,7 +106,7 @@ class MainActivity : Activity() {
                     cameraImageGenerator.start(
                             CameraStatus.CAPTURING_PREVIEW,
                             this.targetCameraImageSize(),
-                            this::handleImageFromCamera)
+                            this::handleAllocationFromCamera)
                 }
             }
         }
@@ -119,7 +117,6 @@ class MainActivity : Activity() {
             cameraImageGenerator.start(
                     CameraStatus.CAPTURING_PREVIEW,
                     this.targetCameraImageSize(),
-                    this::handleImageFromCamera,
                     this::handleAllocationFromCamera)
         }
         else {
@@ -147,28 +144,6 @@ class MainActivity : Activity() {
         })
     }
 
-    // Combine handleImageFromCamera and handleAllocationFromCamera?
-    private fun handleImageFromCamera(image: CameraImage) {
-        handler.post(fun() {
-            val processor = this.imageProcessor
-            if (processor !is CameraImageProcessor) {
-                image.closeImage()
-                return
-            }
-            processor.start(this::handleGeneratedBitmap)
-            // Log.i(TAG, "Received image from camera")
-            if (image.status == CameraStatus.CAPTURING_PHOTO) {
-                Log.i(TAG, "Restarting preview capture")
-                cameraImageGenerator.start(
-                        CameraStatus.CAPTURING_PREVIEW,
-                        this.targetCameraImageSize(),
-                        this::handleImageFromCamera,
-                        this::handleAllocationFromCamera)
-            }
-            processor.queueImage(image)
-        })
-    }
-
     private fun handleAllocationFromCamera(camAllocation: CameraImage) {
         handler.post(fun() {
             val processor = this.imageProcessor
@@ -184,7 +159,6 @@ class MainActivity : Activity() {
                 cameraImageGenerator.start(
                         CameraStatus.CAPTURING_PREVIEW,
                         this.targetCameraImageSize(),
-                        this::handleImageFromCamera,
                         this::handleAllocationFromCamera)
             }
             processor.queueAllocation(camAllocation)
@@ -197,7 +171,6 @@ class MainActivity : Activity() {
         cameraImageGenerator.start(
                 CameraStatus.CAPTURING_PREVIEW,
                 this.targetCameraImageSize(),
-                this::handleImageFromCamera,
                 this::handleAllocationFromCamera)
     }
 
@@ -239,7 +212,6 @@ class MainActivity : Activity() {
         cameraImageGenerator.start(
                 CameraStatus.CAPTURING_PHOTO,
                 this.cameraImageSizeForSavedPicture(),
-                this::handleImageFromCamera,
                 this::handleAllocationFromCamera)
     }
 

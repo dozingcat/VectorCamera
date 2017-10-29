@@ -8,7 +8,7 @@ import android.graphics.Paint
 /**
  * Created by brian on 10/13/17.
  */
-class AsciiImageProcessor: CameraImageProcessor() {
+class AsciiImageProcessor {
     var numCharacterColumns = 80
     var charAspectRatio = 9.0 / 7
     var backgroundColor = Color.argb(255, 0, 0, 0)
@@ -32,7 +32,7 @@ class AsciiImageProcessor: CameraImageProcessor() {
         }
     }
 
-    override fun createBitmapFromImage(image: PlanarImage): Bitmap {
+    fun createBitmapFromImage(image: PlanarImage): Bitmap {
         val resultBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         val width = image.width
         val height = image.height

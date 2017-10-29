@@ -3,7 +3,6 @@ package com.dozingcatsoftware.boojiecam
 import android.content.Context
 import android.graphics.ImageFormat
 import android.hardware.camera2.*
-import android.media.ImageReader
 import android.os.Handler
 import android.renderscript.Allocation
 import android.renderscript.Element
@@ -21,12 +20,10 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
 
     private var camera: CameraDevice? = null
-    private var imageReader: ImageReader? = null
     private var captureSession: CameraCaptureSession? = null
     private var captureSize: Size? = null
     var status = CameraStatus.CLOSED
     private var targetStatus = CameraStatus.CLOSED
-    private var imageCallback: ((CameraImage) -> Unit)? = null
     private var imageAllocationCallback: ((CameraImage) -> Unit)? = null
     private var handler = Handler()
 
@@ -49,14 +46,12 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     }()
 
     fun start(targetStatus: CameraStatus, targetSize: Size,
-              imageCallback: ((CameraImage) -> Unit)?,
               imageAllocationCallback: ((CameraImage) -> Unit)? = null) {
         this.captureSize = pickBestSize(
                 cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                         .getOutputSizes(ImageFormat.YUV_420_888),
                 targetSize)
         this.targetStatus = targetStatus
-        this.imageCallback = imageCallback
         this.imageAllocationCallback = imageAllocationCallback
 
         if (this.status.isCapturing()) {
@@ -136,34 +131,6 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         try {
             val size = this.captureSize!!
             Log.i(TAG, "Using camera size: " + size)
-            imageReader = ImageReader.newInstance(size.width, size.height,
-                    ImageFormat.YUV_420_888, 4)
-            imageReader!!.setOnImageAvailableListener({ reader ->
-                val image = try {
-                    reader.acquireLatestImage()
-                } catch (ex: IllegalStateException) {
-                    Log.w(TAG, "max images already acquired")
-                    null
-                }
-                if (image != null) {
-                    if (captureSession != null) {
-                        if (this.imageCallback != null) {
-                            this.imageCallback!!(CameraImage.withImage(
-                                    PlanarImage.fromMediaImage(image),
-                                    imageOrientation,
-                                    this.status,
-                                    this.timestampFn()))
-                        }
-                        else {
-                            image.close()
-                        }
-                    }
-                    else {
-                        Log.i(TAG, "captureSession is null, closing image")
-                        image.close()
-                    }
-                }
-            }, null)
 
             allocation = createRenderscriptAllocation(size)
             allocation!!.setOnBufferAvailableListener({
@@ -183,7 +150,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             })
 
             camera!!.createCaptureSession(
-                    listOf(imageReader!!.surface, allocation!!.surface),
+                    listOf(allocation!!.surface),
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) {
                             captureSession = session
@@ -218,8 +185,6 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                 throw IllegalStateException("Invalid status: " + this.status)
             }
         }
-        // TODO: Only add the target we actually need.
-        request.addTarget(imageReader!!.surface)
         request.addTarget(allocation!!.surface)
         if (this.targetStatus == CameraStatus.CAPTURING_PHOTO) {
             captureSession!!.capture(request.build(), null, null)
@@ -234,8 +199,6 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         Log.i(TAG, "stopCameraSession")
         captureSession?.close()
         captureSession = null
-        imageReader?.close()
-        imageReader = null
     }
 
     private fun stopCamera() {
