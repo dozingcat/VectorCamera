@@ -7,25 +7,23 @@ import android.renderscript.RenderScript
 import android.renderscript.Type
 
 /**
- * Created by brian on 10/18/17.
+ * Created by brian on 10/29/17.
  */
-class EdgeAllocationProcessor(rs: RenderScript,
-                              private val colorTable: Allocation,
-                              private val paintFn: (CameraImage, RectF) -> Paint?):
+class SolidColorAllocationProcessor(rs: RenderScript,
+                                    private val colorTable: Allocation,
+                                    private val paintFn: (CameraImage, RectF) -> Paint?):
         CameraAllocationProcessor(rs) {
+
     private var outputAllocation: Allocation? = null
-    private var script: ScriptC_edge? = null
+    private var script: ScriptC_solid? = null
 
     override fun createBitmap(camAllocation: CameraImage): Bitmap {
         if (script == null) {
-            script = ScriptC_edge(rs)
+            script = ScriptC_solid(rs)
         }
         val allocation = camAllocation.allocation!!
-        script!!._gYuvInput = allocation
-        script!!._gWidth = allocation.type.x
-        script!!._gHeight = allocation.type.y
-        script!!._gMultiplier = minOf(4, maxOf(2, Math.round(allocation.type.x / 480f)))
-        script!!._gColorMap = colorTable
+        script!!._yuvInput = allocation
+        script!!._colorMap = colorTable
 
         if (outputAllocation == null ||
                 outputAllocation!!.type.x != allocation.type.x ||
@@ -37,7 +35,7 @@ class EdgeAllocationProcessor(rs: RenderScript,
                     Allocation.USAGE_SCRIPT)
         }
 
-        script!!.forEach_computeEdgeWithColorMap(outputAllocation)
+        script!!.forEach_computeColor(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
                 allocation.type.x, allocation.type.y, Bitmap.Config.ARGB_8888)
@@ -52,8 +50,8 @@ class EdgeAllocationProcessor(rs: RenderScript,
 
     companion object {
         fun withFixedColors(rs: RenderScript,
-                            minEdgeColor: Int, maxEdgeColor: Int): EdgeAllocationProcessor {
-            return EdgeAllocationProcessor(
+                            minEdgeColor: Int, maxEdgeColor: Int): SolidColorAllocationProcessor {
+            return SolidColorAllocationProcessor(
                     rs, makeAllocationColorMap(rs, minEdgeColor, maxEdgeColor), {_, _ -> null})
         }
 
@@ -84,6 +82,5 @@ class EdgeAllocationProcessor(rs: RenderScript,
             }
             return EdgeAllocationProcessor(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
         }
-
     }
 }

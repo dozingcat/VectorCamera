@@ -29,24 +29,18 @@ class MainActivity : Activity() {
 
     private lateinit var rs: RenderScript
 
-    /*
-    private val allImageProcessors = arrayOf(
-            EdgeColorImageProcessor(),
-            EdgeImageProcessor.withFixedColors(0x000000, 0x00ff00),
-            EdgeImageProcessor.withFixedColors(0x00ffff, 0xff0000),
-            EdgeImageProcessor.withFixedColors(0xffffff, 0x000000),
-            EdgeImageProcessor.withLinearGradient(0x000000, 0xff0000, 0x0000ff),
-            EdgeImageProcessor.withRadialGradient(0x191970, 0xffff00, 0xff4500),
-            AsciiImageProcessor(),
-            GrayscaleImageGenerator()
-    )
-    */
     private val allImageProcessors = arrayOf(
             {EdgeColorAllocationProcessor(rs)},
-            {EdgeAllocationProcessor.withFixedColors(rs, 0x000000, 0x00ffff)},
-            {EdgeAllocationProcessor.withFixedColors(rs, 0x004080, 0xffa000)},
-            {EdgeAllocationProcessor.withLinearGradient(rs, 0x000000, 0x00ff00, 0x0000ff)},
-            {EdgeAllocationProcessor.withRadialGradient(rs, 0x191970, 0xffff00, 0xff4500)}
+            {EdgeAllocationProcessor.withFixedColors(
+                    rs, 0x000000, 0x00ffff)},
+            {EdgeAllocationProcessor.withFixedColors(
+                    rs, 0x004080, 0xffa000)},
+            {EdgeAllocationProcessor.withLinearGradient(
+                    rs, 0x000000, 0x00ff00, 0x0000ff)},
+            {EdgeAllocationProcessor.withRadialGradient(
+                    rs, 0x191970, 0xffff00, 0xff4500)},
+            {SolidColorAllocationProcessor.withFixedColors(
+                    rs, 0x000000, 0xffffff)}
             //{AsciiImageProcessor()},
             //{GrayscaleImageGenerator()}
     )
