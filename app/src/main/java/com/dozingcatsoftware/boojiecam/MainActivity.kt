@@ -40,9 +40,8 @@ class MainActivity : Activity() {
             {EdgeAllocationProcessor.withRadialGradient(
                     rs, 0x191970, 0xffff00, 0xff4500)},
             {SolidColorAllocationProcessor.withFixedColors(
-                    rs, 0x000000, 0xffffff)}
-            //{AsciiImageProcessor()},
-            //{GrayscaleImageGenerator()}
+                    rs, 0x000000, 0xffffff)},
+            {AsciiAllocationProcessor(rs)}
     )
     private var processorIndex = 0;
 
@@ -67,7 +66,6 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Log.i(TAG, "onResume")
-        // lifeGenerator.start(this::handleGeneratedBitmap)
         checkPermissionAndStartCamera()
     }
 

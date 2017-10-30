@@ -13,6 +13,7 @@ class EdgeAllocationProcessor(rs: RenderScript,
                               private val colorTable: Allocation,
                               private val paintFn: (CameraImage, RectF) -> Paint?):
         CameraAllocationProcessor(rs) {
+
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge? = null
 
