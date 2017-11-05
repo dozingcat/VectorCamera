@@ -8,24 +8,21 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.Type
-import android.util.Log
 
 /**
  * Created by brian on 10/13/17.
  */
 class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) {
-    var numCharacterColumns = 80
-    var charAspectRatio = 9.0 / 7
+    var characterWidthInPixels = 10
+    var charHeightOverWidth = 9.0 / 7
     var backgroundColor = Color.argb(255, 0, 0, 0)
     var textColor = Color.argb(255, 255, 255, 255)
     var pixelChars = " .:oO8#"
 
-    private var outputAllocation: Allocation? = null
-    private var script: ScriptC_ascii? = null
-
-    // private var resultBitmap1: Bitmap? = null
-    // private var resultBitmap2: Bitmap? = null
-    // private var lastUsedBitmap: Bitmap? = null
+    private var asciiBlockAllocation: Allocation? = null
+    private var characterTemplateAllocation: Allocation? = null
+    private var bitmapOutputAllocation: Allocation? = null
+    private val script = ScriptC_ascii(rs)
 
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
@@ -43,57 +40,72 @@ class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) 
     override fun createBitmap(camAllocation: CameraImage): Bitmap {
         val width = camAllocation.width()
         val height = camAllocation.height()
+        // TODO: Reuse resultBitmap and charBitmap if possible.
         val resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val charPixelWidth = width / numCharacterColumns
-        val charPixelHeight = Math.floor(charPixelWidth * charAspectRatio).toInt()
+        val charPixelWidth = characterWidthInPixels
+        val charPixelHeight = Math.floor(charPixelWidth * charHeightOverWidth).toInt()
         val numCharacterRows = height / charPixelHeight
+        val numCharacterColumns = width / charPixelWidth
 
-        val result = computeAsciiResult(
-                camAllocation, pixelChars,
-                charPixelWidth, charPixelHeight, numCharacterColumns, numCharacterRows)
-
-        val canvas = Canvas(resultBitmap)
-        canvas.drawColor(backgroundColor)
+        // Create Bitmap and draw each character into it.
         val paint = Paint()
         paint.textSize = charPixelHeight.toFloat()
         paint.color = textColor
-        for (row in 0 until result.numRows) {
-            val y = (row * charPixelHeight).toFloat()
-            for (col in 0 until result.numCols) {
-                val x = (col * charPixelWidth).toFloat()
-                canvas.drawText(result.charAtRowAndColumn(row, col).toString(), x, y, paint)
-            }
+
+        val charBitmap = Bitmap.createBitmap(
+                charPixelWidth * pixelChars.length, charPixelHeight, Bitmap.Config.ARGB_8888)
+        val charBitmapCanvas = Canvas(charBitmap)
+        charBitmapCanvas.drawColor(backgroundColor)
+
+        for (i in 0 until pixelChars.length) {
+            charBitmapCanvas.drawText(
+                    pixelChars[i].toString(), (i * charPixelWidth).toFloat(), charPixelHeight - 1f, paint)
         }
+
+        val result = computeAsciiResult(
+                camAllocation, pixelChars,
+                charPixelWidth, charPixelHeight, numCharacterColumns, numCharacterRows, charBitmap)
+
+        bitmapOutputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap
     }
 
     fun computeAsciiResult(camAllocation: CameraImage, pixelChars: String,
                            charPixelWidth: Int, charPixelHeight: Int,
-                           numCharacterColumns: Int, numCharacterRows: Int): AsciiResult {
-        if (script == null) {
-            script = ScriptC_ascii(rs)
+                           numCharacterColumns: Int, numCharacterRows: Int,
+                           charBitmap: Bitmap): AsciiResult {
+        if (!allocationHas2DSize(asciiBlockAllocation, numCharacterColumns, numCharacterRows)) {
+            asciiBlockAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    numCharacterColumns, numCharacterRows)
         }
-        if (outputAllocation == null ||
-                outputAllocation!!.type.x != numCharacterColumns ||
-                outputAllocation!!.type.y != numCharacterRows) {
-            val outputTypeBuilder = Type.Builder(rs, Element.RGBA_8888(rs))
-            outputTypeBuilder.setX(numCharacterColumns)
-            outputTypeBuilder.setY(numCharacterRows)
-            outputAllocation = Allocation.createTyped(rs, outputTypeBuilder.create(),
-                    Allocation.USAGE_SCRIPT)
+        if (!allocationHas2DSize(
+                bitmapOutputAllocation, camAllocation.width(), camAllocation.height())) {
+            bitmapOutputAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    camAllocation.width(), camAllocation.height())
         }
+        if (!allocationHas2DSize(characterTemplateAllocation,
+                pixelChars.length * charPixelWidth, charPixelHeight)) {
+            characterTemplateAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    pixelChars.length * charPixelWidth, charPixelHeight)
+        }
+        characterTemplateAllocation!!.copyFrom(charBitmap)
 
-        script!!._yuvInput = camAllocation.allocation
-        script!!._imageWidth = camAllocation.width()
-        script!!._imageHeight = camAllocation.height()
-        script!!._numCharColumns = numCharacterColumns
-        script!!._numCharRows = numCharacterRows
+        script._yuvInput = camAllocation.allocation
+        script._characterBitmapInput = characterTemplateAllocation
+        script._imageOutput = bitmapOutputAllocation
+        script._imageWidth = camAllocation.width()
+        script._imageHeight = camAllocation.height()
+        script._numCharColumns = numCharacterColumns
+        script._numCharRows = numCharacterRows
+        script._numCharacters = pixelChars.length
+        script._flipHorizontal = camAllocation.orientation.isXFlipped()
+        script._flipVertical = camAllocation.orientation.isYFlipped()
 
-        script!!.forEach_computeBlockAverages(outputAllocation)
+        script.forEach_computeBlockAverages(asciiBlockAllocation)
 
         val allocBytes = ByteArray(4 * numCharacterColumns * numCharacterRows)
-        outputAllocation!!.copyTo(allocBytes)
+        asciiBlockAllocation!!.copyTo(allocBytes)
 
         val result = AsciiResult(numCharacterRows, numCharacterColumns)
         // Average brightness is stored in the alpha component, and allocations are RGBA.

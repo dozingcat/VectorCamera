@@ -1,6 +1,5 @@
 package com.dozingcatsoftware.boojiecam
 
-import android.graphics.ImageFormat
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
@@ -10,19 +9,6 @@ import java.nio.ByteBuffer
 
 inline fun toUInt(b: Byte): Int {
     return b.toInt() and 0xff
-}
-
-fun getBufferBytes(buffer: ByteBuffer): ByteArray {
-    if (buffer.hasArray() && buffer.arrayOffset() == 0) {
-        val arr = buffer.array()
-        if (arr.size == buffer.limit()) {
-            return arr
-        }
-    }
-    buffer.position(0)
-    val arr = ByteArray(buffer.limit())
-    buffer.get(arr)
-    return arr
 }
 
 inline fun addAlpha(color: Int): Int {
@@ -61,28 +47,18 @@ fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
     return outputBytes
 }
 
-fun writeBufferToOuptutStream(buffer: ByteBuffer, output: OutputStream) {
-    if (buffer.hasArray()) {
-        val arr = buffer.array()
-        output.write(arr, buffer.arrayOffset(), buffer.limit())
-    }
-    else {
-        val arr = ByteArray(buffer.limit())
-        buffer.get(arr)
-        output.write(arr)
-    }
-}
-
 fun ioReceiveIfInput(alloc: Allocation?) {
     if (alloc != null && (alloc.usage and Allocation.USAGE_IO_INPUT != 0)) {
         alloc.ioReceive()
     }
 }
 
-fun copyAllocation(rs: RenderScript, alloc: Allocation): Allocation {
-    val data = ByteArray(alloc.bytesSize)
-    alloc.copyTo(data)
-    val newAlloc = Allocation.createTyped(rs, alloc.type, Allocation.USAGE_SCRIPT)
-    newAlloc.copyFrom(data)
-    return newAlloc
+fun allocationHas2DSize(alloc: Allocation?, x: Int, y: Int): Boolean {
+    return (alloc != null) && (alloc.type.x) == x && (alloc.type.y == y)
+}
+
+fun create2dAllocation(rs: RenderScript, elementFn: (RenderScript) -> Element, x: Int, y: Int,
+                       usage: Int = Allocation.USAGE_SCRIPT): Allocation {
+    val typeBuilder = Type.Builder(rs, elementFn(rs)).setX(x).setY(y)
+    return Allocation.createTyped(rs, typeBuilder.create(), usage)
 }

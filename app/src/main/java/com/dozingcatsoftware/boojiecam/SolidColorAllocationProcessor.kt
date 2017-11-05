@@ -25,14 +25,9 @@ class SolidColorAllocationProcessor(rs: RenderScript,
         script!!._yuvInput = allocation
         script!!._colorMap = colorTable
 
-        if (outputAllocation == null ||
-                outputAllocation!!.type.x != allocation.type.x ||
-                outputAllocation!!.type.y != allocation.type.y) {
-            val outputTypeBuilder = Type.Builder(rs, Element.RGBA_8888(rs))
-            outputTypeBuilder.setX(allocation.type.x)
-            outputTypeBuilder.setY(allocation.type.y)
-            outputAllocation = Allocation.createTyped(rs, outputTypeBuilder.create(),
-                    Allocation.USAGE_SCRIPT)
+        if (!allocationHas2DSize(outputAllocation, allocation.type.x, allocation.type.y)) {
+            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    allocation.type.x, allocation.type.y);
         }
 
         script!!.forEach_computeColor(outputAllocation)

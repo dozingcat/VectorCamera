@@ -28,14 +28,9 @@ class EdgeAllocationProcessor(rs: RenderScript,
         script!!._gMultiplier = minOf(4, maxOf(2, Math.round(allocation.type.x / 480f)))
         script!!._gColorMap = colorTable
 
-        if (outputAllocation == null ||
-                outputAllocation!!.type.x != allocation.type.x ||
-                outputAllocation!!.type.y != allocation.type.y) {
-            val outputTypeBuilder = Type.Builder(rs, Element.RGBA_8888(rs))
-            outputTypeBuilder.setX(allocation.type.x)
-            outputTypeBuilder.setY(allocation.type.y)
-            outputAllocation = Allocation.createTyped(rs, outputTypeBuilder.create(),
-                    Allocation.USAGE_SCRIPT)
+        if (!allocationHas2DSize(outputAllocation, allocation.type.x, allocation.type.y)) {
+            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    allocation.type.x, allocation.type.y);
         }
 
         script!!.forEach_computeEdgeWithColorMap(outputAllocation)

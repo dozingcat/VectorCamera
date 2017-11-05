@@ -3,10 +3,17 @@
 #pragma rs_fp_relaxed
 
 rs_allocation yuvInput;
+rs_allocation characterBitmapInput;
+rs_allocation imageOutput;
 int imageWidth;
 int imageHeight;
 int numCharRows;
 int numCharColumns;
+int characterPixelWidth;
+int characterPixelHeight;
+int numCharacters;
+bool flipHorizontal;
+bool flipVertical;
 
 uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
     int pixelsPerCol = imageWidth / numCharColumns;
@@ -41,5 +48,17 @@ uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
     ret.g = greenTotal / numPixels;
     ret.b = blueTotal / numPixels;
     ret.a = brightnessTotal / numPixels;
+
+    uint32_t pixelIndex = (uint32_t) (ret.a / 256.0 * numCharacters);
+    uint32_t xoff = pixelIndex * pixelsPerCol;
+    for (uint32_t dy = 0; dy < pixelsPerRow; dy++) {
+        uint32_t ysrc = flipVertical ? pixelsPerRow - 1 - dy : dy;
+        for (uint32_t dx = 0; dx < pixelsPerCol; dx++) {
+            uint32_t xsrc = xoff + (flipHorizontal ? pixelsPerCol - 1 - dx : dx);
+            uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+            rsSetElementAt_uchar4(imageOutput, pixel, xmin + dx, ymin + dy);
+        }
+    }
+
     return ret;
 }

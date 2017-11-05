@@ -21,7 +21,7 @@ class MainActivity : Activity() {
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraImageGenerator: CameraImageGenerator
 
-    private lateinit var imageProcessor: AbstractImageProcessor
+    private lateinit var imageProcessor: CameraAllocationProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
     private val photoLibrary = PhotoLibrary(
