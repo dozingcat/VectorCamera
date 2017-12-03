@@ -7,17 +7,16 @@ import android.graphics.Paint
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
-import android.renderscript.Type
 
 /**
  * Created by brian on 10/13/17.
  */
 class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) {
-    var characterWidthInPixels = 10
+    var characterWidthInPixels = 15
     var charHeightOverWidth = 9.0 / 7
     var backgroundColor = Color.argb(255, 0, 0, 0)
     var textColor = Color.argb(255, 255, 255, 255)
-    var pixelChars = " .:oO8#"
+    var pixelChars = " .:o08#"
 
     private var asciiBlockAllocation: Allocation? = null
     private var characterTemplateAllocation: Allocation? = null

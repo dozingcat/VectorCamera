@@ -2,8 +2,8 @@ package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.renderscript.RenderScript
 import android.util.DisplayMetrics
@@ -13,7 +13,6 @@ import android.view.View
 import android.view.Window
 import android.view.WindowManager
 import kotlinx.android.synthetic.main.activity_main.*
-import java.io.File
 
 class MainActivity : Activity() {
 
@@ -24,8 +23,7 @@ class MainActivity : Activity() {
     private lateinit var imageProcessor: CameraAllocationProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
-    private val photoLibrary = PhotoLibrary(
-            File(Environment.getExternalStorageDirectory(), "BoojieCam"))
+    private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
 
@@ -61,6 +59,7 @@ class MainActivity : Activity() {
         switchResolutionButton.setOnClickListener(this::switchResolution)
         switchEffectButton.setOnClickListener(this::switchEffect)
         takePictureButton.setOnClickListener(this::takePicture)
+        libraryButton.setOnClickListener(this::gotoLibrary)
     }
 
     override fun onResume() {
@@ -205,6 +204,10 @@ class MainActivity : Activity() {
                 CameraStatus.CAPTURING_PHOTO,
                 this.cameraImageSizeForSavedPicture(),
                 this::handleAllocationFromCamera)
+    }
+
+    private fun gotoLibrary(view: View) {
+        this.startActivity(Intent(this, ImageListActivity::class.java))
     }
 
     /**

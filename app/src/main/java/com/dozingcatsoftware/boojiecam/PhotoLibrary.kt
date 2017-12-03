@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.graphics.Bitmap
+import android.os.Environment
 import android.util.Log
 import org.json.JSONObject
 import java.io.File
@@ -10,15 +11,30 @@ import java.util.*
 import java.util.zip.GZIPOutputStream
 
 /**
- * Created by brian on 10/9/17.
+ * Directory structure:
+ * [root]/
+ *     thumbnails/
+ *         [image_id].jpg
+ *         [video_id].jpg
+ *     metadata/
+ *         [image_id].json
+ *         [video_id].json
+ *     raw/
+ *         [image_id].gz
+ *         [video_id].gz
+ *     images/
+ *         [image_id].jpg
+ *         [video_id].jpg (if exported)
+ *     videos/
+ *         [video_id].webm (if exported)
  */
 class PhotoLibrary(val rootDirectory: File) {
 
     val thumbnailDirectory = File(rootDirectory, "thumbnails")
-
-    init {
-        PHOTO_ID_FORMAT.timeZone = TimeZone.getTimeZone("UTC")
-    }
+    val metadataDirectory = File(rootDirectory, "metadata")
+    val rawDirectory = File(rootDirectory, "raw")
+    val imageDirectory = File(rootDirectory, "images")
+    val videoDirectory = File(rootDirectory, "videos")
 
     fun savePhoto(processedBitmap: ProcessedBitmap,
                   successFn: (String) -> Unit,
@@ -30,10 +46,9 @@ class PhotoLibrary(val rootDirectory: File) {
             val height = sourceImage.height()
 
             val photoId = PHOTO_ID_FORMAT.format(Date(sourceImage.timestamp))
-            val photoDir = File(rootDirectory, photoId)
-            photoDir.mkdirs()
 
-            val rawImageFile = File(photoDir, "image.gz")
+            rawDirectory.mkdirs()
+            val rawImageFile = File(rawDirectory, photoId + ".gz")
             GZIPOutputStream(FileOutputStream(rawImageFile)).use({
                 it.write(processedBitmap.yuvBytes)
             })
@@ -43,6 +58,7 @@ class PhotoLibrary(val rootDirectory: File) {
             Log.i(TAG, "Wrote $compressedSize bytes, compressed to $compressedPercent")
 
             val metadata = mapOf(
+                    "type" to "image",
                     "width" to width,
                     "height" to height,
                     "xFlipped" to sourceImage.orientation.isXFlipped(),
@@ -50,7 +66,8 @@ class PhotoLibrary(val rootDirectory: File) {
                     "timestamp" to sourceImage.timestamp
             )
             val json = JSONObject(metadata).toString(2)
-            FileOutputStream(File(photoDir, "metadata.json")).use({
+            metadataDirectory.mkdirs()
+            FileOutputStream(File(metadataDirectory, photoId + ".json")).use({
                 it.write(json.toByteArray(Charsets.UTF_8))
             })
 
@@ -58,7 +75,8 @@ class PhotoLibrary(val rootDirectory: File) {
             // TODO: Scan image with MediaConnectionScanner
             run {
                 val resultBitmap = processedBitmap.renderBitmap(width, height)
-                val pngOutputStream = FileOutputStream(File(rootDirectory, photoId + ".jpg"))
+                imageDirectory.mkdirs()
+                val pngOutputStream = FileOutputStream(File(imageDirectory, photoId + ".jpg"))
                 pngOutputStream.use({
                     resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
                 })
@@ -71,6 +89,7 @@ class PhotoLibrary(val rootDirectory: File) {
                 }
                 val thumbnailOutputStream =
                         FileOutputStream(File(thumbnailDirectory, photoId + ".jpg"))
+                // Preserve aspect ratio?
                 val thumbnailBitmap = processedBitmap.renderBitmap(thumbnailWidth, thumbnailHeight)
                 thumbnailOutputStream.use({
                     thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
@@ -84,10 +103,32 @@ class PhotoLibrary(val rootDirectory: File) {
         }
     }
 
+    fun allItemIds(): List<String> {
+        val mdFiles = metadataDirectory.listFiles() ?: arrayOf()
+        return mdFiles
+                .filter({it.name.endsWith(".json")})
+                .map({it.name.substring(0, it.name.lastIndexOf('.'))})
+    }
+
+    fun thumbnailFileForItemId(itemId: String): File {
+        return File(thumbnailDirectory, itemId + ".jpg")
+    }
+
     companion object {
         val TAG = "PhotoLibrary"
         val PHOTO_ID_FORMAT = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS")
         val thumbnailWidth = 320
         val thumbnailHeight = 240
+
+        init {
+            PHOTO_ID_FORMAT.timeZone = TimeZone.getTimeZone("UTC")
+        }
+
+        fun defaultLibrary(): PhotoLibrary {
+            return PhotoLibrary(
+                    File(Environment.getExternalStorageDirectory(), "BoojieCam"))
+        }
     }
 }
+
+enum class LibraryItemType {IMAGE, VIDEO}
