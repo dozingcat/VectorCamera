@@ -139,10 +139,9 @@ class MainActivity : Activity() {
         handler.post(fun() {
             val processor = this.imageProcessor
             if (processor !is CameraAllocationProcessor) {
-                camAllocation.allocation!!.ioReceive()
+                camAllocation.singleYuvAllocation!!.ioReceive()
                 return
             }
-            // allocation.allocation.ioReceive()
 
             processor.start(this::handleGeneratedBitmap)
             if (camAllocation.status == CameraStatus.CAPTURING_PHOTO) {

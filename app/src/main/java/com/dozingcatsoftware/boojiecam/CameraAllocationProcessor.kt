@@ -52,13 +52,13 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
     fun queueAllocation(cameraAllocation: CameraImage) {
         threadLock.withLock({
             if (consumerThread == null) {
-                ioReceiveIfInput(cameraAllocation.allocation)
+                ioReceiveIfInput(cameraAllocation.singleYuvAllocation)
                 return
             }
         })
 
         allocationLock.withLock({
-            val allocation = cameraAllocation.allocation
+            val allocation = cameraAllocation.singleYuvAllocation!!
             if (lastAllocationRef != null) {
                 val prevAllocation = lastAllocationRef!!.get()
                 if (prevAllocation == allocation) {
@@ -103,7 +103,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
                     else {
                         debugLog("Calling ioReceive, count="+allocationUpdateCount)
                         for (i in 0 until allocationUpdateCount) {
-                            ioReceiveIfInput(currentCamAllocation!!.allocation)
+                            ioReceiveIfInput(currentCamAllocation!!.singleYuvAllocation)
                         }
                         allocationUpdateCount = 0
                         receivedCameraAllocation = null
@@ -115,7 +115,7 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
             val backgroundPaintFn = createPaintFn(currentCamAllocation!!)
             var yuvBytes: ByteArray? = null
             if (currentCamAllocation!!.status == CameraStatus.CAPTURING_PHOTO) {
-                yuvBytes = flattenedYuvImageBytes(rs, currentCamAllocation!!.allocation!!)
+                yuvBytes = flattenedYuvImageBytes(rs, currentCamAllocation!!.singleYuvAllocation!!)
             }
             callback(ProcessedBitmap(
                     currentCamAllocation!!, bitmap, backgroundPaintFn, yuvBytes))

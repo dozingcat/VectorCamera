@@ -4,7 +4,7 @@ import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
-import android.renderscript.Type
+import java.io.ByteArrayInputStream
 
 /**
  * Created by brian on 10/29/17.
@@ -17,23 +17,32 @@ class SolidColorAllocationProcessor(rs: RenderScript,
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_solid? = null
 
-    override fun createBitmap(camAllocation: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (script == null) {
             script = ScriptC_solid(rs)
         }
-        val allocation = camAllocation.allocation!!
-        script!!._yuvInput = allocation
-        script!!._colorMap = colorTable
+        val scr = script!!
 
-        if (!allocationHas2DSize(outputAllocation, allocation.type.x, allocation.type.y)) {
+        if (cameraImage.planarYuvAllocations != null) {
+            scr._yuvInput = cameraImage.planarYuvAllocations.y
+        }
+        else {
+//            val bytes = flattenedYuvImageBytes(rs, cameraImage.singleYuvAllocation!!)
+//            scr._yuvInput = PlanarYuvAllocations.fromInputStream(rs, ByteArrayInputStream(bytes),
+//                    cameraImage.width(), cameraImage.height()).y
+            scr._yuvInput = cameraImage.singleYuvAllocation
+        }
+        scr._colorMap = colorTable
+
+        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    allocation.type.x, allocation.type.y);
+                    cameraImage.width(), cameraImage.height())
         }
 
-        script!!.forEach_computeColor(outputAllocation)
+        scr.forEach_computeColor(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
-                allocation.type.x, allocation.type.y, Bitmap.Config.ARGB_8888)
+                cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
         outputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap

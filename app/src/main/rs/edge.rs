@@ -5,7 +5,7 @@
 int gMultiplier = 2;
 int gWidth;
 int gHeight;
-// Created from camera input.
+// May be YUV data (the U and V planes will be ignored), or just the Y plane.
 rs_allocation gYuvInput;
 // Element.RGBA_8888, created from packed RGBA byte array.
 rs_allocation gColorMap;
@@ -13,15 +13,15 @@ rs_allocation gColorMap;
 uchar4 RS_KERNEL computeEdgeWithColorMap(uint32_t x, uint32_t y) {
     int edge = 0;
     if (x > 0 && x < gWidth - 1 && y > 0 && y < gHeight - 1) {
-        edge = 8 * rsGetElementAtYuv_uchar_Y(gYuvInput, x, y) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x - 1, y - 1) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x - 1, y) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x - 1, y + 1) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x, y - 1) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x, y + 1) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y - 1) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y) -
-                   rsGetElementAtYuv_uchar_Y(gYuvInput, x + 1, y + 1);
+        edge = 8 * rsGetElementAt_uchar(gYuvInput, x, y) -
+                   rsGetElementAt_uchar(gYuvInput, x - 1, y - 1) -
+                   rsGetElementAt_uchar(gYuvInput, x - 1, y) -
+                   rsGetElementAt_uchar(gYuvInput, x - 1, y + 1) -
+                   rsGetElementAt_uchar(gYuvInput, x, y - 1) -
+                   rsGetElementAt_uchar(gYuvInput, x, y + 1) -
+                   rsGetElementAt_uchar(gYuvInput, x + 1, y - 1) -
+                   rsGetElementAt_uchar(gYuvInput, x + 1, y) -
+                   rsGetElementAt_uchar(gYuvInput, x + 1, y + 1);
     }
     int index = clamp(gMultiplier * edge, 0, 255);
     return rsGetElementAt_uchar4(gColorMap, index);

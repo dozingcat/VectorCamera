@@ -4,7 +4,6 @@ import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
-import android.renderscript.Type
 
 /**
  * Created by brian on 10/18/17.
@@ -17,26 +16,31 @@ class EdgeAllocationProcessor(rs: RenderScript,
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge? = null
 
-    override fun createBitmap(camAllocation: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (script == null) {
             script = ScriptC_edge(rs)
         }
-        val allocation = camAllocation.allocation!!
-        script!!._gYuvInput = allocation
-        script!!._gWidth = allocation.type.x
-        script!!._gHeight = allocation.type.y
-        script!!._gMultiplier = minOf(4, maxOf(2, Math.round(allocation.type.x / 480f)))
-        script!!._gColorMap = colorTable
+        val scr = this.script!!
+        scr._gWidth = cameraImage.width()
+        scr._gHeight = cameraImage.height()
+        scr._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
+        scr._gColorMap = colorTable
 
-        if (!allocationHas2DSize(outputAllocation, allocation.type.x, allocation.type.y)) {
+        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    allocation.type.x, allocation.type.y);
+                    cameraImage.width(), cameraImage.height())
         }
 
-        script!!.forEach_computeEdgeWithColorMap(outputAllocation)
+        if (cameraImage.singleYuvAllocation != null) {
+            scr._gYuvInput = cameraImage.singleYuvAllocation
+        }
+        else {
+            scr._gYuvInput = cameraImage.planarYuvAllocations!!.y
+        }
+        scr.forEach_computeEdgeWithColorMap(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
-                allocation.type.x, allocation.type.y, Bitmap.Config.ARGB_8888)
+                cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
         outputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap

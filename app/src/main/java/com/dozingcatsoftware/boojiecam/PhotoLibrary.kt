@@ -5,9 +5,12 @@ import android.os.Environment
 import android.util.Log
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 /**
@@ -48,8 +51,14 @@ class PhotoLibrary(val rootDirectory: File) {
             val photoId = PHOTO_ID_FORMAT.format(Date(sourceImage.timestamp))
 
             rawDirectory.mkdirs()
-            val rawImageFile = File(rawDirectory, photoId + ".gz")
-            GZIPOutputStream(FileOutputStream(rawImageFile)).use({
+            val rawImageFile = rawFileForItemId(photoId)
+            // For some reason, using GZIPInputStream only reads a few hundred bytes rather than
+            // the entire file. (Even though copying the file and running gunzip works).
+            // Store uncompressed for now.
+//            GZIPOutputStream(FileOutputStream(rawImageFile)).use({
+//                it.write(processedBitmap.yuvBytes)
+//            })
+            FileOutputStream(rawImageFile).use({
                 it.write(processedBitmap.yuvBytes)
             })
             val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
@@ -67,7 +76,7 @@ class PhotoLibrary(val rootDirectory: File) {
             )
             val json = JSONObject(metadata).toString(2)
             metadataDirectory.mkdirs()
-            FileOutputStream(File(metadataDirectory, photoId + ".json")).use({
+            FileOutputStream(metadataFileForItemId(photoId)).use({
                 it.write(json.toByteArray(Charsets.UTF_8))
             })
 
@@ -112,6 +121,24 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun thumbnailFileForItemId(itemId: String): File {
         return File(thumbnailDirectory, itemId + ".jpg")
+    }
+
+    fun rawFileForItemId(itemId: String): File {
+        return File(rawDirectory, itemId + ".gz")
+    }
+
+    fun rawFileInputStreamForItemId(itemId: String): InputStream {
+        // return GZIPInputStream(FileInputStream(rawFileForItemId(itemId)))
+        return FileInputStream(rawFileForItemId(itemId))
+    }
+
+    fun metadataFileForItemId(itemId: String): File {
+        return File(metadataDirectory, itemId + ".json")
+    }
+
+    fun metadataForItemId(itemId: String): JSONObject {
+        val mdText = metadataFileForItemId(itemId).readText()
+        return JSONObject(mdText)
     }
 
     companion object {

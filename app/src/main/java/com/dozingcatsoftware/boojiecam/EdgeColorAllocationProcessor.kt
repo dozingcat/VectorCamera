@@ -11,25 +11,33 @@ class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge_color? = null
 
-    override fun createBitmap(camAllocation: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
+            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    cameraImage.width(), cameraImage.height());
+        }
         if (script == null) {
             script = ScriptC_edge_color(rs)
         }
-        val allocation = camAllocation.allocation!!
-        script!!._gYuvInput = allocation
-        script!!._gWidth = allocation.type.x
-        script!!._gHeight = allocation.type.y
-        script!!._gMultiplier = minOf(4, maxOf(2, Math.round(allocation.type.x / 480f)))
+        val scr = script!!
+        scr._gWidth = cameraImage.width()
+        scr._gHeight = cameraImage.height()
+        scr._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
 
-        if (!allocationHas2DSize(outputAllocation, allocation.type.x, allocation.type.y)) {
-            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    allocation.type.x, allocation.type.y);
+        if (cameraImage.planarYuvAllocations != null) {
+            scr._gYInput = cameraImage.planarYuvAllocations.y
+            scr._gUInput = cameraImage.planarYuvAllocations.u
+            scr._gVInput = cameraImage.planarYuvAllocations.v
+            scr.forEach_setBrightnessToEdgeStrength_planar(outputAllocation)
+        }
+        else {
+            scr._gYuvInput = cameraImage.singleYuvAllocation!!
+            scr.forEach_setBrightnessToEdgeStrength(outputAllocation)
         }
 
-        script!!.forEach_setBrightnessToEdgeStrength(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
-                allocation.type.x, allocation.type.y, Bitmap.Config.ARGB_8888)
+                cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
         outputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap

@@ -41,7 +41,6 @@ data class ProcessedBitmap(
             canvas.drawRect(dstRect, paint)
         }
         canvas.drawBitmap(bitmap, flipMatrix, null)
-
     }
 
     fun renderBitmap(width: Int, height: Int): Bitmap {

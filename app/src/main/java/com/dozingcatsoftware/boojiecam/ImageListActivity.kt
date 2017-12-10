@@ -1,13 +1,8 @@
 package com.dozingcatsoftware.boojiecam
 
-import java.io.File
-import java.util.ArrayList
-import java.util.HashMap
-
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Resources
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -25,12 +20,16 @@ class ImageListActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var gridView: GridView
-    private var selectedGridIndex: Int = 0
+    private var gridImageIds: List<String>? = null
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.imagegrid)
         gridView = findViewById(R.id.gridview)
+        gridView.onItemClickListener = OnItemClickListener { parent, view, position, id ->
+            ViewImageActivity.startActivityWithImageId(
+                    this@ImageListActivity, gridImageIds!![position])
+        }
     }
 
     public override fun onResume() {
@@ -39,8 +38,8 @@ class ImageListActivity : Activity() {
     }
 
     private fun displayGrid() {
-        val itemIds = photoLibrary.allItemIds()
-        val cellMaps = itemIds.map(
+        gridImageIds = photoLibrary.allItemIds().asReversed()
+        val cellMaps = gridImageIds!!.map(
                 { mapOf("thumbnailUri" to Uri.fromFile(photoLibrary.thumbnailFileForItemId(it)))})
         val adapter = SimpleAdapter(this, cellMaps,
                 R.layout.imagegrid_cell,
@@ -71,7 +70,7 @@ class ImageListActivity : Activity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         /*
         if (resultCode == ViewImageActivity.DELETE_RESULT) {
             imageDirectories.removeAt(selectedGridIndex)

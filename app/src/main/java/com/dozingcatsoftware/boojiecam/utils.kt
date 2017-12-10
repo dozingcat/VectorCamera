@@ -4,8 +4,6 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.Type
-import java.io.OutputStream
-import java.nio.ByteBuffer
 
 inline fun toUInt(b: Byte): Int {
     return b.toInt() and 0xff
@@ -18,15 +16,13 @@ inline fun addAlpha(color: Int): Int {
 fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
     // There's no way to directly read the U and V bytes from a YUV allocation(?), but we can
     // use a .rs script to extract the three planes into output allocations and combine them.
-    val yType = Type.Builder(rs, Element.U8(rs))
-    yType.setX(yuvAlloc.type.x)
-    yType.setY(yuvAlloc.type.y)
-    val uvType = Type.Builder(rs, Element.U8(rs))
-    uvType.setX(Math.ceil(yuvAlloc.type.x / 2.0).toInt())
-    uvType.setY(Math.ceil(yuvAlloc.type.y / 2.0).toInt())
-    val yAlloc = Allocation.createTyped(rs, yType.create(), Allocation.USAGE_SCRIPT)
-    val uAlloc = Allocation.createTyped(rs, uvType.create(), Allocation.USAGE_SCRIPT)
-    val vAlloc = Allocation.createTyped(rs, uvType.create(), Allocation.USAGE_SCRIPT)
+    val width = yuvAlloc.type.x
+    val height = yuvAlloc.type.y
+    val yAlloc = create2dAllocation(rs, Element::U8, width, height)
+    val uvWidth = Math.ceil(width / 2.0).toInt()
+    val uvHeight = Math.ceil(height / 2.0).toInt()
+    val uAlloc = create2dAllocation(rs, Element::U8, uvWidth, uvHeight)
+    val vAlloc = create2dAllocation(rs, Element::U8, uvWidth, uvHeight)
 
     val script = ScriptC_flatten_yuv(rs)
     script._yuvInputAlloc = yuvAlloc
@@ -34,8 +30,8 @@ fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
     script._vOutputAlloc = vAlloc
     script.forEach_flattenYuv(yAlloc)
 
-    val ySize = yAlloc.type.x * yAlloc.type.y
-    val uvSize = uAlloc.type.x * uAlloc.type.y
+    val ySize = width * height
+    val uvSize = uvWidth * uvHeight
     val outputBytes = ByteArray(ySize + 2 * uvSize)
     val outBuffer = ByteArray(ySize)
     yAlloc.copyTo(outBuffer)

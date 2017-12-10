@@ -29,6 +29,9 @@
         <activity
             android:name=".ImageListActivity">
         </activity>
+        <activity
+            android:name=".ViewImageActivity">
+        </activity>
 
     </application>
 

@@ -36,9 +36,9 @@ class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) 
         }
     }
 
-    override fun createBitmap(camAllocation: CameraImage): Bitmap {
-        val width = camAllocation.width()
-        val height = camAllocation.height()
+    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+        val width = cameraImage.width()
+        val height = cameraImage.height()
         // TODO: Reuse resultBitmap and charBitmap if possible.
         val resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val charPixelWidth = characterWidthInPixels
@@ -62,7 +62,7 @@ class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) 
         }
 
         val result = computeAsciiResult(
-                camAllocation, pixelChars,
+                cameraImage, pixelChars,
                 charPixelWidth, charPixelHeight, numCharacterColumns, numCharacterRows, charBitmap)
 
         bitmapOutputAllocation!!.copyTo(resultBitmap)
@@ -90,7 +90,6 @@ class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) 
         }
         characterTemplateAllocation!!.copyFrom(charBitmap)
 
-        script._yuvInput = camAllocation.allocation
         script._characterBitmapInput = characterTemplateAllocation
         script._imageOutput = bitmapOutputAllocation
         script._imageWidth = camAllocation.width()
@@ -100,8 +99,16 @@ class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) 
         script._numCharacters = pixelChars.length
         script._flipHorizontal = camAllocation.orientation.isXFlipped()
         script._flipVertical = camAllocation.orientation.isYFlipped()
-
-        script.forEach_computeBlockAverages(asciiBlockAllocation)
+        if (camAllocation.planarYuvAllocations != null) {
+            script._yInput = camAllocation.planarYuvAllocations.y
+            script._uInput = camAllocation.planarYuvAllocations.u
+            script._vInput = camAllocation.planarYuvAllocations.v
+            script.forEach_computeBlockAverages_planar(asciiBlockAllocation)
+        }
+        else {
+            script._yuvInput = camAllocation.singleYuvAllocation
+            script.forEach_computeBlockAverages(asciiBlockAllocation)
+        }
 
         val allocBytes = ByteArray(4 * numCharacterColumns * numCharacterRows)
         asciiBlockAllocation!!.copyTo(allocBytes)
