@@ -14,7 +14,7 @@ class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    cameraImage.width(), cameraImage.height());
+                    cameraImage.width(), cameraImage.height())
         }
         if (script == null) {
             script = ScriptC_edge_color(rs)

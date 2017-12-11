@@ -29,6 +29,9 @@ class MainActivity : Activity() {
 
     private val allImageProcessors = arrayOf(
             {EdgeColorAllocationProcessor(rs)},
+            {PermuteColorAllocationProcessor.noOp(rs)},
+            {PermuteColorAllocationProcessor.rgbToBrg(rs)},
+            {PermuteColorAllocationProcessor.rgbToGbr(rs)},
             {EdgeAllocationProcessor.withFixedColors(
                     rs, 0x000000, 0x00ffff)},
             {EdgeAllocationProcessor.withFixedColors(
