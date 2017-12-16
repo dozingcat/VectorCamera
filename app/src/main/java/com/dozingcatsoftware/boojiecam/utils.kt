@@ -13,6 +13,14 @@ inline fun addAlpha(color: Int): Int {
     return 0xff000000.toInt() or color
 }
 
+fun argbArrayFromInt(argb: Int): IntArray {
+    return intArrayOf(argb shr 24, (argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
+}
+
+fun intFromArgbArray(a: IntArray): Int {
+    return (a[0] shl 24) or (a[1] shl 16) or (a[2] shl 8) or a[3]
+}
+
 fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
     // There's no way to directly read the U and V bytes from a YUV allocation(?), but we can
     // use a .rs script to extract the three planes into output allocations and combine them.

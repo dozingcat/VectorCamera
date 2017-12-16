@@ -8,9 +8,14 @@ import android.graphics.RectF
  * Created by brian on 12/16/17.
  */
 interface Effect {
-    fun createBitmap(camAllocation: CameraImage): Bitmap
+    fun createBitmap(cameraImage: CameraImage): Bitmap
 
-    fun createPaintFn(camAllocation: CameraImage): (RectF) -> Paint? {
+    fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
         return {null}
     }
+
+    fun effectName(): String
+
+    fun effectParameters(): Map<String, Any> = mapOf()
+
 }

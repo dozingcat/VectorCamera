@@ -8,12 +8,15 @@ import android.renderscript.RenderScript
 /**
  * Created by brian on 10/18/17.
  */
+// TODO: add params to constructor and static factory method to build from params
 class EdgeEffect(val rs: RenderScript,
                  private val colorTable: Allocation,
                  private val paintFn: (CameraImage, RectF) -> Paint?): Effect {
 
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge? = null
+
+    override fun effectName() = EFFECT_NAME
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (script == null) {
@@ -45,11 +48,13 @@ class EdgeEffect(val rs: RenderScript,
         return resultBitmap
     }
 
-    override fun createPaintFn(camAllocation: CameraImage): (RectF) -> Paint? {
-        return {rect -> paintFn(camAllocation, rect)}
+    override fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
+        return {rect -> paintFn(cameraImage, rect)}
     }
 
     companion object {
+        val EFFECT_NAME = "edge"
+
         fun withFixedColors(rs: RenderScript,
                             minEdgeColor: Int, maxEdgeColor: Int): EdgeEffect {
             return EdgeEffect(

@@ -25,6 +25,8 @@ class PermuteColorEffect(
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_permute_colors? = null
 
+    override fun effectName() = EFFECT_NAME
+
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
@@ -57,6 +59,8 @@ class PermuteColorEffect(
     }
 
     companion object {
+        val EFFECT_NAME = "permute_colors"
+
         fun noOp(rs: RenderScript) = PermuteColorEffect(rs,
                 ColorComponentSource.RED, ColorComponentSource.GREEN, ColorComponentSource.BLUE)
 

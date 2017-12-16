@@ -23,6 +23,15 @@ class AsciiEffect(val rs: RenderScript): Effect {
     private var bitmapOutputAllocation: Allocation? = null
     private val script = ScriptC_ascii(rs)
 
+    override fun effectName() = EFFECT_NAME
+
+    override fun effectParameters(): Map<String, Any> = mapOf(
+            "backgroundColor" to argbArrayFromInt(backgroundColor),
+            "textColor" to argbArrayFromInt(textColor),
+            "pixelChars" to pixelChars,
+            "charWidth" to characterWidthInPixels
+    )
+
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
         val colors = IntArray(numRows * numCols)
@@ -125,5 +134,9 @@ class AsciiEffect(val rs: RenderScript): Effect {
             }
         }
         return result
+    }
+
+    companion object {
+        val EFFECT_NAME = "ascii"
     }
 }

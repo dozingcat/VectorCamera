@@ -137,6 +137,5 @@ class CameraAllocationProcessor {
                 Log.i(TAG, msg)
             }
         }
-
     }
 }

@@ -11,6 +11,8 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge_color? = null
 
+    override fun effectName() = EFFECT_NAME
+
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
@@ -41,5 +43,9 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
         outputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap
+    }
+
+    companion object {
+        val EFFECT_NAME = "edge_luminance"
     }
  }

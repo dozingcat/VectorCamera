@@ -112,10 +112,7 @@ class MainActivity : Activity() {
 
     private fun checkPermissionAndStartCamera() {
         if (PermissionsChecker.hasCameraPermission(this)) {
-            cameraImageGenerator.start(
-                    CameraStatus.CAPTURING_PREVIEW,
-                    this.targetCameraImageSize(),
-                    this::handleAllocationFromCamera)
+            restartCameraImageGenerator()
         }
         else {
             PermissionsChecker.requestCameraAndStoragePermissions(this)
@@ -126,8 +123,7 @@ class MainActivity : Activity() {
         handler.post(fun() {
             overlayView.processedBitmap = processedBitmap
             overlayView.invalidate()
-            if (processedBitmap.sourceImage != null &&
-                    processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
+            if (processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Saving picture")
                 Thread({
                     val yuvBytes = flattenedYuvImageBytes(
@@ -146,21 +142,11 @@ class MainActivity : Activity() {
 
     private fun handleAllocationFromCamera(camAllocation: CameraImage) {
         handler.post(fun() {
-            val processor = this.imageProcessor
-            if (processor !is CameraAllocationProcessor) {
-                camAllocation.singleYuvAllocation!!.ioReceive()
-                return
-            }
-
-            processor.start(allEffects[effectIndex](), this::handleGeneratedBitmap)
             if (camAllocation.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
-                cameraImageGenerator.start(
-                        CameraStatus.CAPTURING_PREVIEW,
-                        this.targetCameraImageSize(),
-                        this::handleAllocationFromCamera)
+                restartCameraImageGenerator()
             }
-            processor.queueAllocation(camAllocation)
+            this.imageProcessor.queueAllocation(camAllocation)
         })
     }
 
@@ -171,6 +157,7 @@ class MainActivity : Activity() {
                 CameraStatus.CAPTURING_PREVIEW,
                 this.targetCameraImageSize(),
                 this::handleAllocationFromCamera)
+        this.imageProcessor.start(allEffects[effectIndex](), this::handleGeneratedBitmap)
     }
 
     private fun switchToNextCamera(view: View) {
