@@ -5,8 +5,7 @@ import android.graphics.*
 data class ProcessedBitmap(
         val sourceImage: CameraImage,
         val bitmap: Bitmap,
-        val backgroundPaintFn: (RectF) -> Paint?,
-        val yuvBytes: ByteArray? = null) {
+        val backgroundPaintFn: (RectF) -> Paint?) {
 
     fun renderToCanvas(canvas: Canvas, width: Int, height: Int, outsidePaint: Paint? = null,
                        tmpRect: RectF? = null, tmpMatrix: Matrix? = null) {

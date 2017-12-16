@@ -11,7 +11,7 @@ import android.renderscript.RenderScript
 /**
  * Created by brian on 10/13/17.
  */
-class AsciiAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) {
+class AsciiEffect(val rs: RenderScript): Effect {
     var characterWidthInPixels = 15
     var charHeightOverWidth = 9.0 / 7
     var backgroundColor = Color.argb(255, 0, 0, 0)

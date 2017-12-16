@@ -16,11 +16,11 @@ enum class ColorComponentSource(val rsCode: Int) {
     MAX(-1),
 }
 
-class PermuteColorAllocationProcessor(
-        rs: RenderScript,
+class PermuteColorEffect(
+        val rs: RenderScript,
         val redSource: ColorComponentSource,
         val greenSource: ColorComponentSource,
-        val blueSource: ColorComponentSource): CameraAllocationProcessor(rs) {
+        val blueSource: ColorComponentSource): Effect {
 
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_permute_colors? = null
@@ -57,13 +57,13 @@ class PermuteColorAllocationProcessor(
     }
 
     companion object {
-        fun noOp(rs: RenderScript) = PermuteColorAllocationProcessor(rs,
+        fun noOp(rs: RenderScript) = PermuteColorEffect(rs,
                 ColorComponentSource.RED, ColorComponentSource.GREEN, ColorComponentSource.BLUE)
 
-        fun rgbToGbr(rs: RenderScript) = PermuteColorAllocationProcessor(rs,
+        fun rgbToGbr(rs: RenderScript) = PermuteColorEffect(rs,
                 ColorComponentSource.GREEN, ColorComponentSource.BLUE, ColorComponentSource.RED)
 
-        fun rgbToBrg(rs: RenderScript) = PermuteColorAllocationProcessor(rs,
+        fun rgbToBrg(rs: RenderScript) = PermuteColorEffect(rs,
                 ColorComponentSource.BLUE, ColorComponentSource.RED, ColorComponentSource.GREEN)
     }
 }

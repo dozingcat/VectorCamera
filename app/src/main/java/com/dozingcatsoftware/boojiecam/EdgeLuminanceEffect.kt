@@ -6,7 +6,7 @@ import android.renderscript.*
 /**
  * Created by brian on 10/16/17.
  */
-class EdgeColorAllocationProcessor(rs: RenderScript): CameraAllocationProcessor(rs) {
+class EdgeLuminanceEffect(val rs: RenderScript): Effect {
 
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_edge_color? = null

@@ -4,42 +4,39 @@ import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
-import java.io.ByteArrayInputStream
 
 /**
- * Created by brian on 10/29/17.
+ * Created by brian on 10/18/17.
  */
-class SolidColorAllocationProcessor(rs: RenderScript,
-                                    private val colorTable: Allocation,
-                                    private val paintFn: (CameraImage, RectF) -> Paint?):
-        CameraAllocationProcessor(rs) {
+class EdgeEffect(val rs: RenderScript,
+                 private val colorTable: Allocation,
+                 private val paintFn: (CameraImage, RectF) -> Paint?): Effect {
 
     private var outputAllocation: Allocation? = null
-    private var script: ScriptC_solid? = null
+    private var script: ScriptC_edge? = null
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (script == null) {
-            script = ScriptC_solid(rs)
+            script = ScriptC_edge(rs)
         }
-        val scr = script!!
-
-        if (cameraImage.planarYuvAllocations != null) {
-            scr._yuvInput = cameraImage.planarYuvAllocations.y
-        }
-        else {
-//            val bytes = flattenedYuvImageBytes(rs, cameraImage.singleYuvAllocation!!)
-//            scr._yuvInput = PlanarYuvAllocations.fromInputStream(rs, ByteArrayInputStream(bytes),
-//                    cameraImage.width(), cameraImage.height()).y
-            scr._yuvInput = cameraImage.singleYuvAllocation
-        }
-        scr._colorMap = colorTable
+        val scr = this.script!!
+        scr._gWidth = cameraImage.width()
+        scr._gHeight = cameraImage.height()
+        scr._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
+        scr._gColorMap = colorTable
 
         if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
                     cameraImage.width(), cameraImage.height())
         }
 
-        scr.forEach_computeColor(outputAllocation)
+        if (cameraImage.singleYuvAllocation != null) {
+            scr._gYuvInput = cameraImage.singleYuvAllocation
+        }
+        else {
+            scr._gYuvInput = cameraImage.planarYuvAllocations!!.y
+        }
+        scr.forEach_computeEdgeWithColorMap(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
@@ -54,14 +51,14 @@ class SolidColorAllocationProcessor(rs: RenderScript,
 
     companion object {
         fun withFixedColors(rs: RenderScript,
-                            minEdgeColor: Int, maxEdgeColor: Int): SolidColorAllocationProcessor {
-            return SolidColorAllocationProcessor(
+                            minEdgeColor: Int, maxEdgeColor: Int): EdgeEffect {
+            return EdgeEffect(
                     rs, makeAllocationColorMap(rs, minEdgeColor, maxEdgeColor), {_, _ -> null})
         }
 
         fun withLinearGradient(
                 rs: RenderScript, minEdgeColor: Int,
-                gradientStartColor: Int, gradientEndColor: Int): EdgeAllocationProcessor {
+                gradientStartColor: Int, gradientEndColor: Int): EdgeEffect {
             val paintFn = fun(_: CameraImage, rect: RectF): Paint {
                 val p = Paint()
                 p.shader = LinearGradient(
@@ -70,12 +67,12 @@ class SolidColorAllocationProcessor(rs: RenderScript,
                         Shader.TileMode.MIRROR)
                 return p
             }
-            return EdgeAllocationProcessor(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
+            return EdgeEffect(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
         }
 
         fun withRadialGradient(
                 rs: RenderScript, minEdgeColor: Int,
-                centerColor: Int, outerColor: Int): EdgeAllocationProcessor {
+                centerColor: Int, outerColor: Int): EdgeEffect {
             val paintFn = fun(_: CameraImage, rect: RectF): Paint {
                 val p = Paint()
                 p.shader = RadialGradient(
@@ -84,7 +81,8 @@ class SolidColorAllocationProcessor(rs: RenderScript,
                         addAlpha(centerColor), addAlpha(outerColor), Shader.TileMode.MIRROR)
                 return p
             }
-            return EdgeAllocationProcessor(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
+            return EdgeEffect(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
         }
+
     }
 }

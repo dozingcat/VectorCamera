@@ -20,31 +20,36 @@ class MainActivity : Activity() {
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraImageGenerator: CameraImageGenerator
 
-    private lateinit var imageProcessor: CameraAllocationProcessor
+    private var imageProcessor = CameraAllocationProcessor()
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
 
-    private val allImageProcessors = arrayOf(
-            {EdgeColorAllocationProcessor(rs)},
-            {PermuteColorAllocationProcessor.noOp(rs)},
-            {PermuteColorAllocationProcessor.rgbToBrg(rs)},
-            {PermuteColorAllocationProcessor.rgbToGbr(rs)},
-            {EdgeAllocationProcessor.withFixedColors(
+    private val allEffects = arrayOf(
+            { EdgeLuminanceEffect(rs)},
+            { PermuteColorEffect.noOp(rs)},
+            { PermuteColorEffect.rgbToBrg(rs)},
+            { PermuteColorEffect.rgbToGbr(rs)},
+            {
+                EdgeEffect.withFixedColors(
                     rs, 0x000000, 0x00ffff)},
-            {EdgeAllocationProcessor.withFixedColors(
+            {
+                EdgeEffect.withFixedColors(
                     rs, 0x004080, 0xffa000)},
-            {EdgeAllocationProcessor.withLinearGradient(
+            {
+                EdgeEffect.withLinearGradient(
                     rs, 0x000000, 0x00ff00, 0x0000ff)},
-            {EdgeAllocationProcessor.withRadialGradient(
+            {
+                EdgeEffect.withRadialGradient(
                     rs, 0x191970, 0xffff00, 0xff4500)},
-            {SolidColorAllocationProcessor.withFixedColors(
+            {
+                SolidColorEffect.withFixedColors(
                     rs, 0x000000, 0xffffff)},
-            {AsciiAllocationProcessor(rs)}
+            { AsciiEffect(rs)}
     )
-    private var processorIndex = 0;
+    private var effectIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,7 +61,6 @@ class MainActivity : Activity() {
 
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
-        imageProcessor = allImageProcessors[0]()
 
         switchCameraButton.setOnClickListener(this::switchToNextCamera)
         switchResolutionButton.setOnClickListener(this::switchResolution)
@@ -126,7 +130,9 @@ class MainActivity : Activity() {
                     processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Saving picture")
                 Thread({
-                    photoLibrary.savePhoto(processedBitmap,
+                    val yuvBytes = flattenedYuvImageBytes(
+                            rs, processedBitmap.sourceImage.singleYuvAllocation!!)
+                    photoLibrary.savePhoto(processedBitmap, yuvBytes,
                             fun(photoId: String) {
                                 Log.i(TAG, "Saved $photoId")
                             },
@@ -146,7 +152,7 @@ class MainActivity : Activity() {
                 return
             }
 
-            processor.start(this::handleGeneratedBitmap)
+            processor.start(allEffects[effectIndex](), this::handleGeneratedBitmap)
             if (camAllocation.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
                 cameraImageGenerator.start(
@@ -191,10 +197,8 @@ class MainActivity : Activity() {
     }
 
     private fun switchEffect(view: View) {
-        imageProcessor.pause()
-
-        processorIndex = (processorIndex + 1) % allImageProcessors.size
-        imageProcessor = allImageProcessors[processorIndex]()
+        effectIndex = (effectIndex + 1) % allEffects.size
+        imageProcessor.start(allEffects[effectIndex](), this::handleGeneratedBitmap)
     }
 
     private fun takePicture(view: View) {

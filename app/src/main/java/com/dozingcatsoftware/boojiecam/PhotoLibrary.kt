@@ -39,7 +39,7 @@ class PhotoLibrary(val rootDirectory: File) {
     val imageDirectory = File(rootDirectory, "images")
     val videoDirectory = File(rootDirectory, "videos")
 
-    fun savePhoto(processedBitmap: ProcessedBitmap,
+    fun savePhoto(processedBitmap: ProcessedBitmap, yuvBytes: ByteArray,
                   successFn: (String) -> Unit,
                   errorFn: (Exception) -> Unit) {
         try {
@@ -59,7 +59,7 @@ class PhotoLibrary(val rootDirectory: File) {
 //                it.write(processedBitmap.yuvBytes)
 //            })
             FileOutputStream(rawImageFile).use({
-                it.write(processedBitmap.yuvBytes)
+                it.write(yuvBytes)
             })
             val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
             val compressedSize = rawImageFile.length()

@@ -15,7 +15,7 @@ import kotlin.concurrent.withLock
 /**
  * Created by brian on 10/15/17.
  */
-abstract class CameraAllocationProcessor(val rs: RenderScript) {
+class CameraAllocationProcessor {
     private var consumerThread: Thread? = null
     private var receivedCameraAllocation: CameraImage? = null
     private var lastAllocationRef: WeakReference<Allocation>? = null
@@ -23,8 +23,11 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
     private val threadLock = ReentrantLock()
     private val allocationLock = ReentrantLock()
     private val allocationAvailable = allocationLock.newCondition()
+    private lateinit var effect: Effect
 
-    fun start(callback: (ProcessedBitmap) -> Unit) {
+    fun start(effect: Effect, callback: (ProcessedBitmap) -> Unit) {
+        this.pause()
+        this.effect = effect
         threadLock.withLock({
             if (consumerThread == null) {
                 consumerThread = Thread({this.threadEntry(callback)})
@@ -111,22 +114,11 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
                 })
             }
 
-            val bitmap = createBitmap(currentCamAllocation!!)
-            val backgroundPaintFn = createPaintFn(currentCamAllocation!!)
-            var yuvBytes: ByteArray? = null
-            if (currentCamAllocation!!.status == CameraStatus.CAPTURING_PHOTO) {
-                yuvBytes = flattenedYuvImageBytes(rs, currentCamAllocation!!.singleYuvAllocation!!)
-            }
-            callback(ProcessedBitmap(
-                    currentCamAllocation!!, bitmap, backgroundPaintFn, yuvBytes))
+            val bitmap = effect.createBitmap(currentCamAllocation!!)
+            val backgroundPaintFn = effect.createPaintFn(currentCamAllocation!!)
+            callback(ProcessedBitmap(currentCamAllocation!!, bitmap, backgroundPaintFn))
             currentCamAllocation = null
         }
-    }
-
-    abstract fun createBitmap(camAllocation: CameraImage): Bitmap
-
-    open fun createPaintFn(camAllocation: CameraImage): (RectF) -> Paint? {
-        return {null}
     }
 
     companion object {
@@ -146,50 +138,5 @@ abstract class CameraAllocationProcessor(val rs: RenderScript) {
             }
         }
 
-        fun makeAllocationColorMap(rs: RenderScript,
-                                           minEdgeColor: Int, maxEdgeColor: Int, size: Int=256): Allocation {
-            val r0 = (minEdgeColor shr 16) and 0xff
-            val g0 = (minEdgeColor shr 8) and 0xff
-            val b0 = (minEdgeColor) and 0xff
-            val r1 = (maxEdgeColor shr 16) and 0xff
-            val g1 = (maxEdgeColor shr 8) and 0xff
-            val b1 = (maxEdgeColor) and 0xff
-            val sizef = size.toFloat()
-
-            val colors = ByteArray(size * 4)
-            var bindex = 0
-            for (index in 0 until size) {
-                val fraction = index / sizef
-                // Allocations are RGBA even though bitmaps are ARGB.
-                colors[bindex++] = Math.round(r0 + (r1 - r0) * fraction).toByte()
-                colors[bindex++] = Math.round(g0 + (g1 - g0) * fraction).toByte()
-                colors[bindex++] = Math.round(b0 + (b1 - b0) * fraction).toByte()
-                colors[bindex++] = 0xff.toByte()
-            }
-            val type = Type.Builder(rs, Element.RGBA_8888(rs))
-            type.setX(size)
-            val allocation = Allocation.createTyped(rs, type.create(), Allocation.USAGE_SCRIPT)
-            allocation.copyFrom(colors)
-            return allocation
-        }
-
-        fun makeAlphaAllocation(rs: RenderScript, color: Int): Allocation {
-            val r = ((color shr 16) and 0xff).toByte()
-            val g = ((color shr 8) and 0xff).toByte()
-            val b = ((color) and 0xff).toByte()
-            val colors = ByteArray(4 * 256)
-            var bindex = 0
-            for (index in 0 until 256) {
-                colors[bindex++] = r
-                colors[bindex++] = g
-                colors[bindex++] = b
-                colors[bindex++] = (255 - index).toByte()
-            }
-            val type = Type.Builder(rs, Element.RGBA_8888(rs))
-            type.setX(256)
-            val allocation = Allocation.createTyped(rs, type.create(), Allocation.USAGE_SCRIPT)
-            allocation.copyFrom(colors)
-            return allocation
-        }
     }
 }
