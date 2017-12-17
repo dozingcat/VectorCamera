@@ -32,6 +32,7 @@ class MainActivity : Activity() {
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var effectIndex = 0
     private var inEffectSelectionMode = false
+    private var lastBitmapTimestamp = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,6 +105,10 @@ class MainActivity : Activity() {
 
     private fun handleGeneratedBitmap(processedBitmap: ProcessedBitmap) {
         handler.post(fun() {
+            if (lastBitmapTimestamp > processedBitmap.sourceImage.timestamp) {
+                return
+            }
+            lastBitmapTimestamp = processedBitmap.sourceImage.timestamp
             overlayView.processedBitmap = processedBitmap
             overlayView.invalidate()
             if (processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
@@ -174,7 +179,7 @@ class MainActivity : Activity() {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             val comboEffect = CombinationEffect(rs, allEffectFactories)
-            // TODO: Reduce preview size so tiles don't compute full resolution.
+            // TODO: Reduce preview size so tiles don't compute full resolution?
             this.imageProcessor.start(comboEffect, this::handleGeneratedBitmap)
         }
         else {
@@ -193,6 +198,8 @@ class MainActivity : Activity() {
                 val index = gridSize * tileY + tileX
 
                 effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
+                restartCameraImageGenerator()
+
                 imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
                 inEffectSelectionMode = false
             }
