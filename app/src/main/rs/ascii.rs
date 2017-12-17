@@ -85,8 +85,8 @@ uchar4 RS_KERNEL computeBlockAverages_planar(uint32_t x, uint32_t y) {
     for (uint32_t yy = ymin; yy < ymax; yy++) {
         for (uint32_t xx = xmin; xx < xmax; xx++) {
             uchar yuv_y = rsGetElementAt_uchar(yInput, xx, yy);
-            uchar yuv_u = rsGetElementAt_uchar(uInput, xx, yy);
-            uchar yuv_v = rsGetElementAt_uchar(vInput, xx, yy);
+            uchar yuv_u = rsGetElementAt_uchar(uInput, xx / 2, yy / 2);
+            uchar yuv_v = rsGetElementAt_uchar(vInput, xx / 2, yy / 2);
             uchar4 rgba = rsYuvToRGBA_uchar4(yuv_y, yuv_u, yuv_v);
             redTotal += rgba.r;
             greenTotal += rgba.g;
