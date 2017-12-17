@@ -9,9 +9,11 @@ import android.renderscript.RenderScript
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Size
+import android.view.MotionEvent
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import kotlinx.android.synthetic.main.activity_main.*
 
@@ -29,6 +31,7 @@ class MainActivity : Activity() {
     private lateinit var rs: RenderScript
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var effectIndex = 0
+    private var inEffectSelectionMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +49,7 @@ class MainActivity : Activity() {
         switchEffectButton.setOnClickListener(this::switchEffect)
         takePictureButton.setOnClickListener(this::takePicture)
         libraryButton.setOnClickListener(this::gotoLibrary)
+        overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
     }
 
     override fun onResume() {
@@ -163,8 +167,36 @@ class MainActivity : Activity() {
     }
 
     private fun switchEffect(view: View) {
+        /*
         effectIndex = (effectIndex + 1) % allEffectFactories.size
         imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
+        */
+        inEffectSelectionMode = !inEffectSelectionMode
+        if (inEffectSelectionMode) {
+            val comboEffect = CombinationEffect(rs, allEffectFactories)
+            // TODO: Reduce preview size so tiles don't compute full resolution.
+            this.imageProcessor.start(comboEffect, this::handleGeneratedBitmap)
+        }
+        else {
+            imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
+        }
+    }
+
+    private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            if (inEffectSelectionMode) {
+                val gridSize = Math.floor(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                val tileWidth = view.width / gridSize
+                val tileHeight = view.height / gridSize
+                val tileX = (event.x / tileWidth).toInt()
+                val tileY = (event.y / tileHeight).toInt()
+                val index = gridSize * tileY + tileX
+
+                effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
+                imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
+                inEffectSelectionMode = false
+            }
+        }
     }
 
     private fun takePicture(view: View) {
