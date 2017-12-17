@@ -1,7 +1,8 @@
-package com.dozingcatsoftware.boojiecam
+package com.dozingcatsoftware.boojiecam.effect
 
 import android.graphics.Bitmap
 import android.renderscript.*
+import com.dozingcatsoftware.boojiecam.*
 
 /**
  * Created by brian on 10/16/17.

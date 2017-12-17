@@ -1,13 +1,8 @@
 package com.dozingcatsoftware.boojiecam
 
-import android.graphics.Bitmap
-import android.graphics.Paint
-import android.graphics.RectF
 import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.Type
 import android.util.Log
+import com.dozingcatsoftware.boojiecam.effect.Effect
 import java.lang.ref.WeakReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock

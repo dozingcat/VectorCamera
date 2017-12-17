@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.graphics.*
+import com.dozingcatsoftware.boojiecam.effect.Effect
 
 data class ProcessedBitmap(
         val effect: Effect,

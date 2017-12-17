@@ -12,6 +12,7 @@ import android.util.Size
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : Activity() {

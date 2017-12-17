@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.renderscript.RenderScript
+import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 
 class ViewImageActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()

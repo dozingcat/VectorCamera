@@ -1,8 +1,9 @@
-package com.dozingcatsoftware.boojiecam
+package com.dozingcatsoftware.boojiecam.effect
 
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
+import com.dozingcatsoftware.boojiecam.CameraImage
 
 /**
  * Created by brian on 12/16/17.

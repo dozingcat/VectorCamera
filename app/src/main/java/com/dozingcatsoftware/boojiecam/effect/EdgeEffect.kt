@@ -1,9 +1,10 @@
-package com.dozingcatsoftware.boojiecam
+package com.dozingcatsoftware.boojiecam.effect
 
 import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import com.dozingcatsoftware.boojiecam.*
 
 class EdgeEffect(val rs: RenderScript,
                  private val effectParams: Map<String, Any>,
@@ -60,7 +61,7 @@ class EdgeEffect(val rs: RenderScript,
                     val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
                     val maxEdgeColor = intFromArgbList(params["maxEdgeColor"] as List<Int>)
                     val colorMap = makeAllocationColorMap(rs, minEdgeColor, maxEdgeColor)
-                    return EdgeEffect(rs, params, colorMap, {_, _ -> null})
+                    return EdgeEffect(rs, params, colorMap, { _, _ -> null })
                 }
                 "linear_gradient" -> {
                     val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)

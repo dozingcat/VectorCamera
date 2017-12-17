@@ -1,4 +1,4 @@
-package com.dozingcatsoftware.boojiecam
+package com.dozingcatsoftware.boojiecam.effect
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import com.dozingcatsoftware.boojiecam.*
 
 /**
  * Created by brian on 10/13/17.
