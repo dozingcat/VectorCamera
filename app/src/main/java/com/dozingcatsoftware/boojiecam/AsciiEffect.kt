@@ -138,5 +138,10 @@ class AsciiEffect(val rs: RenderScript): Effect {
 
     companion object {
         val EFFECT_NAME = "ascii"
+
+        fun fromParameters(rs: RenderScript, params: Map<String, Any>): AsciiEffect {
+            // TODO: Read params and add to constructor.
+            return AsciiEffect(rs)
+        }
     }
 }

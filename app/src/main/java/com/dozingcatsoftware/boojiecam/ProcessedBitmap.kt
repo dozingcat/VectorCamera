@@ -3,6 +3,7 @@ package com.dozingcatsoftware.boojiecam
 import android.graphics.*
 
 data class ProcessedBitmap(
+        val effect: Effect,
         val sourceImage: CameraImage,
         val bitmap: Bitmap,
         val backgroundPaintFn: (RectF) -> Paint?) {

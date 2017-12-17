@@ -116,7 +116,7 @@ class CameraAllocationProcessor {
 
             val bitmap = effect.createBitmap(currentCamAllocation!!)
             val backgroundPaintFn = effect.createPaintFn(currentCamAllocation!!)
-            callback(ProcessedBitmap(currentCamAllocation!!, bitmap, backgroundPaintFn))
+            callback(ProcessedBitmap(effect, currentCamAllocation!!, bitmap, backgroundPaintFn))
             currentCamAllocation = null
         }
     }

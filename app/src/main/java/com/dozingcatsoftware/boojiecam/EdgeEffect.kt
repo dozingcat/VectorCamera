@@ -5,11 +5,8 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 
-/**
- * Created by brian on 10/18/17.
- */
-// TODO: add params to constructor and static factory method to build from params
 class EdgeEffect(val rs: RenderScript,
+                 private val effectParams: Map<String, Any>,
                  private val colorTable: Allocation,
                  private val paintFn: (CameraImage, RectF) -> Paint?): Effect {
 
@@ -17,6 +14,8 @@ class EdgeEffect(val rs: RenderScript,
     private var script: ScriptC_edge? = null
 
     override fun effectName() = EFFECT_NAME
+
+    override fun effectParameters() = effectParams
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (script == null) {
@@ -55,39 +54,46 @@ class EdgeEffect(val rs: RenderScript,
     companion object {
         val EFFECT_NAME = "edge"
 
-        fun withFixedColors(rs: RenderScript,
-                            minEdgeColor: Int, maxEdgeColor: Int): EdgeEffect {
-            return EdgeEffect(
-                    rs, makeAllocationColorMap(rs, minEdgeColor, maxEdgeColor), {_, _ -> null})
-        }
-
-        fun withLinearGradient(
-                rs: RenderScript, minEdgeColor: Int,
-                gradientStartColor: Int, gradientEndColor: Int): EdgeEffect {
-            val paintFn = fun(_: CameraImage, rect: RectF): Paint {
-                val p = Paint()
-                p.shader = LinearGradient(
-                        rect.left, rect.top, rect.right, rect.bottom,
-                        addAlpha(gradientStartColor), addAlpha(gradientEndColor),
-                        Shader.TileMode.MIRROR)
-                return p
+        fun fromParameters(rs: RenderScript, params: Map<String, Any>): EdgeEffect {
+            when (params["type"]) {
+                "fixed" -> {
+                    val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
+                    val maxEdgeColor = intFromArgbList(params["maxEdgeColor"] as List<Int>)
+                    val colorMap = makeAllocationColorMap(rs, minEdgeColor, maxEdgeColor)
+                    return EdgeEffect(rs, params, colorMap, {_, _ -> null})
+                }
+                "linear_gradient" -> {
+                    val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
+                    val gradientStartColor =
+                            intFromArgbList(params["gradientStartColor"] as List<Int>)
+                    val gradientEndColor =
+                            intFromArgbList(params["gradientEndColor"] as List<Int>)
+                    val paintFn = fun(_: CameraImage, rect: RectF): Paint {
+                        val p = Paint()
+                        p.shader = LinearGradient(
+                                rect.left, rect.top, rect.right, rect.bottom,
+                                addAlpha(gradientStartColor), addAlpha(gradientEndColor),
+                                Shader.TileMode.MIRROR)
+                        return p
+                    }
+                    return EdgeEffect(rs, params, makeAlphaAllocation(rs, minEdgeColor), paintFn)
+                }
+                "radial_gradient" -> {
+                    val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
+                    val centerColor = intFromArgbList(params["centerColor"] as List<Int>)
+                    val outerColor = intFromArgbList(params["outerColor"] as List<Int>)
+                    val paintFn = fun(_: CameraImage, rect: RectF): Paint {
+                        val p = Paint()
+                        p.shader = RadialGradient(
+                                rect.width() / 2, rect.height() / 2,
+                                maxOf(rect.width(), rect.height()) / 2f,
+                                addAlpha(centerColor), addAlpha(outerColor), Shader.TileMode.MIRROR)
+                        return p
+                    }
+                    return EdgeEffect(rs, params, makeAlphaAllocation(rs, minEdgeColor), paintFn)
+                }
             }
-            return EdgeEffect(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
+            throw IllegalArgumentException("Unknown parameters: " + params)
         }
-
-        fun withRadialGradient(
-                rs: RenderScript, minEdgeColor: Int,
-                centerColor: Int, outerColor: Int): EdgeEffect {
-            val paintFn = fun(_: CameraImage, rect: RectF): Paint {
-                val p = Paint()
-                p.shader = RadialGradient(
-                        rect.width() / 2, rect.height() / 2,
-                        maxOf(rect.width(), rect.height()) / 2f,
-                        addAlpha(centerColor), addAlpha(outerColor), Shader.TileMode.MIRROR)
-                return p
-            }
-            return EdgeEffect(rs, makeAlphaAllocation(rs, minEdgeColor), paintFn)
-        }
-
     }
 }

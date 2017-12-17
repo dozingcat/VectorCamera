@@ -8,7 +8,6 @@ import android.renderscript.RenderScript
 class ViewImageActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
     private lateinit var rs : RenderScript
-    private lateinit var effect: Effect
     private lateinit var imageId: String
     private lateinit var overlayView: OverlayView
 
@@ -17,10 +16,6 @@ class ViewImageActivity : Activity() {
         setContentView(R.layout.view_image)
         rs = RenderScript.create(this)
 
-        effect = EdgeLuminanceEffect(rs)
-        //imageProcessor = SolidColorEffect.withFixedColors(
-        //        rs, 0x000000, 0xffffff)
-
         imageId = intent.getStringExtra("imageId")
         overlayView = findViewById(R.id.overlayView)
         loadImage()
@@ -28,19 +23,27 @@ class ViewImageActivity : Activity() {
 
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val width = metadata.get("width") as Int
-        val height = metadata.get("height") as Int
+        val width = metadata["width"] as Int
+        val height = metadata["height"] as Int
         val planarYuv = photoLibrary.rawFileInputStreamForItemId(imageId).use {
             PlanarYuvAllocations.fromInputStream(rs, it, width, height)
         }
-        val xFlipped = (metadata.get("xFlipped") == true)
+        val xFlipped = (metadata["xFlipped"] == true)
         val orientation = if (xFlipped) ImageOrientation.ROTATED_180 else ImageOrientation.NORMAL
         val inputImage = CameraImage(null, planarYuv,
                 orientation, CameraStatus.CAPTURING_PHOTO, 0)
 
+        // Temporary workaround for pictures that didn't save effect dict.
+        val effectDict = if (metadata.containsKey("effect"))
+            metadata["effect"] as Map<String, Any>
+            else mapOf("name" to "edge_luminance", "params" to mapOf<String, Any>())
+
+        val effect = EffectRegistry.forNameAndParameters(rs,
+                effectDict["name"] as String,
+                effectDict["params"] as Map<String, Any>)
         val bitmap = effect.createBitmap(inputImage)
         val paintFn = effect.createPaintFn(inputImage)
-        overlayView.processedBitmap = ProcessedBitmap(inputImage, bitmap, paintFn)
+        overlayView.processedBitmap = ProcessedBitmap(effect, inputImage, bitmap, paintFn)
         overlayView.invalidate()
     }
 

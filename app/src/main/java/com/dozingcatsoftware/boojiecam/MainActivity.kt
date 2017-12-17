@@ -26,29 +26,7 @@ class MainActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
-
-    private val allEffects = arrayOf(
-            { EdgeLuminanceEffect(rs)},
-            { PermuteColorEffect.noOp(rs)},
-            { PermuteColorEffect.rgbToBrg(rs)},
-            { PermuteColorEffect.rgbToGbr(rs)},
-            {
-                EdgeEffect.withFixedColors(
-                    rs, 0x000000, 0x00ffff)},
-            {
-                EdgeEffect.withFixedColors(
-                    rs, 0x004080, 0xffa000)},
-            {
-                EdgeEffect.withLinearGradient(
-                    rs, 0x000000, 0x00ff00, 0x0000ff)},
-            {
-                EdgeEffect.withRadialGradient(
-                    rs, 0x191970, 0xffff00, 0xff4500)},
-            {
-                SolidColorEffect.withFixedColors(
-                    rs, 0x000000, 0xffffff)},
-            { AsciiEffect(rs)}
-    )
+    private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var effectIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,7 +135,7 @@ class MainActivity : Activity() {
                 CameraStatus.CAPTURING_PREVIEW,
                 this.targetCameraImageSize(),
                 this::handleAllocationFromCamera)
-        this.imageProcessor.start(allEffects[effectIndex](), this::handleGeneratedBitmap)
+        this.imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
     }
 
     private fun switchToNextCamera(view: View) {
@@ -184,8 +162,8 @@ class MainActivity : Activity() {
     }
 
     private fun switchEffect(view: View) {
-        effectIndex = (effectIndex + 1) % allEffects.size
-        imageProcessor.start(allEffects[effectIndex](), this::handleGeneratedBitmap)
+        effectIndex = (effectIndex + 1) % allEffectFactories.size
+        imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
     }
 
     private fun takePicture(view: View) {

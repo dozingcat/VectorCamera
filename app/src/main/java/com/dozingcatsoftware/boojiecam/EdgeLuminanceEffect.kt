@@ -47,5 +47,9 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
 
     companion object {
         val EFFECT_NAME = "edge_luminance"
+
+        fun fromParameters(rs: RenderScript, params: Map<String, Any>): EdgeLuminanceEffect {
+            return EdgeLuminanceEffect(rs)
+        }
     }
  }

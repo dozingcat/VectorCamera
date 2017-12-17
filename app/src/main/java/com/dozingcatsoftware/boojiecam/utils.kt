@@ -4,6 +4,8 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.Type
+import org.json.JSONArray
+import org.json.JSONObject
 
 inline fun toUInt(b: Byte): Int {
     return b.toInt() and 0xff
@@ -13,11 +15,11 @@ inline fun addAlpha(color: Int): Int {
     return 0xff000000.toInt() or color
 }
 
-fun argbArrayFromInt(argb: Int): IntArray {
-    return intArrayOf(argb shr 24, (argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
+fun argbArrayFromInt(argb: Int): List<Int> {
+    return listOf(argb shr 24, (argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
 }
 
-fun intFromArgbArray(a: IntArray): Int {
+fun intFromArgbList(a: List<Int>): Int {
     return (a[0] shl 24) or (a[1] shl 16) or (a[2] shl 8) or a[3]
 }
 
@@ -112,3 +114,29 @@ fun makeAlphaAllocation(rs: RenderScript, color: Int): Allocation {
     allocation.copyFrom(colors)
     return allocation
 }
+
+fun convertJsonValue(value: Any): Any {
+    // JSONObject.NULL will be unmodified.
+    return when (value) {
+        is JSONObject -> jsonObjectToMap(value)
+        is JSONArray -> jsonArrayToList(value)
+        else -> value
+    }
+}
+
+fun jsonObjectToMap(json: JSONObject): Map<String, Any> {
+    val m = mutableMapOf<String, Any>()
+    for (key in json.keys()) {
+        m[key] = convertJsonValue(json.get(key))
+    }
+    return m
+}
+
+fun jsonArrayToList(json: JSONArray): List<Any> {
+    val list = mutableListOf<Any>()
+    for (i in 0 until json.length()) {
+        list.add(convertJsonValue(json.get(i)))
+    }
+    return list
+}
+

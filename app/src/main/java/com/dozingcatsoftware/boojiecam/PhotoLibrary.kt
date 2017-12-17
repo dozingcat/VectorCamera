@@ -66,13 +66,18 @@ class PhotoLibrary(val rootDirectory: File) {
             val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
             Log.i(TAG, "Wrote $compressedSize bytes, compressed to $compressedPercent")
 
+            val effectInfo = mapOf(
+                    "name" to processedBitmap.effect.effectName(),
+                    "params" to processedBitmap.effect.effectParameters()
+            )
             val metadata = mapOf(
                     "type" to "image",
                     "width" to width,
                     "height" to height,
                     "xFlipped" to sourceImage.orientation.isXFlipped(),
                     "yFlipped" to sourceImage.orientation.isYFlipped(),
-                    "timestamp" to sourceImage.timestamp
+                    "timestamp" to sourceImage.timestamp,
+                    "effect" to effectInfo
             )
             val json = JSONObject(metadata).toString(2)
             metadataDirectory.mkdirs()
@@ -136,9 +141,9 @@ class PhotoLibrary(val rootDirectory: File) {
         return File(metadataDirectory, itemId + ".json")
     }
 
-    fun metadataForItemId(itemId: String): JSONObject {
+    fun metadataForItemId(itemId: String): Map<String, Any> {
         val mdText = metadataFileForItemId(itemId).readText()
-        return JSONObject(mdText)
+        return jsonObjectToMap(JSONObject(mdText))
     }
 
     companion object {
