@@ -172,10 +172,6 @@ class MainActivity : Activity() {
     }
 
     private fun switchEffect(view: View) {
-        /*
-        effectIndex = (effectIndex + 1) % allEffectFactories.size
-        imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
-        */
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             val comboEffect = CombinationEffect(rs, allEffectFactories)

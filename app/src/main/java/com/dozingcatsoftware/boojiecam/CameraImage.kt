@@ -32,4 +32,3 @@ data class CameraImage(val singleYuvAllocation: Allocation?,
         }
     }
 }
-
