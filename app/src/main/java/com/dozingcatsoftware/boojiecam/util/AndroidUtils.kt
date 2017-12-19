@@ -1,47 +1,19 @@
 package com.dozingcatsoftware.util
 
 import java.io.FileNotFoundException
-import java.lang.reflect.Method
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Paint
 import android.media.MediaScannerConnection
 import android.net.Uri
-import android.view.View
 
 object AndroidUtils {
-
-    /** Adds a click listener to the given view which invokes the method named by methodName on the given target.
-     * The method must be public and take no arguments.
-     */
-    fun bindOnClickListener(target: Any, view: View, methodName: String) {
-        val method: Method
-        try {
-            method = target.javaClass.getMethod(methodName)
-        } catch (ex: Exception) {
-            throw IllegalArgumentException(ex)
-        }
-
-        view.setOnClickListener {
-            try {
-                method.invoke(target)
-            } catch (ex: Exception) {
-                throw RuntimeException(ex)
-            }
-        }
-    }
-
-    interface MediaScannerCallback {
-        fun mediaScannerCompleted(scanPath: String, scanURI: Uri)
-    }
-
     /** Notifies the OS to index the new image, so it shows up in Gallery. Allows optional callback method to notify client when
      * the scan is completed, e.g. so it can access the "content" URI that gets assigned.
      */
-    @JvmOverloads
-    fun scanSavedMediaFile(context: Context, path: String, callback: MediaScannerCallback? = null) {
+    fun scanSavedMediaFile(context: Context, path: String,
+                           callback: ((String, Uri) -> Unit)? = null) {
         // silly array hack so closure can reference scannerConnection[0] before it's created
         val scannerConnection = arrayOfNulls<MediaScannerConnection>(1)
         try {
@@ -52,7 +24,9 @@ object AndroidUtils {
 
                 override fun onScanCompleted(scanPath: String, scanURI: Uri) {
                     scannerConnection[0]!!.disconnect()
-                    callback?.mediaScannerCompleted(scanPath, scanURI)
+                    if (callback != null) {
+                        callback(scanPath, scanURI)
+                    }
                 }
             }
             scannerConnection[0] = MediaScannerConnection(context, scannerClient)
@@ -171,51 +145,5 @@ object AndroidUtils {
         }
         result[n] = max
         return result
-    }
-
-    /** On API level 14 (ICS) or higher, calls view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE)
-     * and returns true. On earlier API versions, does nothing and returns false.
-     */
-    fun setSystemUiLowProfile(view: View): Boolean {
-        return setSystemUiVisibility(view, "SYSTEM_UI_FLAG_LOW_PROFILE")
-    }
-
-    internal fun setSystemUiVisibility(view: View, flagName: String): Boolean {
-        try {
-            val setUiMethod = View::class.java.getMethod("setSystemUiVisibility", Int::class.javaPrimitiveType)
-            val flagField = View::class.java.getField(flagName)
-            setUiMethod.invoke(view, flagField.get(null))
-            return true
-        } catch (ex: Exception) {
-            return false
-        }
-
-    }
-
-    /** Returns the estimated memory usage in bytes for a bitmap. Calls bitmap.getByteCount() if that method
-     * is available (in API level 12 or higher), otherwise returns 4 times the number of pixels in the bitmap.
-     */
-    fun getBitmapByteCount(bitmap: Bitmap): Int {
-        try {
-            val byteCountMethod = Bitmap::class.java.getMethod("getByteCount")
-            return byteCountMethod.invoke(bitmap) as Int
-        } catch (ex: Exception) {
-            return 4 * bitmap.width * bitmap.height
-        }
-
-    }
-
-    /** Enables or disables hardware acceleration for a view, if supported by the API. Returns true if successful  */
-    fun setViewHardwareAcceleration(view: View, enabled: Boolean): Boolean {
-        try {
-            val setLayerType = View::class.java.getMethod("setLayerType", Int::class.javaPrimitiveType, Paint::class.java)
-            val fieldName = if (enabled) "LAYER_TYPE_HARDWARE" else "LAYER_TYPE_SOFTWARE"
-            val layerType = View::class.java.getField(fieldName).get(null) as Int
-            setLayerType.invoke(view, layerType, null)
-            return true
-        } catch (ignored: Exception) {
-            return false
-        }
-
     }
 }

@@ -57,6 +57,7 @@ class MainActivity : Activity() {
         super.onResume()
         Log.i(TAG, "onResume")
         checkPermissionAndStartCamera()
+        overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
     }
 
     override fun onPause() {

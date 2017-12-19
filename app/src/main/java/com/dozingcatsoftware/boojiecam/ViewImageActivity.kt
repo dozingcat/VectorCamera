@@ -2,13 +2,17 @@ package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
 import android.content.Intent
+import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
 import android.renderscript.RenderScript
 import android.view.MotionEvent
 import android.view.View
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
+import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.view_image.*
 
 class ViewImageActivity : Activity() {
@@ -17,6 +21,7 @@ class ViewImageActivity : Activity() {
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
+    private val handler = Handler()
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,6 +29,7 @@ class ViewImageActivity : Activity() {
         rs = RenderScript.create(this)
 
         switchEffectButton.setOnClickListener(this::switchEffect)
+        shareButton.setOnClickListener(this::shareImage)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         imageId = intent.getStringExtra("imageId")
@@ -93,6 +99,21 @@ class ViewImageActivity : Activity() {
                 inEffectSelectionMode = false
             }
         }
+    }
+
+    private fun shareImage(view: View) {
+        val callback = {path: String, uri: Uri -> handler.post({
+            val shareIntent = Intent(Intent.ACTION_SEND)
+            shareIntent.type = "image/jpeg"
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "BoojieCam Picture")
+            shareIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(shareIntent, "Share Picture Using:"))
+        }) as Unit}
+
+        AndroidUtils.scanSavedMediaFile(this, photoLibrary.imageFileForItemId(imageId).path,
+                callback)
     }
 
     companion object {

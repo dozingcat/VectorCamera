@@ -90,7 +90,7 @@ class PhotoLibrary(val rootDirectory: File) {
             run {
                 val resultBitmap = processedBitmap.renderBitmap(width, height)
                 imageDirectory.mkdirs()
-                val pngOutputStream = FileOutputStream(File(imageDirectory, photoId + ".jpg"))
+                val pngOutputStream = FileOutputStream(imageFileForItemId(photoId))
                 pngOutputStream.use({
                     resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
                 })
@@ -139,6 +139,10 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun metadataFileForItemId(itemId: String): File {
         return File(metadataDirectory, itemId + ".json")
+    }
+
+    fun imageFileForItemId(itemId: String): File {
+        return File(imageDirectory, itemId + ".jpg")
     }
 
     fun metadataForItemId(itemId: String): Map<String, Any> {
