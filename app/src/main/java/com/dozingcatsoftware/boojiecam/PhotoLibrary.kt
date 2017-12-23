@@ -33,11 +33,11 @@ import java.util.zip.GZIPOutputStream
  */
 class PhotoLibrary(val rootDirectory: File) {
 
-    val thumbnailDirectory = File(rootDirectory, "thumbnails")
-    val metadataDirectory = File(rootDirectory, "metadata")
-    val rawDirectory = File(rootDirectory, "raw")
-    val imageDirectory = File(rootDirectory, "images")
-    val videoDirectory = File(rootDirectory, "videos")
+    private val thumbnailDirectory = File(rootDirectory, "thumbnails")
+    private val metadataDirectory = File(rootDirectory, "metadata")
+    private val rawDirectory = File(rootDirectory, "raw")
+    private val imageDirectory = File(rootDirectory, "images")
+    private val videoDirectory = File(rootDirectory, "videos")
 
     fun savePhoto(processedBitmap: ProcessedBitmap, yuvBytes: ByteArray,
                   successFn: (String) -> Unit,
@@ -52,13 +52,8 @@ class PhotoLibrary(val rootDirectory: File) {
 
             rawDirectory.mkdirs()
             val rawImageFile = rawFileForItemId(photoId)
-            // For some reason, using GZIPInputStream only reads a few hundred bytes rather than
-            // the entire file. (Even though copying the file and running gunzip works).
-            // Store uncompressed for now.
-//            GZIPOutputStream(FileOutputStream(rawImageFile)).use({
-//                it.write(processedBitmap.yuvBytes)
-//            })
-            FileOutputStream(rawImageFile).use({
+            // gzip compression usually saves about 50%.
+            GZIPOutputStream(FileOutputStream(rawImageFile)).use({
                 it.write(yuvBytes)
             })
             val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
@@ -133,8 +128,12 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     fun rawFileInputStreamForItemId(itemId: String): InputStream {
-        // return GZIPInputStream(FileInputStream(rawFileForItemId(itemId)))
-        return FileInputStream(rawFileForItemId(itemId))
+        // Backwards compatibility for uncompressed images, remove when no longer needed.
+        val file = rawFileForItemId(itemId)
+        if (file.length() == 1920L * 1080 * 3 / 2) {
+            return FileInputStream(rawFileForItemId(itemId))
+        }
+        return GZIPInputStream(FileInputStream(rawFileForItemId(itemId)))
     }
 
     fun metadataFileForItemId(itemId: String): File {

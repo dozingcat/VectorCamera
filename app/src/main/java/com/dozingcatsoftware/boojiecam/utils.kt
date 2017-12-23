@@ -6,6 +6,7 @@ import android.renderscript.RenderScript
 import android.renderscript.Type
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.InputStream
 
 inline fun toUInt(b: Byte): Int {
     return b.toInt() and 0xff
@@ -21,6 +22,13 @@ fun argbArrayFromInt(argb: Int): List<Int> {
 
 fun intFromArgbList(a: List<Int>): Int {
     return (a[0] shl 24) or (a[1] shl 16) or (a[2] shl 8) or a[3]
+}
+
+fun readBytesIntoBuffer(input: InputStream, bytesToRead: Int, buffer: ByteArray, offset: Int = 0) {
+    var totalBytesRead = 0
+    while (totalBytesRead < bytesToRead) {
+        totalBytesRead += input.read(buffer, offset + totalBytesRead, bytesToRead - totalBytesRead)
+    }
 }
 
 fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {

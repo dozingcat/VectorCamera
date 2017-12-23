@@ -17,12 +17,12 @@ class PlanarYuvAllocations(val y: Allocation, val u: Allocation, val v: Allocati
             val vAlloc = create2dAllocation(rs, Element::U8, uvWidth, uvHeight)
 
             var buffer = ByteArray(width * height)
-            input.read(buffer)
+            readBytesIntoBuffer(input, buffer.size, buffer)
             yAlloc.copyFrom(buffer)
             buffer = ByteArray(uvWidth * uvHeight)
-            input.read(buffer)
+            readBytesIntoBuffer(input, buffer.size, buffer)
             uAlloc.copyFrom(buffer)
-            input.read(buffer)
+            readBytesIntoBuffer(input, buffer.size, buffer)
             vAlloc.copyFrom(buffer)
             return PlanarYuvAllocations(yAlloc, uAlloc, vAlloc)
         }
