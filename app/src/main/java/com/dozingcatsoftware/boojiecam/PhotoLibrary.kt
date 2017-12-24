@@ -4,10 +4,7 @@ import android.graphics.Bitmap
 import android.os.Environment
 import android.util.Log
 import org.json.JSONObject
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.InputStream
+import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.GZIPInputStream
@@ -24,7 +21,8 @@ import java.util.zip.GZIPOutputStream
  *         [video_id].json
  *     raw/
  *         [image_id].gz
- *         [video_id].gz
+ *         [video_id]_video.gz
+ *         [video_id]_audio.gz
  *     images/
  *         [image_id].jpg
  *         [video_id].jpg (if exported)
@@ -125,6 +123,15 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun rawFileForItemId(itemId: String): File {
         return File(rawDirectory, itemId + ".gz")
+    }
+
+    fun createRawFileOutputStreamForItemId(itemId: String): OutputStream {
+        val file = rawFileForItemId(itemId)
+        if (file.exists()) {
+            throw IllegalStateException("File already exists")
+        }
+        rawDirectory.mkdirs()
+        return FileOutputStream(file)
     }
 
     fun rawFileInputStreamForItemId(itemId: String): InputStream {

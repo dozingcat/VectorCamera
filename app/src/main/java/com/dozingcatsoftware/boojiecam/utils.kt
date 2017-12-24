@@ -6,7 +6,9 @@ import android.renderscript.RenderScript
 import android.renderscript.Type
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.io.OutputStream
 
 inline fun toUInt(b: Byte): Int {
     return b.toInt() and 0xff
@@ -29,6 +31,11 @@ fun readBytesIntoBuffer(input: InputStream, bytesToRead: Int, buffer: ByteArray,
     while (totalBytesRead < bytesToRead) {
         totalBytesRead += input.read(buffer, offset + totalBytesRead, bytesToRead - totalBytesRead)
     }
+}
+
+fun gzipCompressToBuffer(input: ByteArray, buffer: OutputStream) {
+    val input = ByteArrayInputStream(input)
+    val output =
 }
 
 fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
