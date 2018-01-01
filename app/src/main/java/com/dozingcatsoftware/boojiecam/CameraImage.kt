@@ -11,13 +11,11 @@ data class CameraImage(val singleYuvAllocation: Allocation?,
                        val timestamp: Long) {
 
     fun width(): Int {
-        return if (singleYuvAllocation != null) singleYuvAllocation.type.x
-               else planarYuvAllocations!!.y.type.x
+        return singleYuvAllocation?.type?.x ?: planarYuvAllocations!!.y.type.x
     }
 
     fun height(): Int {
-        return if (singleYuvAllocation != null) singleYuvAllocation.type.y
-        else planarYuvAllocations!!.y.type.y
+        return singleYuvAllocation?.type?.y ?: planarYuvAllocations!!.y.type.y
     }
 
     companion object {

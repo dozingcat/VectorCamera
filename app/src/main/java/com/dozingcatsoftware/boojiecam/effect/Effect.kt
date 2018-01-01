@@ -8,6 +8,8 @@ import com.dozingcatsoftware.boojiecam.CameraImage
 /**
  * Created by brian on 12/16/17.
  */
+data class EffectMetadata(val name: String, val parameters: Map<String, Any>)
+
 interface Effect {
     fun createBitmap(cameraImage: CameraImage): Bitmap
 
@@ -19,4 +21,5 @@ interface Effect {
 
     fun effectParameters(): Map<String, Any> = mapOf()
 
+    fun effectMetadata(): EffectMetadata = EffectMetadata(effectName(), effectParameters())
 }

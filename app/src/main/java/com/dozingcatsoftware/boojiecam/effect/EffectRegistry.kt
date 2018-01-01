@@ -53,14 +53,15 @@ object EffectRegistry {
         */
     }
 
-    fun forNameAndParameters(rs: RenderScript, name: String, params: Map<String, Any>): Effect {
-        return when (name) {
+    fun forMetadata(rs: RenderScript, metadata: EffectMetadata): Effect {
+        val params = metadata.parameters
+        return when (metadata.name) {
             AsciiEffect.EFFECT_NAME -> AsciiEffect.fromParameters(rs, params)
             EdgeEffect.EFFECT_NAME -> EdgeEffect.fromParameters(rs, params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
-            else -> throw IllegalArgumentException("Unknown effect: " + name)
+            else -> throw IllegalArgumentException("Unknown effect: " + metadata.name)
         }
     }
 }

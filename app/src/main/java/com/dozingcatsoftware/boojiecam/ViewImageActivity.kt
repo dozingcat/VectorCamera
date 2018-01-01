@@ -2,7 +2,6 @@ package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
 import android.content.Intent
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -35,26 +34,18 @@ class ViewImageActivity : Activity() {
         imageId = intent.getStringExtra("imageId")
         loadImage()
 
-        // TODO: Controls to change effect, share, delete.
+        // TODO: Controls to delete, (maybe) save changed effect.
     }
 
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
-        // Temporary workaround for pictures that didn't save effect dict.
-        val effectDict = if (metadata.containsKey("effect"))
-            metadata["effect"] as Map<String, Any>
-            else mapOf("name" to "edge_luminance", "params" to mapOf<String, Any>())
-
-        val effect = EffectRegistry.forNameAndParameters(rs,
-                effectDict["name"] as String,
-                effectDict["params"] as Map<String, Any>)
+        val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         showImage(effect, metadata)
     }
 
     private fun switchEffect(view: View) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
-            val metadata = photoLibrary.metadataForItemId(imageId)
             val comboEffect = CombinationEffect(rs, allEffectFactories)
             // FIXME: This is slow because the saved image is high resolution.
             showImage(comboEffect, photoLibrary.metadataForItemId(imageId))
@@ -64,16 +55,12 @@ class ViewImageActivity : Activity() {
         }
     }
 
-    private fun showImage(effect: Effect, metadata: Map<String, Any>) {
-        val width = metadata["width"] as Int
-        val height = metadata["height"] as Int
-        val planarYuv = photoLibrary.rawFileInputStreamForItemId(imageId).use {
-            PlanarYuvAllocations.fromInputStream(rs, it, width, height)
+    private fun showImage(effect: Effect, metadata: MediaMetadata) {
+        val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
+            PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
-        val xFlipped = (metadata["xFlipped"] == true)
-        val orientation = if (xFlipped) ImageOrientation.ROTATED_180 else ImageOrientation.NORMAL
         val inputImage = CameraImage(null, planarYuv,
-                orientation, CameraStatus.CAPTURING_PHOTO, 0)
+                metadata.orientation, CameraStatus.CAPTURING_PHOTO, 0)
 
         val bitmap = effect.createBitmap(inputImage)
         val paintFn = effect.createPaintFn(inputImage)

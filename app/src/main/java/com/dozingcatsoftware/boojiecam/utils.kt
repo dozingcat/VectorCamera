@@ -33,11 +33,6 @@ fun readBytesIntoBuffer(input: InputStream, bytesToRead: Int, buffer: ByteArray,
     }
 }
 
-fun gzipCompressToBuffer(input: ByteArray, buffer: OutputStream) {
-    val input = ByteArrayInputStream(input)
-    val output =
-}
-
 fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
     // There's no way to directly read the U and V bytes from a YUV allocation(?), but we can
     // use a .rs script to extract the three planes into output allocations and combine them.

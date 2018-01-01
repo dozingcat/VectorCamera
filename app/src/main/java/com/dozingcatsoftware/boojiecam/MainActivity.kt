@@ -14,6 +14,7 @@ import android.view.View
 import android.view.Window
 import android.view.WindowManager
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
+import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import kotlinx.android.synthetic.main.activity_main.*
 
@@ -31,8 +32,14 @@ class MainActivity : Activity() {
     private lateinit var rs: RenderScript
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var effectIndex = 0
+    private var currentEffect: Effect? = null
     private var inEffectSelectionMode = false
     private var lastBitmapTimestamp = 0L
+
+    private var videoRecorder: VideoRecorder? = null
+    private var videoFrameMetadata: MediaMetadata? = null
+    private lateinit var imageSizeBeforeVideoRecording: ImageSize
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +48,8 @@ class MainActivity : Activity() {
 
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
+        // TODO: Save current effect in preferences.
+        currentEffect = allEffectFactories[effectIndex](rs)
 
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
@@ -50,6 +59,7 @@ class MainActivity : Activity() {
         switchEffectButton.setOnClickListener(this::switchEffect)
         takePictureButton.setOnClickListener(this::takePicture)
         libraryButton.setOnClickListener(this::gotoLibrary)
+        recordVideoButton.setOnClickListener(this::toggleVideoRecording)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
     }
 
@@ -135,18 +145,31 @@ class MainActivity : Activity() {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()
             }
+            if (camAllocation.status == CameraStatus.CAPTURING_VIDEO && videoRecorder != null) {
+                val yuvBytes = flattenedYuvImageBytes(rs, camAllocation.singleYuvAllocation!!)
+                if (videoFrameMetadata == null) {
+                    videoFrameMetadata = MediaMetadata(
+                            MediaType.VIDEO,
+                            currentEffect!!.effectMetadata(),
+                            camAllocation.width(),
+                            camAllocation.height(),
+                            camAllocation.orientation,
+                            camAllocation.timestamp)
+                }
+                videoRecorder!!.recordFrame(camAllocation.timestamp, yuvBytes)
+            }
             this.imageProcessor.queueAllocation(camAllocation)
         })
     }
 
-    private fun restartCameraImageGenerator() {
+    private fun restartCameraImageGenerator(cameraStatus: CameraStatus = CameraStatus.CAPTURING_PREVIEW) {
         // cameraImageGenerator?.pause()
         Log.i(TAG, "recreateCameraImageGenerator: " + this.targetCameraImageSize())
         cameraImageGenerator.start(
-                CameraStatus.CAPTURING_PREVIEW,
+                cameraStatus,
                 this.targetCameraImageSize(),
                 this::handleAllocationFromCamera)
-        this.imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
+        this.imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
     }
 
     private fun switchToNextCamera(view: View) {
@@ -175,13 +198,12 @@ class MainActivity : Activity() {
     private fun switchEffect(view: View) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
-            val comboEffect = CombinationEffect(rs, allEffectFactories)
-            // TODO: Reduce preview size so tiles don't compute full resolution?
-            this.imageProcessor.start(comboEffect, this::handleGeneratedBitmap)
+            currentEffect = CombinationEffect(rs, allEffectFactories)
         }
         else {
-            imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
+            currentEffect = allEffectFactories[effectIndex](rs)
         }
+        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
@@ -195,9 +217,9 @@ class MainActivity : Activity() {
                 val index = gridSize * tileY + tileX
 
                 effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
+                currentEffect = allEffectFactories[effectIndex](rs)
                 restartCameraImageGenerator()
-
-                imageProcessor.start(allEffectFactories[effectIndex](rs), this::handleGeneratedBitmap)
+                imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
                 inEffectSelectionMode = false
             }
         }
@@ -216,6 +238,43 @@ class MainActivity : Activity() {
 
     private fun gotoLibrary(view: View) {
         this.startActivity(Intent(this, ImageListActivity::class.java))
+    }
+
+    private fun toggleVideoRecording(view: View) {
+        if (videoRecorder == null) {
+            // TODO: audio
+            Log.i(TAG, "Starting video recording")
+            val videoId = photoLibrary.itemIdForTimestamp(System.currentTimeMillis())
+            val videoStream = photoLibrary.createTempRawVideoFileOutputStreamForItemId(videoId)
+            imageSizeBeforeVideoRecording = preferredImageSize
+            preferredImageSize = ImageSize.VIDEO_RECORDING
+            videoFrameMetadata = null
+            restartCameraImageGenerator(CameraStatus.CAPTURING_VIDEO)
+            videoRecorder = VideoRecorder(videoId, videoStream, this::videoRecorderUpdated)
+            videoRecorder!!.start()
+        }
+        else {
+            Log.i(TAG, "Stopping video recording")
+            videoRecorder!!.stop()
+            videoRecorder = null
+        }
+    }
+
+    private fun videoRecorderUpdated(recorder: VideoRecorder) {
+        when (recorder.status) {
+            VideoRecorder.Status.RUNNING -> {
+                // TODO: Update recording stats for display.
+                Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size +
+                    ", bytes: " + recorder.bytesWritten)
+            }
+            VideoRecorder.Status.FINISHED -> {
+                Log.i(TAG, "Video recording stopped, writing to library")
+                photoLibrary.saveVideo(
+                        recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
+                preferredImageSize = imageSizeBeforeVideoRecording!!
+                restartCameraImageGenerator()
+            }
+        }
     }
 
     /**
