@@ -1,10 +1,13 @@
 package com.dozingcatsoftware.boojiecam
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Environment
+import android.renderscript.RenderScript
 import android.util.Log
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectMetadata
+import com.dozingcatsoftware.util.AndroidUtils
 import org.json.JSONObject
 import java.io.*
 import java.text.SimpleDateFormat
@@ -23,16 +26,21 @@ import java.util.zip.GZIPOutputStream
  *         [video_id].json
  *     raw/
  *         [image_id].gz
- *         [video_id]_video.gz
- *         [video_id]_audio.gz
+ *         [video_id]_video.dat
+ *         [video_id]_audio.dat
  *     images/
  *         [image_id].jpg
  *         [video_id].jpg (if exported)
  *     videos/
  *         [video_id].webm (if exported)
+ *     raw_tmp/
+ *         [video ID of recording in progress]_video.dat
+ *         [video ID of recording in progress]_audio.dat
  *
- *  TODO: "raw_tmp" or something to hold in-progress video recordings, so they
- *  can be cleaned up if the recording fails.
+ *  "raw_tmp" holds in-progress video recordings, so they can be cleaned up if the recording fails.
+ *  Images are stored as flattened YUV data; first (width*height) bytes of Y, then
+ *  (width*height/4) bytes of U, then (width*height/4) bytes of V. Video files store individual
+ *  frames concatenated together.
  */
 class PhotoLibrary(val rootDirectory: File) {
 
@@ -45,7 +53,7 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
-    fun savePhoto(processedBitmap: ProcessedBitmap, yuvBytes: ByteArray,
+    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap, yuvBytes: ByteArray,
                   successFn: (String) -> Unit,
                   errorFn: (Exception) -> Unit) {
         try {
@@ -67,19 +75,10 @@ class PhotoLibrary(val rootDirectory: File) {
             val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
             Log.i(TAG, "Wrote $compressedSize bytes, compressed to $compressedPercent")
 
-            val effectInfo = mapOf(
-                    "name" to processedBitmap.effect.effectName(),
-                    "params" to processedBitmap.effect.effectParameters()
-            )
-            val metadata = mapOf(
-                    "type" to "image",
-                    "width" to width,
-                    "height" to height,
-                    "xFlipped" to sourceImage.orientation.isXFlipped(),
-                    "yFlipped" to sourceImage.orientation.isYFlipped(),
-                    "timestamp" to sourceImage.timestamp,
-                    "effect" to effectInfo
-            )
+            val effectMetadata = EffectMetadata(
+                    processedBitmap.effect.effectName(), processedBitmap.effect.effectParameters())
+            val metadata = MediaMetadata(MediaType.IMAGE, effectMetadata, width, height,
+                    sourceImage.orientation, sourceImage.timestamp)
             writeMetadata(metadata, photoId)
 
             // Write full size image and thumbnail.
@@ -87,10 +86,12 @@ class PhotoLibrary(val rootDirectory: File) {
             run {
                 val resultBitmap = processedBitmap.renderBitmap(width, height)
                 imageDirectory.mkdirs()
-                val pngOutputStream = FileOutputStream(imageFileForItemId(photoId))
+                val pngFile = imageFileForItemId(photoId)
+                val pngOutputStream = FileOutputStream(pngFile)
                 pngOutputStream.use({
                     resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
                 })
+                AndroidUtils.scanSavedMediaFile(context, pngFile.path)
             }
             run {
                 thumbnailDirectory.mkdirs()
@@ -121,8 +122,8 @@ class PhotoLibrary(val rootDirectory: File) {
                 .map({it.name.substring(0, it.name.lastIndexOf('.'))})
     }
 
-    fun writeMetadata(metadata: Map<String, Any>, itemId: String) {
-        val json = JSONObject(metadata).toString(2)
+    fun writeMetadata(metadata: MediaMetadata, itemId: String) {
+        val json = JSONObject(metadata.toJson()).toString(2)
         metadataDirectory.mkdirs()
         FileOutputStream(metadataFileForItemId(itemId)).use({
             it.write(json.toByteArray(Charsets.UTF_8))
@@ -138,19 +139,19 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     fun rawVideoFileForItemId(itemId: String): File {
-        return File(rawDirectory, itemId + "_video.gz")
+        return File(rawDirectory, itemId + "_video.dat")
     }
 
     fun rawAudioFileForItemId(itemId: String): File {
-        return File(rawDirectory, itemId + "_audio.gz")
+        return File(rawDirectory, itemId + "_audio.dat")
     }
 
     private fun tempRawVideoFileForItemId(itemId: String): File {
-        return File(tempRawDirectory, itemId + "_video.gz")
+        return File(tempRawDirectory, itemId + "_video.dat")
     }
 
     private fun tempRawAudioFileForItemId(itemId: String): File {
-        return File(tempRawDirectory, itemId + "_audio.gz")
+        return File(tempRawDirectory, itemId + "_audio.dat")
     }
 
     private fun createTempRawFileOutputStream(file: File): OutputStream {
@@ -182,7 +183,8 @@ class PhotoLibrary(val rootDirectory: File) {
         return GZIPInputStream(FileInputStream(rawImageFileForItemId(itemId)))
     }
 
-    fun saveVideo(itemId: String, imageInfo: MediaMetadata, frameTimestamps: List<Long>) {
+    fun saveVideo(rs: RenderScript, itemId: String, imageInfo: MediaMetadata,
+                  frameTimestamps: List<Long>) {
         // Move video/audio files from tmp_raw/ to raw/, write metadata.json.
         val videoFile = tempRawVideoFileForItemId(itemId)
         val audioFile = tempRawAudioFileForItemId(itemId)
@@ -193,30 +195,23 @@ class PhotoLibrary(val rootDirectory: File) {
         if (audioFile.exists()) {
             audioFile.renameTo(rawAudioFileForItemId(itemId))
         }
-        val effectInfo = mapOf<String, Any>(
-                "name" to imageInfo.effectMetadata.name,
-                "params" to imageInfo.effectMetadata.parameters
-        )
-        val metadata = mapOf(
-                "type" to "video",
-                "width" to imageInfo.width,
-                "height" to imageInfo.height,
-                "xFlipped" to imageInfo.orientation.isXFlipped(),
-                "yFlipped" to imageInfo.orientation.isYFlipped(),
-                "timestamp" to imageInfo.timestamp,
-                "frameTimestamps" to frameTimestamps,
-                "effect" to effectInfo)
+        val metadata = MediaMetadata(
+                MediaType.VIDEO, imageInfo.effectMetadata, imageInfo.width, imageInfo.height,
+                imageInfo.orientation, imageInfo.timestamp, frameTimestamps)
         writeMetadata(metadata, itemId)
+        // Create thumbnail by rendering the first frame.
+        // Circular dependency, ick.
+        val videoReader = VideoReader(rs, this, itemId)
     }
 
     fun rawVideoRandomAccessFileForItemId(itemId: String): RandomAccessFile? {
         val file = rawVideoFileForItemId(itemId)
-        return if (file == null) null else RandomAccessFile(file, "r")
+        return if (file.isFile) null else RandomAccessFile(file, "r")
     }
 
     fun rawAudioRandomAccessFileForItemId(itemId: String): RandomAccessFile? {
         val file = rawAudioFileForItemId(itemId)
-        return if (file == null) null else RandomAccessFile(file, "r")
+        return if (file.isFile) null else RandomAccessFile(file, "r")
     }
 
     fun metadataFileForItemId(itemId: String): File {
@@ -230,20 +225,7 @@ class PhotoLibrary(val rootDirectory: File) {
     fun metadataForItemId(itemId: String): MediaMetadata {
         val mdText = metadataFileForItemId(itemId).readText()
         val mdMap = jsonObjectToMap(JSONObject(mdText))
-        val effectDict = mdMap["effect"] as Map<String, Any>
-        val frameTimestamps = mdMap.getOrElse("frameTimestamps", {listOf<Long>()})
-        return MediaMetadata(
-                MediaType.forType(mdMap["type"] as String),
-                EffectMetadata(
-                        effectDict["name"] as String,
-                        effectDict["params"] as Map<String, Any>),
-                (mdMap["width"] as Number).toInt(),
-                (mdMap["height"] as Number).toInt(),
-                ImageOrientation.withXYFlipped(
-                        mdMap["xFlipped"] as Boolean, mdMap["yFlipped"] as Boolean),
-                mdMap["timestamp"] as Long,
-                frameTimestamps as List<Long>)
-
+        return MediaMetadata.fromJson(mdMap)
     }
 
     companion object {

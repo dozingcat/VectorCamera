@@ -127,7 +127,7 @@ class MainActivity : Activity() {
                 Thread({
                     val yuvBytes = flattenedYuvImageBytes(
                             rs, processedBitmap.sourceImage.singleYuvAllocation!!)
-                    photoLibrary.savePhoto(processedBitmap, yuvBytes,
+                    photoLibrary.savePhoto(this, processedBitmap, yuvBytes,
                             fun(photoId: String) {
                                 Log.i(TAG, "Saved $photoId")
                             },
@@ -270,7 +270,7 @@ class MainActivity : Activity() {
             VideoRecorder.Status.FINISHED -> {
                 Log.i(TAG, "Video recording stopped, writing to library")
                 photoLibrary.saveVideo(
-                        recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
+                        rs, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
                 preferredImageSize = imageSizeBeforeVideoRecording!!
                 restartCameraImageGenerator()
             }

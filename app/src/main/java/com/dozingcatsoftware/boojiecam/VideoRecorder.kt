@@ -4,7 +4,6 @@ import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.util.concurrent.locks.ReentrantLock
-import java.util.zip.GZIPOutputStream
 import kotlin.concurrent.withLock
 
 
@@ -31,12 +30,12 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
         if (writerThread != null) {
             throw IllegalStateException("Already started")
         }
-        writerThread = Thread(this::_threadEntry)
+        writerThread = Thread(this::threadEntry)
         writerThread!!.start()
     }
 
     fun recordFrame(timestamp: Long, frameBytes: ByteArray) {
-        Log.i("VideoRecorder", "recordFrame: " + timestamp + ", " + frameBytes.size + " bytes")
+        Log.i("VideoRecorder", "recordFrame: ${timestamp}, ${frameBytes.size} bytes")
         frameQueueLock.withLock({
             if (frameQueue.size < MAX_QUEUED_FRAMES) {
                 frameQueue.add(Frame(timestamp, frameBytes))
@@ -69,9 +68,10 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
         })
     }
 
-    private fun _threadEntry() {
+    private fun threadEntry() {
         var currentFrame: Frame? = null
         var compressedBuffer = ByteArrayOutputStream()
+        var isFirstFrame = false
         while (true) {
             while (currentFrame == null) {
                 if (writerThreadShouldExit()) {
@@ -87,7 +87,12 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
                     frameAvailable.awaitNanos(250000000)
                 }
             }
-
+            // For some reason the first frame is all zero bytes, which turns into a green square.
+            if (isFirstFrame) {
+                isFirstFrame = false
+                currentFrame = null
+                continue
+            }
             frameTimestamps.add(currentFrame.timestamp)
             frameByteOffsets.add(bytesWritten)
             compressedBuffer.reset()
@@ -102,8 +107,8 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
             val t3 = System.currentTimeMillis()
 
             bytesWritten += compressedBuffer.size()
-            Log.i("VideoRecorder", "Compressed to " + compressedBuffer.size() +
-                    ", bytesWritten=" + bytesWritten + ", times: " + (t2-t1) + " " + (t3-t2))
+            Log.i("VideoRecorder", "Compressed to ${compressedBuffer.size()}" +
+                    ", bytesWritten=${bytesWritten}, times: ${t2-t1} ${(t3-t2)}")
             frameCallback?.invoke(this)
             currentFrame = null
         }
