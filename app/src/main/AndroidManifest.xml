@@ -31,10 +31,12 @@
             android:name=".ImageListActivity">
         </activity>
         <activity
-            android:name=".ViewImageActivity">
+            android:name=".ViewImageActivity"
+            android:screenOrientation="landscape">
         </activity>
         <activity
-            android:name=".ViewVideoActivity">
+            android:name=".ViewVideoActivity"
+            android:screenOrientation="landscape">
         </activity>
 
     </application>

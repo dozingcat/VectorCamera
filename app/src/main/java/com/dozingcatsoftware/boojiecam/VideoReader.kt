@@ -11,7 +11,7 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     val videoFile: RandomAccessFile
     val audioFile: RandomAccessFile?
     val metadata: MediaMetadata
-    val effect: Effect
+    var effect: Effect
     val frameBuffer: ByteArray
 
     init {

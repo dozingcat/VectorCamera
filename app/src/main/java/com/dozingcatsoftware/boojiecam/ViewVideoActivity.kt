@@ -5,7 +5,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
+import android.view.MotionEvent
+import android.view.View
 import android.widget.SeekBar
+import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
+import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import kotlinx.android.synthetic.main.view_video.*
 
@@ -17,6 +21,7 @@ class ViewVideoActivity: Activity() {
     private lateinit var rs : RenderScript
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
+    private var originalEffect: Effect? = null
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private lateinit var videoReader: VideoReader
     private var frameIndex = 0
@@ -26,6 +31,10 @@ class ViewVideoActivity: Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.view_video)
         rs = RenderScript.create(this)
+
+        switchEffectButton.setOnClickListener(this::switchEffect)
+        overlayView.touchEventHandler = this::handleOverlayViewTouch
+        // TODO: sharing
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")
@@ -47,6 +56,40 @@ class ViewVideoActivity: Activity() {
         val bitmap = videoReader.bitmapForFrame(index)
         overlayView.processedBitmap = bitmap
         overlayView.invalidate()
+    }
+
+    private fun switchEffect(view: View) {
+        inEffectSelectionMode = !inEffectSelectionMode
+        if (inEffectSelectionMode) {
+            originalEffect = videoReader.effect
+            videoReader.effect = CombinationEffect(rs, allEffectFactories)
+        }
+        else {
+            videoReader.effect = originalEffect!!
+        }
+        loadFrame(frameIndex)
+    }
+
+    private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
+        // Mostly duplicated from MainActivity.
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            if (inEffectSelectionMode) {
+                val gridSize = Math.floor(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                val tileWidth = view.width / gridSize
+                val tileHeight = view.height / gridSize
+                val tileX = (event.x / tileWidth).toInt()
+                val tileY = (event.y / tileHeight).toInt()
+                val index = gridSize * tileY + tileX
+
+                val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
+                val effect = allEffectFactories[effectIndex](rs)
+                originalEffect = effect
+                videoReader.effect = effect
+                loadFrame(frameIndex)
+                // TODO: Update stored metadata (always? Or separate "save" action?)
+                inEffectSelectionMode = false
+            }
+        }
     }
 
     companion object {
