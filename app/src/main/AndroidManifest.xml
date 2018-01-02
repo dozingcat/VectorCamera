@@ -33,6 +33,9 @@
         <activity
             android:name=".ViewImageActivity">
         </activity>
+        <activity
+            android:name=".ViewVideoActivity">
+        </activity>
 
     </application>
 

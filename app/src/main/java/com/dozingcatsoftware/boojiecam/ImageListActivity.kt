@@ -27,8 +27,16 @@ class ImageListActivity : Activity() {
         setContentView(R.layout.imagegrid)
         gridView = findViewById(R.id.gridview)
         gridView.onItemClickListener = OnItemClickListener { parent, view, position, id ->
-            ViewImageActivity.startActivityWithImageId(
-                    this@ImageListActivity, gridImageIds!![position])
+            val itemId = gridImageIds!![position]
+            val metadata = photoLibrary.metadataForItemId(itemId)
+            when (metadata.mediaType) {
+                MediaType.IMAGE -> {
+                    ViewImageActivity.startActivityWithImageId(this@ImageListActivity, itemId)
+                }
+                MediaType.VIDEO -> {
+                    ViewVideoActivity.startActivityWithVideoId(this@ImageListActivity, itemId)
+                }
+            }
         }
     }
 

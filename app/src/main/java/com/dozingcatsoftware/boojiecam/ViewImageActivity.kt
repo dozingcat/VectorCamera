@@ -34,7 +34,7 @@ class ViewImageActivity : Activity() {
         imageId = intent.getStringExtra("imageId")
         loadImage()
 
-        // TODO: Controls to delete, (maybe) save changed effect.
+        // TODO: Controls to delete, (maybe) save .
     }
 
     private fun loadImage() {
