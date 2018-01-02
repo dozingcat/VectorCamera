@@ -53,9 +53,12 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
-    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap, yuvBytes: ByteArray,
+    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap,
                   successFn: (String) -> Unit,
                   errorFn: (Exception) -> Unit) {
+        if (processedBitmap.yuvBytes == null) {
+            throw IllegalArgumentException("yuvBytes not set in ProcessedBitmap")
+        }
         try {
             Log.i(TAG, "savePhoto start")
             val sourceImage = processedBitmap.sourceImage
@@ -68,7 +71,7 @@ class PhotoLibrary(val rootDirectory: File) {
             val rawImageFile = rawImageFileForItemId(photoId)
             // gzip compression usually saves about 50%.
             GZIPOutputStream(FileOutputStream(rawImageFile)).use({
-                it.write(yuvBytes)
+                it.write(processedBitmap.yuvBytes)
             })
             val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
             val compressedSize = rawImageFile.length()
@@ -82,7 +85,6 @@ class PhotoLibrary(val rootDirectory: File) {
             writeMetadata(metadata, photoId)
 
             // Write full size image and thumbnail.
-            // TODO: Scan image with MediaConnectionScanner
             run {
                 val resultBitmap = processedBitmap.renderBitmap(width, height)
                 imageDirectory.mkdirs()
@@ -93,20 +95,7 @@ class PhotoLibrary(val rootDirectory: File) {
                 })
                 AndroidUtils.scanSavedMediaFile(context, pngFile.path)
             }
-            run {
-                thumbnailDirectory.mkdirs()
-                val noMediaFile = File(thumbnailDirectory, ".nomedia")
-                if (!noMediaFile.exists()) {
-                    noMediaFile.createNewFile()
-                }
-                val thumbnailOutputStream =
-                        FileOutputStream(File(thumbnailDirectory, photoId + ".jpg"))
-                // Preserve aspect ratio?
-                val thumbnailBitmap = processedBitmap.renderBitmap(thumbnailWidth, thumbnailHeight)
-                thumbnailOutputStream.use({
-                    thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
-                })
-            }
+            writeThumbnail(processedBitmap, photoId)
 
             successFn(photoId)
         }
@@ -127,6 +116,21 @@ class PhotoLibrary(val rootDirectory: File) {
         metadataDirectory.mkdirs()
         FileOutputStream(metadataFileForItemId(itemId)).use({
             it.write(json.toByteArray(Charsets.UTF_8))
+        })
+    }
+
+    fun writeThumbnail(processedBitmap: ProcessedBitmap, itemId: String) {
+        thumbnailDirectory.mkdirs()
+        val noMediaFile = File(thumbnailDirectory, ".nomedia")
+        if (!noMediaFile.exists()) {
+            noMediaFile.createNewFile()
+        }
+        val thumbnailOutputStream =
+                FileOutputStream(File(thumbnailDirectory, itemId + ".jpg"))
+        // Preserve aspect ratio?
+        val thumbnailBitmap = processedBitmap.renderBitmap(thumbnailWidth, thumbnailHeight)
+        thumbnailOutputStream.use({
+            thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
         })
     }
 
@@ -202,16 +206,18 @@ class PhotoLibrary(val rootDirectory: File) {
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.
         val videoReader = VideoReader(rs, this, itemId)
+        writeThumbnail(videoReader.bitmapForFrame(0), itemId)
     }
 
     fun rawVideoRandomAccessFileForItemId(itemId: String): RandomAccessFile? {
         val file = rawVideoFileForItemId(itemId)
-        return if (file.isFile) null else RandomAccessFile(file, "r")
+        Log.i(TAG, "Raw video file: ${file.path} exists: ${file.exists()}")
+        return if (file.isFile) RandomAccessFile(file, "r") else null
     }
 
     fun rawAudioRandomAccessFileForItemId(itemId: String): RandomAccessFile? {
         val file = rawAudioFileForItemId(itemId)
-        return if (file.isFile) null else RandomAccessFile(file, "r")
+        return if (file.isFile) RandomAccessFile(file, "r") else null
     }
 
     fun metadataFileForItemId(itemId: String): File {

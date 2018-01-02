@@ -7,7 +7,8 @@ data class ProcessedBitmap(
         val effect: Effect,
         val sourceImage: CameraImage,
         val bitmap: Bitmap,
-        val backgroundPaintFn: (RectF) -> Paint?) {
+        val backgroundPaintFn: (RectF) -> Paint?,
+        val yuvBytes: ByteArray? = null) {
 
     fun renderToCanvas(canvas: Canvas, width: Int, height: Int, outsidePaint: Paint? = null,
                        tmpRect: RectF? = null, tmpMatrix: Matrix? = null) {

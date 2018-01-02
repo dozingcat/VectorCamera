@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.renderscript.Allocation
+import android.renderscript.RenderScript
 import android.util.Log
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import java.lang.ref.WeakReference
@@ -10,7 +11,7 @@ import kotlin.concurrent.withLock
 /**
  * Created by brian on 10/15/17.
  */
-class CameraAllocationProcessor {
+class CameraAllocationProcessor(val rs: RenderScript) {
     private var consumerThread: Thread? = null
     private var receivedCameraAllocation: CameraImage? = null
     private var lastAllocationRef: WeakReference<Allocation>? = null
@@ -76,7 +77,7 @@ class CameraAllocationProcessor {
             }
             this.receivedCameraAllocation = cameraAllocation
             allocationAvailable.signal()
-            debugLog("queueAllocation, count=" + allocationUpdateCount)
+            debugLog("queueAllocation, count=${allocationUpdateCount}")
         })
     }
 
@@ -99,7 +100,7 @@ class CameraAllocationProcessor {
                         allocationAvailable.awaitNanos(250000000)
                     }
                     else {
-                        debugLog("Calling ioReceive, count="+allocationUpdateCount)
+                        debugLog("Calling ioReceive, count=${allocationUpdateCount}")
                         for (i in 0 until allocationUpdateCount) {
                             ioReceiveIfInput(currentCamAllocation!!.singleYuvAllocation)
                         }
@@ -111,7 +112,14 @@ class CameraAllocationProcessor {
 
             val bitmap = effect.createBitmap(currentCamAllocation!!)
             val backgroundPaintFn = effect.createPaintFn(currentCamAllocation!!)
-            callback(ProcessedBitmap(effect, currentCamAllocation!!, bitmap, backgroundPaintFn))
+            // Get the flattened bytes if we need them. RenderScript seems to not play well with
+            // threads, so we don't want to try to parallelize this.
+            val yuvBytes =
+                    if (currentCamAllocation!!.status.isSavingImage())
+                        flattenedYuvImageBytes(rs, currentCamAllocation!!.singleYuvAllocation!!)
+                    else null
+            callback(ProcessedBitmap(
+                    effect, currentCamAllocation!!, bitmap, backgroundPaintFn, yuvBytes))
             currentCamAllocation = null
         }
     }

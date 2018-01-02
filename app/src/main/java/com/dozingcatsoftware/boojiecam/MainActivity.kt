@@ -24,7 +24,7 @@ class MainActivity : Activity() {
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraImageGenerator: CameraImageGenerator
 
-    private var imageProcessor = CameraAllocationProcessor()
+    private lateinit var imageProcessor: CameraAllocationProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
     private val photoLibrary = PhotoLibrary.defaultLibrary()
@@ -48,6 +48,7 @@ class MainActivity : Activity() {
 
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
+        imageProcessor = CameraAllocationProcessor(rs)
         // TODO: Save current effect in preferences.
         currentEffect = allEffectFactories[effectIndex](rs)
 
@@ -124,10 +125,11 @@ class MainActivity : Activity() {
             overlayView.invalidate()
             if (processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Saving picture")
+                if (processedBitmap.yuvBytes == null) {
+                    Log.w(TAG, "yuvBytes not set for saved image")
+                }
                 Thread({
-                    val yuvBytes = flattenedYuvImageBytes(
-                            rs, processedBitmap.sourceImage.singleYuvAllocation!!)
-                    photoLibrary.savePhoto(this, processedBitmap, yuvBytes,
+                    photoLibrary.savePhoto(this, processedBitmap,
                             fun(photoId: String) {
                                 Log.i(TAG, "Saved $photoId")
                             },
@@ -264,8 +266,7 @@ class MainActivity : Activity() {
         when (recorder.status) {
             VideoRecorder.Status.RUNNING -> {
                 // TODO: Update recording stats for display.
-                Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size +
-                    ", bytes: " + recorder.bytesWritten)
+                Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size)
             }
             VideoRecorder.Status.FINISHED -> {
                 Log.i(TAG, "Video recording stopped, writing to library")

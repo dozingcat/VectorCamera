@@ -15,7 +15,6 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
 
     // Timestamps are absolute milliseconds, but only relative differences matter.
     val frameTimestamps = mutableListOf<Long>()
-    val frameByteOffsets = mutableListOf<Long>()
 
     var status = Status.NOT_STARTED
     private var writerThread: Thread? = null
@@ -23,7 +22,6 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
     private val frameQueue = mutableListOf<Frame>()
     private val frameQueueLock = ReentrantLock()
     private val frameAvailable = frameQueueLock.newCondition()
-    var bytesWritten = 0L
 
     fun start() {
         status = Status.STARTING
@@ -70,8 +68,7 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
 
     private fun threadEntry() {
         var currentFrame: Frame? = null
-        var compressedBuffer = ByteArrayOutputStream()
-        var isFirstFrame = false
+        var framesRead = 0
         while (true) {
             while (currentFrame == null) {
                 if (writerThreadShouldExit()) {
@@ -87,28 +84,15 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
                     frameAvailable.awaitNanos(250000000)
                 }
             }
-            // For some reason the first frame is all zero bytes, which turns into a green square.
-            if (isFirstFrame) {
-                isFirstFrame = false
+            // For some reason the first frames are all zero bytes, which turns into a green square.
+            framesRead += 1
+            if (framesRead < 10) {
                 currentFrame = null
                 continue
             }
             frameTimestamps.add(currentFrame.timestamp)
-            frameByteOffsets.add(bytesWritten)
-            compressedBuffer.reset()
-            // Compressing before writing is very slow, so write uncompressed.
-            val t1 = System.currentTimeMillis()
-            // GZIPOutputStream(compressedBuffer).use({
-            //    it.write(currentFrame!!.data)
-            // })
-            val t2 = System.currentTimeMillis()
-            // compressedBuffer.writeTo(videoOutput)
+            // We could gzip the frames, but compression is very slow.
             videoOutput.write(currentFrame!!.data)
-            val t3 = System.currentTimeMillis()
-
-            bytesWritten += compressedBuffer.size()
-            Log.i("VideoRecorder", "Compressed to ${compressedBuffer.size()}" +
-                    ", bytesWritten=${bytesWritten}, times: ${t2-t1} ${(t3-t2)}")
             frameCallback?.invoke(this)
             currentFrame = null
         }

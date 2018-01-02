@@ -17,4 +17,8 @@ enum class CameraStatus {
         return this == CAPTURING_PREVIEW || this == CAPTURING_PHOTO ||
                 this == CAPTURING_VIDEO
     }
+
+    fun isSavingImage(): Boolean {
+        return this == CAPTURING_PHOTO || this == CAPTURING_VIDEO
+    }
 }
