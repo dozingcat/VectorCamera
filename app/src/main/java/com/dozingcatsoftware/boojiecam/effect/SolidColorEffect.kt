@@ -11,8 +11,7 @@ import com.dozingcatsoftware.boojiecam.*
  */
 class SolidColorEffect(val rs: RenderScript,
                        private val effectParams: Map<String, Any>,
-                       private val colorTable: Allocation,
-                       private val paintFn: (CameraImage, RectF) -> Paint?): Effect {
+                       private val colorScheme: ColorScheme): Effect {
 
     private var outputAllocation: Allocation? = null
     private var script: ScriptC_solid? = null
@@ -33,7 +32,7 @@ class SolidColorEffect(val rs: RenderScript,
         else {
             scr._yuvInput = cameraImage.singleYuvAllocation
         }
-        scr._colorMap = colorTable
+        scr._colorMap = colorScheme.colorMap
 
         if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
@@ -50,55 +49,16 @@ class SolidColorEffect(val rs: RenderScript,
     }
 
     override fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
-        return {rect -> paintFn(cameraImage, rect)}
+        return {rect -> colorScheme.paintFn(cameraImage, rect)}
     }
 
     companion object {
         val EFFECT_NAME = "solid_color"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): SolidColorEffect {
-            when (params["type"]) {
-                "fixed" -> {
-                    val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
-                    val maxEdgeColor = intFromArgbList(params["maxEdgeColor"] as List<Int>)
-                    val colorMap = makeAllocationColorMap(rs, minEdgeColor, maxEdgeColor)
-                    return SolidColorEffect(rs, params, colorMap, { _, _ -> null })
-                }
-                "linear_gradient" -> {
-                    val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
-                    val gradientStartColor =
-                            intFromArgbList(params["gradientStartColor"] as List<Int>)
-                    val gradientEndColor =
-                            intFromArgbList(params["gradientEndColor"] as List<Int>)
-                    val paintFn = fun(_: CameraImage, rect: RectF): Paint {
-                        val p = Paint()
-                        p.shader = LinearGradient(
-                                rect.left, rect.top, rect.right, rect.bottom,
-                                addAlpha(gradientStartColor), addAlpha(gradientEndColor),
-                                Shader.TileMode.MIRROR)
-                        return p
-                    }
-                    return SolidColorEffect(
-                            rs, params, makeAlphaAllocation(rs, minEdgeColor), paintFn)
-                }
-                "radial_gradient" -> {
-                    val minEdgeColor = intFromArgbList(params["minEdgeColor"] as List<Int>)
-                    val centerColor = intFromArgbList(params["centerColor"] as List<Int>)
-                    val outerColor = intFromArgbList(params["outerColor"] as List<Int>)
-                    val paintFn = fun(_: CameraImage, rect: RectF): Paint {
-                        val p = Paint()
-                        p.shader = RadialGradient(
-                                rect.width() / 2, rect.height() / 2,
-                                maxOf(rect.width(), rect.height()) / 2f,
-                                addAlpha(centerColor), addAlpha(outerColor), Shader.TileMode.MIRROR)
-                        return p
-                    }
-                    return SolidColorEffect(
-                            rs, params, makeAlphaAllocation(rs, minEdgeColor), paintFn)
-                }
-
-            }
-            throw IllegalArgumentException("Unknown parameters: " + params)
+            // Hack for backwards compatibility.
+            val p = params.getOrElse("colors", {params}) as Map<String, Any>
+            return SolidColorEffect(rs, params, ColorScheme.fromParameters(rs, p))
         }
     }
 }
