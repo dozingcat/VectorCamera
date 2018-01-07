@@ -37,7 +37,7 @@ class MainActivity : Activity() {
 
     private var videoRecorder: VideoRecorder? = null
     private var videoFrameMetadata: MediaMetadata? = null
-    private lateinit var imageSizeBeforeVideoRecording: ImageSize
+    private lateinit var previousImageSize: ImageSize
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,6 +82,7 @@ class MainActivity : Activity() {
             ImageSize.FULL_SCREEN -> displaySize
             ImageSize.HALF_SCREEN -> Size(displaySize.width / 2, displaySize.height / 2)
             ImageSize.VIDEO_RECORDING -> Size(640, 360)
+            ImageSize.EFFECT_GRID -> Size(displaySize.width / 4, displaySize.height / 4)
         }
     }
 
@@ -186,6 +187,9 @@ class MainActivity : Activity() {
         if (cameraImageGenerator.status != CameraStatus.CAPTURING_PREVIEW) {
             return
         }
+        if (inEffectSelectionMode) {
+            return
+        }
         preferredImageSize =
                 if (preferredImageSize == ImageSize.FULL_SCREEN)
                     ImageSize.HALF_SCREEN
@@ -198,10 +202,14 @@ class MainActivity : Activity() {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             currentEffect = CombinationEffect(rs, allEffectFactories)
+            previousImageSize = preferredImageSize
+            preferredImageSize = ImageSize.EFFECT_GRID
         }
         else {
             currentEffect = allEffectFactories[effectIndex](rs)
+            preferredImageSize = previousImageSize
         }
+        restartCameraImageGenerator()
         imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
     }
 
@@ -217,6 +225,7 @@ class MainActivity : Activity() {
 
                 effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
                 currentEffect = allEffectFactories[effectIndex](rs)
+                preferredImageSize = previousImageSize
                 restartCameraImageGenerator()
                 imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
                 inEffectSelectionMode = false
@@ -245,7 +254,7 @@ class MainActivity : Activity() {
             Log.i(TAG, "Starting video recording")
             val videoId = photoLibrary.itemIdForTimestamp(System.currentTimeMillis())
             val videoStream = photoLibrary.createTempRawVideoFileOutputStreamForItemId(videoId)
-            imageSizeBeforeVideoRecording = preferredImageSize
+            previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.VIDEO_RECORDING
             videoFrameMetadata = null
             restartCameraImageGenerator(CameraStatus.CAPTURING_VIDEO)
@@ -267,11 +276,10 @@ class MainActivity : Activity() {
             }
             VideoRecorder.Status.FINISHED -> {
                 Log.i(TAG, "Video recording stopped, writing to library")
-                preferredImageSize = imageSizeBeforeVideoRecording
+                preferredImageSize = previousImageSize
                 restartCameraImageGenerator()
                 photoLibrary.saveVideo(
                         this, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
-                preferredImageSize = imageSizeBeforeVideoRecording!!
             }
         }
     }

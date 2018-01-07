@@ -9,6 +9,7 @@ enum class ImageSize {
     FULL_SCREEN,
     HALF_SCREEN,
     VIDEO_RECORDING,
+    EFFECT_GRID,
 }
 
 /**

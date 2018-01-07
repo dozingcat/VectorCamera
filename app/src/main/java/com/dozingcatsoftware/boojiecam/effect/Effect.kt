@@ -18,8 +18,6 @@ interface Effect {
         return {null}
     }
 
-    fun outputImageSize(cameraImage: CameraImage) = Size(cameraImage.width(), cameraImage.height())
-
     fun effectName(): String
 
     fun effectParameters(): Map<String, Any> = mapOf()

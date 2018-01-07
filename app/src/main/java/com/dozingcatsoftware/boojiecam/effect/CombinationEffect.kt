@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.RectF
 import android.renderscript.RenderScript
+import android.util.Size
 import com.dozingcatsoftware.boojiecam.CameraImage
 
 /**
@@ -16,17 +17,21 @@ class CombinationEffect(
 
     override fun effectName() = "combination"
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(originalCameraImage: CameraImage): Bitmap {
         val gridSize = Math.floor(Math.sqrt(effectFactories.size.toDouble())).toInt()
-        val tileWidth = cameraImage.width() / gridSize
-        val tileHeight = cameraImage.height() / gridSize
+        val cameraImage = originalCameraImage.withDisplaySize(Size(
+                originalCameraImage.displaySize.width / gridSize,
+                originalCameraImage.displaySize.height / gridSize))
+
+        val outputWidth = cameraImage.displaySize.width
+        val outputHeight = cameraImage.displaySize.height
+        val tileWidth = outputWidth / gridSize
+        val tileHeight = outputHeight / gridSize
         val tileBuffer = Bitmap.createBitmap(
-                cameraImage.width() / gridSize, cameraImage.height() / gridSize,
-                Bitmap.Config.ARGB_8888)
+                outputWidth / gridSize, outputHeight / gridSize, Bitmap.Config.ARGB_8888)
         val tileCanvas = Canvas(tileBuffer)
 
-        val resultBitmap = Bitmap.createBitmap(
-                cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
+        val resultBitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
         val resultCanvas = Canvas(resultBitmap)
 
         val srcRect = RectF(0f, 0f, tileBuffer.width.toFloat(), tileBuffer.height.toFloat())

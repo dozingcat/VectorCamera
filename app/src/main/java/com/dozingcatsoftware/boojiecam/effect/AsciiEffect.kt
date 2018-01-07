@@ -35,8 +35,6 @@ class AsciiEffect(val rs: RenderScript): Effect {
             "charWidth" to characterWidthInPixels
     )
 
-    override fun outputImageSize(cameraImage: CameraImage) = cameraImage.displaySize
-
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
         val colors = IntArray(numRows * numCols)

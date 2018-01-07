@@ -12,8 +12,6 @@ rs_allocation characterBitmapInput;
 rs_allocation imageOutput;
 int inputImageWidth;
 int inputImageHeight;
-int outputImageWidth;
-int outputImageHeight;
 int numCharRows;
 int numCharColumns;
 int characterPixelWidth;
