@@ -6,7 +6,12 @@ object EffectRegistry {
 
     val baseEffects = listOf<(RenderScript) -> Effect>(
             {rs -> EdgeLuminanceEffect(rs) },
-            {rs -> PermuteColorEffect.noOp(rs) },
+            // {rs -> PermuteColorEffect.noOp(rs) },
+            {rs ->
+                Convolve3x3Effect.fromParameters(rs, mapOf(
+                    "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4)
+                ))
+            },
             {rs -> PermuteColorEffect.rgbToBrg(rs) },
             {rs -> PermuteColorEffect.rgbToGbr(rs) },
             {rs ->
@@ -61,6 +66,7 @@ object EffectRegistry {
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
+            Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
             else -> throw IllegalArgumentException("Unknown effect: " + metadata.name)
         }
     }
