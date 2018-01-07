@@ -59,8 +59,8 @@ class ViewImageActivity : Activity() {
         val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
-        val inputImage = CameraImage(null, planarYuv,
-                metadata.orientation, CameraStatus.CAPTURING_PHOTO, 0)
+        val inputImage = CameraImage(null, planarYuv, metadata.orientation,
+                CameraStatus.CAPTURING_PHOTO, 0, AndroidUtils.displaySize(this))
 
         val bitmap = effect.createBitmap(inputImage)
         val paintFn = effect.createPaintFn(inputImage)

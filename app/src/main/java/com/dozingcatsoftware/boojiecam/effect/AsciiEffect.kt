@@ -7,11 +7,13 @@ import android.graphics.Paint
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import android.util.Size
 import com.dozingcatsoftware.boojiecam.*
 
 /**
  * Created by brian on 10/13/17.
  */
+// TODO: Always render to full screen resolution.
 class AsciiEffect(val rs: RenderScript): Effect {
     var characterWidthInPixels = 15
     var charHeightOverWidth = 9.0 / 7
@@ -33,6 +35,8 @@ class AsciiEffect(val rs: RenderScript): Effect {
             "charWidth" to characterWidthInPixels
     )
 
+    override fun outputImageSize(cameraImage: CameraImage) = cameraImage.displaySize
+
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
         val colors = IntArray(numRows * numCols)
@@ -47,14 +51,18 @@ class AsciiEffect(val rs: RenderScript): Effect {
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val width = cameraImage.width()
-        val height = cameraImage.height()
+        val inputWidth = cameraImage.width()
+        val inputHeight = cameraImage.height()
+        val outputWidth = cameraImage.displaySize.width
+        val outputHeight = cameraImage.displaySize.height
         // TODO: Reuse resultBitmap and charBitmap if possible.
-        val resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val resultBitmap = Bitmap.createBitmap(
+                cameraImage.displaySize.width, cameraImage.displaySize.height,
+                Bitmap.Config.ARGB_8888)
         val charPixelWidth = characterWidthInPixels
         val charPixelHeight = Math.floor(charPixelWidth * charHeightOverWidth).toInt()
-        val numCharacterRows = height / charPixelHeight
-        val numCharacterColumns = width / charPixelWidth
+        val numCharacterRows = outputHeight / charPixelHeight
+        val numCharacterColumns = outputWidth / charPixelWidth
 
         // Create Bitmap and draw each character into it.
         val paint = Paint()
@@ -88,10 +96,9 @@ class AsciiEffect(val rs: RenderScript): Effect {
             asciiBlockAllocation = create2dAllocation(rs, Element::RGBA_8888,
                     numCharacterColumns, numCharacterRows)
         }
-        if (!allocationHas2DSize(
-                bitmapOutputAllocation, camAllocation.width(), camAllocation.height())) {
-            bitmapOutputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    camAllocation.width(), camAllocation.height())
+        val ds = camAllocation.displaySize
+        if (!allocationHas2DSize(bitmapOutputAllocation, ds.width, ds.height)) {
+            bitmapOutputAllocation = create2dAllocation(rs, Element::RGBA_8888, ds.width, ds.height)
         }
         if (!allocationHas2DSize(characterTemplateAllocation,
                 pixelChars.length * charPixelWidth, charPixelHeight)) {
@@ -102,8 +109,10 @@ class AsciiEffect(val rs: RenderScript): Effect {
 
         script._characterBitmapInput = characterTemplateAllocation
         script._imageOutput = bitmapOutputAllocation
-        script._imageWidth = camAllocation.width()
-        script._imageHeight = camAllocation.height()
+        script._inputImageWidth = camAllocation.width()
+        script._inputImageHeight = camAllocation.height()
+        script._characterPixelWidth = charPixelWidth
+        script._characterPixelHeight = charPixelHeight
         script._numCharColumns = numCharacterColumns
         script._numCharRows = numCharacterRows
         script._numCharacters = pixelChars.length

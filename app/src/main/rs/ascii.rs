@@ -10,8 +10,10 @@ rs_allocation uInput;
 rs_allocation vInput;
 rs_allocation characterBitmapInput;
 rs_allocation imageOutput;
-int imageWidth;
-int imageHeight;
+int inputImageWidth;
+int inputImageHeight;
+int outputImageWidth;
+int outputImageHeight;
 int numCharRows;
 int numCharColumns;
 int characterPixelWidth;
@@ -21,13 +23,13 @@ bool flipHorizontal;
 bool flipVertical;
 
 uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
-    int pixelsPerCol = imageWidth / numCharColumns;
-    int pixelsPerRow = imageHeight / numCharRows;
+    int inputPixelsPerCol = inputImageWidth / numCharColumns;
+    int inputPixelsPerRow = inputImageHeight / numCharRows;
 
-    uint32_t xmin = x * pixelsPerCol;
-    uint32_t xmax = (x + 1) * pixelsPerCol;
-    uint32_t ymin = y * pixelsPerRow;
-    uint32_t ymax = (y + 1) * pixelsPerRow;
+    uint32_t xmin = x * inputPixelsPerCol;
+    uint32_t xmax = (x + 1) * inputPixelsPerCol;
+    uint32_t ymin = y * inputPixelsPerRow;
+    uint32_t ymax = (y + 1) * inputPixelsPerRow;
 
     uint32_t redTotal = 0;
     uint32_t greenTotal = 0;
@@ -47,21 +49,23 @@ uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
         }
     }
 
-    uint32_t numPixels = pixelsPerCol * pixelsPerRow;
+    uint32_t numPixels = inputPixelsPerCol * inputPixelsPerRow;
     uchar4 ret;
     ret.r = redTotal / numPixels;
     ret.g = greenTotal / numPixels;
     ret.b = blueTotal / numPixels;
     ret.a = brightnessTotal / numPixels;
 
+    int xOutMin = x * characterPixelWidth;
+    int yOutMin = y * characterPixelHeight;
     uint32_t pixelIndex = (uint32_t) (ret.a / 256.0 * numCharacters);
-    uint32_t xoff = pixelIndex * pixelsPerCol;
-    for (uint32_t dy = 0; dy < pixelsPerRow; dy++) {
-        uint32_t ysrc = flipVertical ? pixelsPerRow - 1 - dy : dy;
-        for (uint32_t dx = 0; dx < pixelsPerCol; dx++) {
-            uint32_t xsrc = xoff + (flipHorizontal ? pixelsPerCol - 1 - dx : dx);
+    uint32_t xoff = pixelIndex * characterPixelWidth;
+    for (uint32_t dy = 0; dy < characterPixelHeight; dy++) {
+        uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
+        for (uint32_t dx = 0; dx < characterPixelWidth; dx++) {
+            uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
             uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
-            rsSetElementAt_uchar4(imageOutput, pixel, xmin + dx, ymin + dy);
+            rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
         }
     }
 
@@ -69,13 +73,13 @@ uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
 }
 
 uchar4 RS_KERNEL computeBlockAverages_planar(uint32_t x, uint32_t y) {
-    int pixelsPerCol = imageWidth / numCharColumns;
-    int pixelsPerRow = imageHeight / numCharRows;
+    int inputPixelsPerCol = inputImageWidth / numCharColumns;
+    int inputPixelsPerRow = inputImageHeight / numCharRows;
 
-    uint32_t xmin = x * pixelsPerCol;
-    uint32_t xmax = (x + 1) * pixelsPerCol;
-    uint32_t ymin = y * pixelsPerRow;
-    uint32_t ymax = (y + 1) * pixelsPerRow;
+    uint32_t xmin = x * inputPixelsPerCol;
+    uint32_t xmax = (x + 1) * inputPixelsPerCol;
+    uint32_t ymin = y * inputPixelsPerRow;
+    uint32_t ymax = (y + 1) * inputPixelsPerRow;
 
     uint32_t redTotal = 0;
     uint32_t greenTotal = 0;
@@ -95,21 +99,23 @@ uchar4 RS_KERNEL computeBlockAverages_planar(uint32_t x, uint32_t y) {
         }
     }
 
-    uint32_t numPixels = pixelsPerCol * pixelsPerRow;
+    uint32_t numPixels = inputPixelsPerCol * inputPixelsPerRow;
     uchar4 ret;
     ret.r = redTotal / numPixels;
     ret.g = greenTotal / numPixels;
     ret.b = blueTotal / numPixels;
     ret.a = brightnessTotal / numPixels;
 
+    int xOutMin = x * characterPixelWidth;
+    int yOutMin = y * characterPixelHeight;
     uint32_t pixelIndex = (uint32_t) (ret.a / 256.0 * numCharacters);
-    uint32_t xoff = pixelIndex * pixelsPerCol;
-    for (uint32_t dy = 0; dy < pixelsPerRow; dy++) {
-        uint32_t ysrc = flipVertical ? pixelsPerRow - 1 - dy : dy;
-        for (uint32_t dx = 0; dx < pixelsPerCol; dx++) {
-            uint32_t xsrc = xoff + (flipHorizontal ? pixelsPerCol - 1 - dx : dx);
+    uint32_t xoff = pixelIndex * characterPixelWidth;
+    for (uint32_t dy = 0; dy < characterPixelHeight; dy++) {
+        uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
+        for (uint32_t dx = 0; dx < characterPixelWidth; dx++) {
+            uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
             uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
-            rsSetElementAt_uchar4(imageOutput, pixel, xmin + dx, ymin + dy);
+            rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
         }
     }
 

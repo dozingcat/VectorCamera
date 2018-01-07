@@ -7,8 +7,18 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.util.DisplayMetrics
+import android.util.Size
+import android.view.WindowManager
 
 object AndroidUtils {
+    fun displaySize(context: Context): Size {
+        val metrics = DisplayMetrics()
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        windowManager.defaultDisplay.getMetrics(metrics)
+        return Size(metrics.widthPixels, metrics.heightPixels)
+    }
+
     /** Notifies the OS to index the new image, so it shows up in Gallery. Allows optional callback method to notify client when
      * the scan is completed, e.g. so it can access the "content" URI that gets assigned.
      */

@@ -11,6 +11,7 @@ import android.widget.SeekBar
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
+import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.view_video.*
 
 /**
@@ -38,7 +39,7 @@ class ViewVideoActivity: Activity() {
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")
-        videoReader = VideoReader(rs, photoLibrary, videoId)
+        videoReader = VideoReader(rs, photoLibrary, videoId, AndroidUtils.displaySize(this))
 
         frameSeekBar.max = videoReader.numberOfFrames() - 1
         frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {

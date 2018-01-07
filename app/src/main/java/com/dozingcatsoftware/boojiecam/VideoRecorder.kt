@@ -10,13 +10,13 @@ import kotlin.concurrent.withLock
 private data class Frame(val timestamp: Long, val data: ByteArray)
 
 class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
-                    val frameCallback: ((VideoRecorder) -> Unit)?) {
+                    val frameCallback: ((VideoRecorder, Status) -> Unit)?) {
     enum class Status {NOT_STARTED, STARTING, RUNNING, STOPPING, FINISHED}
 
     // Timestamps are absolute milliseconds, but only relative differences matter.
     val frameTimestamps = mutableListOf<Long>()
 
-    var status = Status.NOT_STARTED
+    private var status = Status.NOT_STARTED
     private var writerThread: Thread? = null
     private val writerThreadLock = ReentrantLock()
     private val frameQueue = mutableListOf<Frame>()
@@ -72,33 +72,37 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
         while (true) {
             while (currentFrame == null) {
                 if (writerThreadShouldExit()) {
+                    Log.i(TAG, "Exiting")
                     videoOutput.close()
                     this.status = Status.FINISHED
-                    frameCallback?.invoke(this)
+                    frameCallback?.invoke(this, this.status)
                     return
                 }
                 while (currentFrame == null) {
                     currentFrame = acquireFrameFromQueue()
                 }
                 if (currentFrame == null) {
+                    Log.i(TAG, "Frame not available, waiting, status=${status}")
                     frameAvailable.awaitNanos(250000000)
                 }
             }
-            // For some reason the first frames are all zero bytes, which turns into a green square.
+            // For some reason the first frames are sometimes zero bytes.
             framesRead += 1
-            if (framesRead < 10) {
+            Log.i(TAG, "Got frame ${framesRead}")
+            if (framesRead < 5) {
                 currentFrame = null
                 continue
             }
             frameTimestamps.add(currentFrame.timestamp)
             // We could gzip the frames, but compression is very slow.
             videoOutput.write(currentFrame!!.data)
-            frameCallback?.invoke(this)
+            frameCallback?.invoke(this, this.status)
             currentFrame = null
         }
     }
 
     companion object {
+        val TAG = "VideoRecorder"
         val MAX_QUEUED_FRAMES = 3
     }
 }

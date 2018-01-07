@@ -187,7 +187,7 @@ class PhotoLibrary(val rootDirectory: File) {
         return GZIPInputStream(FileInputStream(rawImageFileForItemId(itemId)))
     }
 
-    fun saveVideo(rs: RenderScript, itemId: String, imageInfo: MediaMetadata,
+    fun saveVideo(context: Context, itemId: String, imageInfo: MediaMetadata,
                   frameTimestamps: List<Long>) {
         // Move video/audio files from tmp_raw/ to raw/, write metadata.json.
         val videoFile = tempRawVideoFileForItemId(itemId)
@@ -205,7 +205,8 @@ class PhotoLibrary(val rootDirectory: File) {
         writeMetadata(metadata, itemId)
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.
-        val videoReader = VideoReader(rs, this, itemId)
+        val rs = RenderScript.create(context)
+        val videoReader = VideoReader(rs, this, itemId, AndroidUtils.displaySize(context))
         writeThumbnail(videoReader.bitmapForFrame(0), itemId)
     }
 

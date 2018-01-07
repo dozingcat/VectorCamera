@@ -3,6 +3,7 @@ package com.dozingcatsoftware.boojiecam.effect
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
+import android.util.Size
 import com.dozingcatsoftware.boojiecam.CameraImage
 
 /**
@@ -16,6 +17,8 @@ interface Effect {
     fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
         return {null}
     }
+
+    fun outputImageSize(cameraImage: CameraImage) = Size(cameraImage.width(), cameraImage.height())
 
     fun effectName(): String
 

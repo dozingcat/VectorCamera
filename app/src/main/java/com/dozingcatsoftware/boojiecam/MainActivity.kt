@@ -1,21 +1,19 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
-import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Size
 import android.view.MotionEvent
 import android.view.View
 import android.view.Window
-import android.view.WindowManager
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
+import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : Activity() {
@@ -30,6 +28,7 @@ class MainActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
+    private lateinit var displaySize: Size
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var effectIndex = 0
     private var currentEffect: Effect? = null
@@ -46,6 +45,7 @@ class MainActivity : Activity() {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_main)
 
+        displaySize = AndroidUtils.displaySize(this)
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
         imageProcessor = CameraAllocationProcessor(rs)
@@ -78,14 +78,9 @@ class MainActivity : Activity() {
     }
 
     private fun targetCameraImageSize(): Size {
-        val metrics = DisplayMetrics()
-        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        windowManager.defaultDisplay.getMetrics(metrics)
-        val displayWidth = metrics.widthPixels
-        val displayHeight = metrics.heightPixels
         return when (preferredImageSize) {
-            ImageSize.FULL_SCREEN -> Size(displayWidth, displayHeight)
-            ImageSize.HALF_SCREEN -> Size(displayWidth / 2, displayHeight / 2)
+            ImageSize.FULL_SCREEN -> displaySize
+            ImageSize.HALF_SCREEN -> Size(displaySize.width / 2, displaySize.height / 2)
             ImageSize.VIDEO_RECORDING -> Size(640, 360)
         }
     }
@@ -141,26 +136,28 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun handleAllocationFromCamera(camAllocation: CameraImage) {
+    private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
         handler.post(fun() {
-            if (camAllocation.status == CameraStatus.CAPTURING_PHOTO) {
+            // Slightly ugly but some effects need the display size.
+            val cameraImage = imageFromCamera.withDisplaySize(displaySize)
+            if (cameraImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()
             }
-            if (camAllocation.status == CameraStatus.CAPTURING_VIDEO && videoRecorder != null) {
-                val yuvBytes = flattenedYuvImageBytes(rs, camAllocation.singleYuvAllocation!!)
+            if (cameraImage.status == CameraStatus.CAPTURING_VIDEO && videoRecorder != null) {
+                val yuvBytes = flattenedYuvImageBytes(rs, cameraImage.singleYuvAllocation!!)
                 if (videoFrameMetadata == null) {
                     videoFrameMetadata = MediaMetadata(
                             MediaType.VIDEO,
                             currentEffect!!.effectMetadata(),
-                            camAllocation.width(),
-                            camAllocation.height(),
-                            camAllocation.orientation,
-                            camAllocation.timestamp)
+                            cameraImage.width(),
+                            cameraImage.height(),
+                            cameraImage.orientation,
+                            cameraImage.timestamp)
                 }
-                videoRecorder!!.recordFrame(camAllocation.timestamp, yuvBytes)
+                videoRecorder!!.recordFrame(cameraImage.timestamp, yuvBytes)
             }
-            this.imageProcessor.queueAllocation(camAllocation)
+            this.imageProcessor.queueAllocation(cameraImage)
         })
     }
 
@@ -262,18 +259,19 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun videoRecorderUpdated(recorder: VideoRecorder) {
-        when (recorder.status) {
+    private fun videoRecorderUpdated(recorder: VideoRecorder, status: VideoRecorder.Status) {
+        when (status) {
             VideoRecorder.Status.RUNNING -> {
                 // TODO: Update recording stats for display.
                 Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size)
             }
             VideoRecorder.Status.FINISHED -> {
                 Log.i(TAG, "Video recording stopped, writing to library")
-                photoLibrary.saveVideo(
-                        rs, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
-                preferredImageSize = imageSizeBeforeVideoRecording!!
+                preferredImageSize = imageSizeBeforeVideoRecording
                 restartCameraImageGenerator()
+                photoLibrary.saveVideo(
+                        this, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
+                preferredImageSize = imageSizeBeforeVideoRecording!!
             }
         }
     }
