@@ -5,27 +5,64 @@ import android.renderscript.RenderScript
 object EffectRegistry {
 
     val baseEffects = listOf<(RenderScript) -> Effect>(
+
             {rs -> EdgeLuminanceEffect(rs) },
-            // {rs -> PermuteColorEffect.noOp(rs) },
-            {rs ->
-                Convolve3x3Effect.fromParameters(rs, mapOf(
-                    "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
-                        "colors" to mapOf(
-                               "type" to "fixed",
-                                "minColor" to listOf(255, 0, 0, 0),
-                                "maxColor" to listOf(255, 255, 0, 0)
-                        )
-                ))
-            },
             {rs -> PermuteColorEffect.noOp(rs) },
             {rs -> PermuteColorEffect.rgbToBrg(rs) },
             {rs -> PermuteColorEffect.rgbToGbr(rs) },
+
             {rs ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
-                                "minColor" to listOf(255, 255, 255, 255),
-                                "maxColor" to listOf(255, 255, 0, 0)
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 255)
+                        )
+                ))
+            },
+            {rs ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 0, 0)
+                        )
+                ))
+            },
+            {rs ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(0, 255, 0)
+                        )
+                ))
+            },
+            {rs ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(0, 0, 255)
+                        )
+                ))
+            },
+
+            {rs ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(255, 255, 255),
+                                "maxColor" to listOf(0, 0, 0)
+                        )
+                ))
+            },
+            {rs ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(255, 255, 255),
+                                "maxColor" to listOf(0, 0, 255)
                         )
                 ))
             },
@@ -33,9 +70,9 @@ object EffectRegistry {
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "linear_gradient",
-                                "minColor" to listOf(255, 0, 0, 0),
-                                "gradientStartColor" to listOf(255, 0, 255, 0),
-                                "gradientEndColor" to listOf(255, 0, 0, 255)
+                                "minColor" to listOf(0, 0, 0),
+                                "gradientStartColor" to listOf(0, 255, 0),
+                                "gradientEndColor" to listOf(0, 0, 255)
                         )
                 ))
             },
@@ -43,22 +80,49 @@ object EffectRegistry {
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "radial_gradient",
-                                "minColor" to listOf(255, 25, 25, 112),
-                                "centerColor" to listOf(255, 255, 255, 0),
-                                "outerColor" to listOf(255, 255, 70, 0)
+                                "minColor" to listOf(25, 25, 112),
+                                "centerColor" to listOf(255, 255, 0),
+                                "outerColor" to listOf(255, 70, 0)
+                        )
+                ))
+            },
+
+            {rs ->
+                Convolve3x3Effect.fromParameters(rs, mapOf(
+                        "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 255)
                         )
                 ))
             },
             {rs ->
-                SolidColorEffect.fromParameters(rs, mapOf(
+                Convolve3x3Effect.fromParameters(rs, mapOf(
+                        "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
                         "colors" to mapOf(
                                 "type" to "fixed",
-                                "minColor" to listOf(255, 255, 255, 255),
-                                "maxColor" to listOf(255, 0, 0, 0)
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 0, 0)
                         )
                 ))
             },
-            {rs -> AsciiEffect(rs) }
+            {rs ->
+                AsciiEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "text" to listOf(255, 255, 255),
+                                "background" to listOf(0, 0, 0)
+                        )
+                ))
+            },
+            {rs ->
+                AsciiEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "text" to listOf(0, 0, 0),
+                                "background" to listOf(255, 255, 255)
+                        )
+                ))
+            }
     )
 
     fun defaultEffectFactories(): List<(RenderScript) -> Effect> {

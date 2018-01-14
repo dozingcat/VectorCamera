@@ -13,12 +13,12 @@ import com.dozingcatsoftware.boojiecam.*
 /**
  * Created by brian on 10/13/17.
  */
-// TODO: Always render to full screen resolution.
-class AsciiEffect(val rs: RenderScript): Effect {
+class AsciiEffect(private val rs: RenderScript,
+                  private val effectParams: Map<String, Any>,
+                  private val textColor: Int,
+                  private val backgroundColor: Int): Effect {
     var characterWidthInPixels = 15
     var charHeightOverWidth = 9.0 / 7
-    var backgroundColor = Color.argb(255, 0, 0, 0)
-    var textColor = Color.argb(255, 255, 255, 255)
     var pixelChars = " .:o08#"
 
     private var asciiBlockAllocation: Allocation? = null
@@ -28,12 +28,7 @@ class AsciiEffect(val rs: RenderScript): Effect {
 
     override fun effectName() = EFFECT_NAME
 
-    override fun effectParameters(): Map<String, Any> = mapOf(
-            "backgroundColor" to argbArrayFromInt(backgroundColor),
-            "textColor" to argbArrayFromInt(textColor),
-            "pixelChars" to pixelChars,
-            "charWidth" to characterWidthInPixels
-    )
+    override fun effectParameters() = effectParams
 
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
@@ -148,8 +143,12 @@ class AsciiEffect(val rs: RenderScript): Effect {
         val EFFECT_NAME = "ascii"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): AsciiEffect {
-            // TODO: Read params and add to constructor.
-            return AsciiEffect(rs)
+            val colors = params.getOrElse("colors", {mapOf<String, Any>()}) as Map<String, Any>
+            val textColor = intFromArgbList(
+                    colors.getOrElse("text", {listOf(255, 255, 255)}) as List<Int>)
+            val backgroundColor = intFromArgbList(
+                    colors.getOrElse("background", {listOf(0, 0, 0)}) as List<Int>)
+            return AsciiEffect(rs, params, textColor, backgroundColor)
         }
     }
 }

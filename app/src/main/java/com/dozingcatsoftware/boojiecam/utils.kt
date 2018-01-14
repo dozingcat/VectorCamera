@@ -21,7 +21,13 @@ fun argbArrayFromInt(argb: Int): List<Int> {
 }
 
 fun intFromArgbList(a: List<Int>): Int {
-    return (a[0] shl 24) or (a[1] shl 16) or (a[2] shl 8) or a[3]
+    if (a.size == 4) {
+        return (a[0] shl 24) or (a[1] shl 16) or (a[2] shl 8) or a[3]
+    }
+    if (a.size == 3) {
+        return (255 shl 24) or (a[0] shl 16) or (a[1] shl 8) or a[2]
+    }
+    throw IllegalArgumentException("List must have 3 or 4 items")
 }
 
 fun readBytesIntoBuffer(input: InputStream, bytesToRead: Int, buffer: ByteArray, offset: Int = 0) {
