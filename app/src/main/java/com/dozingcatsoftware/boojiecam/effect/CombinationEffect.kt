@@ -18,11 +18,12 @@ class CombinationEffect(
     override fun effectName() = "combination"
 
     override fun createBitmap(originalCameraImage: CameraImage): Bitmap {
-        val gridSize = Math.floor(Math.sqrt(effectFactories.size.toDouble())).toInt()
+        val gridSize = Math.ceil(Math.sqrt(effectFactories.size.toDouble())).toInt()
         val cameraImage = originalCameraImage.withDisplaySize(Size(
                 originalCameraImage.displaySize.width / gridSize,
                 originalCameraImage.displaySize.height / gridSize))
-
+        // We're rendering several subeffects at low resolution; use the full display resolution
+        // for the combined image.
         val outputWidth = cameraImage.displaySize.width
         val outputHeight = cameraImage.displaySize.height
         val tileWidth = outputWidth / gridSize

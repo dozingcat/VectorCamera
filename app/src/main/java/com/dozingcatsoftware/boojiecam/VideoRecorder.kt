@@ -2,6 +2,7 @@ package com.dozingcatsoftware.boojiecam
 
 import android.util.Log
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -69,35 +70,38 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
     private fun threadEntry() {
         var currentFrame: Frame? = null
         var framesRead = 0
-        while (true) {
-            while (currentFrame == null) {
-                if (writerThreadShouldExit()) {
-                    Log.i(TAG, "Exiting")
-                    videoOutput.close()
-                    this.status = Status.FINISHED
-                    frameCallback?.invoke(this, this.status)
-                    return
-                }
+        this.status = Status.RUNNING
+        try {
+            while (true) {
                 while (currentFrame == null) {
+                    if (writerThreadShouldExit()) {
+                        Log.i(TAG, "Exiting")
+                        videoOutput.close()
+                        this.status = Status.FINISHED
+                        frameCallback?.invoke(this, this.status)
+                        return
+                    }
                     currentFrame = acquireFrameFromQueue()
+                    if (currentFrame == null) {
+                        Log.i(TAG, "Frame not available, waiting, status=${status}")
+                        frameQueueLock.withLock {
+                            frameAvailable.awaitNanos(250000000)
+                        }
+                    }
                 }
-                if (currentFrame == null) {
-                    Log.i(TAG, "Frame not available, waiting, status=${status}")
-                    frameAvailable.awaitNanos(250000000)
-                }
-            }
-            // For some reason the first frames are sometimes zero bytes.
-            framesRead += 1
-            Log.i(TAG, "Got frame ${framesRead}")
-            if (framesRead < 5) {
+                framesRead += 1
+                Log.i(TAG, "Got frame ${framesRead}")
+                frameTimestamps.add(currentFrame.timestamp)
+                // We could gzip the frames, but compression is very slow.
+                videoOutput.write(currentFrame!!.data)
+                frameCallback?.invoke(this, this.status)
                 currentFrame = null
-                continue
             }
-            frameTimestamps.add(currentFrame.timestamp)
-            // We could gzip the frames, but compression is very slow.
-            videoOutput.write(currentFrame!!.data)
-            frameCallback?.invoke(this, this.status)
-            currentFrame = null
+        }
+        finally {
+            Log.i(TAG, "VideoRecorder thread exiting")
+            try {videoOutput.close()}
+            catch (ignored: Exception) {}
         }
     }
 

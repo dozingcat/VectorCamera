@@ -9,9 +9,9 @@ android {
     buildToolsVersion '26.0.2'
     defaultConfig {
         applicationId "com.dozingcatsoftware.boojiecam"
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 26
-        renderscriptTargetApi 21
+        renderscriptTargetApi 23
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"

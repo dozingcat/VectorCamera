@@ -15,6 +15,7 @@ import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.activity_main.*
+import java.io.FileOutputStream
 
 class MainActivity : Activity() {
 
@@ -37,6 +38,7 @@ class MainActivity : Activity() {
 
     private var videoRecorder: VideoRecorder? = null
     private var videoFrameMetadata: MediaMetadata? = null
+    private var audioRecorder: AudioRecorder? = null
     private lateinit var previousImageSize: ImageSize
 
 
@@ -111,21 +113,22 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun handleGeneratedBitmap(processedBitmap: ProcessedBitmap) {
+    private fun handleGeneratedBitmap(pb: ProcessedBitmap) {
         handler.post(fun() {
-            if (lastBitmapTimestamp > processedBitmap.sourceImage.timestamp) {
+            if (lastBitmapTimestamp > pb.sourceImage.timestamp) {
                 return
             }
-            lastBitmapTimestamp = processedBitmap.sourceImage.timestamp
-            overlayView.processedBitmap = processedBitmap
+            lastBitmapTimestamp = pb.sourceImage.timestamp
+            overlayView.processedBitmap = pb
             overlayView.invalidate()
-            if (processedBitmap.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
+            // Save image or video frame if necessary.
+            if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Saving picture")
-                if (processedBitmap.yuvBytes == null) {
+                if (pb.yuvBytes == null) {
                     Log.w(TAG, "yuvBytes not set for saved image")
                 }
                 Thread({
-                    photoLibrary.savePhoto(this, processedBitmap,
+                    photoLibrary.savePhoto(this, pb,
                             fun(photoId: String) {
                                 Log.i(TAG, "Saved $photoId")
                             },
@@ -133,6 +136,26 @@ class MainActivity : Activity() {
                                 Log.w(TAG, "Error saving photo: " + ex)
                             })
                 }).start()
+            }
+            if (pb.sourceImage.status == CameraStatus.CAPTURING_VIDEO) {
+                val vr = videoRecorder
+                if (vr != null) {
+                    if (pb.yuvBytes != null) {
+                        if (videoFrameMetadata == null) {
+                            videoFrameMetadata = MediaMetadata(
+                                    MediaType.VIDEO,
+                                    currentEffect!!.effectMetadata(),
+                                    pb.sourceImage.width(),
+                                    pb.sourceImage.height(),
+                                    pb.sourceImage.orientation,
+                                    pb.sourceImage.timestamp)
+                        }
+                        vr.recordFrame(pb.sourceImage.timestamp, pb.yuvBytes)
+                    }
+                    else {
+                        Log.w(TAG, "yuvBytes not set for video frame")
+                    }
+                }
             }
         })
     }
@@ -144,19 +167,6 @@ class MainActivity : Activity() {
             if (cameraImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()
-            }
-            if (cameraImage.status == CameraStatus.CAPTURING_VIDEO && videoRecorder != null) {
-                val yuvBytes = flattenedYuvImageBytes(rs, cameraImage.singleYuvAllocation!!)
-                if (videoFrameMetadata == null) {
-                    videoFrameMetadata = MediaMetadata(
-                            MediaType.VIDEO,
-                            currentEffect!!.effectMetadata(),
-                            cameraImage.width(),
-                            cameraImage.height(),
-                            cameraImage.orientation,
-                            cameraImage.timestamp)
-                }
-                videoRecorder!!.recordFrame(cameraImage.timestamp, yuvBytes)
             }
             this.imageProcessor.queueAllocation(cameraImage)
         })
@@ -216,7 +226,7 @@ class MainActivity : Activity() {
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
         if (event.action == MotionEvent.ACTION_DOWN) {
             if (inEffectSelectionMode) {
-                val gridSize = Math.floor(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
                 val tileWidth = view.width / gridSize
                 val tileHeight = view.height / gridSize
                 val tileX = (event.x / tileWidth).toInt()
@@ -260,26 +270,43 @@ class MainActivity : Activity() {
             restartCameraImageGenerator(CameraStatus.CAPTURING_VIDEO)
             videoRecorder = VideoRecorder(videoId, videoStream, this::videoRecorderUpdated)
             videoRecorder!!.start()
+
+            //val audioStream = photoLibrary.createTempRawAudioFileOutputStreamForItemId(videoId)
+            //audioRecorder = AudioRecorder(videoId, audioStream as FileOutputStream)
+            //audioRecorder!!.start()
         }
         else {
             Log.i(TAG, "Stopping video recording")
-            videoRecorder!!.stop()
-            videoRecorder = null
+            try {
+                videoRecorder!!.stop()
+            }
+            finally {
+                videoRecorder = null
+                try {
+                    //audioRecorder!!.stop()
+                }
+                finally {
+                    //audioRecorder = null
+                }
+            }
         }
     }
 
     private fun videoRecorderUpdated(recorder: VideoRecorder, status: VideoRecorder.Status) {
-        when (status) {
-            VideoRecorder.Status.RUNNING -> {
-                // TODO: Update recording stats for display.
-                Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size)
-            }
-            VideoRecorder.Status.FINISHED -> {
-                Log.i(TAG, "Video recording stopped, writing to library")
-                preferredImageSize = previousImageSize
-                restartCameraImageGenerator()
-                photoLibrary.saveVideo(
-                        this, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
+        // This is called from the video recording thread, so post to the main thread.
+        handler.post {
+            when (status) {
+                VideoRecorder.Status.RUNNING -> {
+                    // TODO: Update recording stats for display.
+                    Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size)
+                }
+                VideoRecorder.Status.FINISHED -> {
+                    Log.i(TAG, "Video recording stopped, writing to library")
+                    preferredImageSize = previousImageSize
+                    restartCameraImageGenerator()
+                    photoLibrary.saveVideo(
+                            this, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
+                }
             }
         }
     }

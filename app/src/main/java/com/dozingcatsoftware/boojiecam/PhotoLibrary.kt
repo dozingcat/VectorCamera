@@ -27,7 +27,7 @@ import java.util.zip.GZIPOutputStream
  *     raw/
  *         [image_id].gz
  *         [video_id]_video.dat
- *         [video_id]_audio.dat
+ *         [video_id]_audio.pcm
  *     images/
  *         [image_id].jpg
  *         [video_id].jpg (if exported)
@@ -35,12 +35,12 @@ import java.util.zip.GZIPOutputStream
  *         [video_id].webm (if exported)
  *     raw_tmp/
  *         [video ID of recording in progress]_video.dat
- *         [video ID of recording in progress]_audio.dat
+ *         [video ID of recording in progress]_audio.pcm
  *
  *  "raw_tmp" holds in-progress video recordings, so they can be cleaned up if the recording fails.
  *  Images are stored as flattened YUV data; first (width*height) bytes of Y, then
  *  (width*height/4) bytes of U, then (width*height/4) bytes of V. Video files store individual
- *  frames concatenated together.
+ *  frames concatenated together. Audio is 16-bit 44kHz PCM.
  */
 class PhotoLibrary(val rootDirectory: File) {
 
@@ -147,7 +147,7 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     fun rawAudioFileForItemId(itemId: String): File {
-        return File(rawDirectory, itemId + "_audio.dat")
+        return File(rawDirectory, itemId + "_audio.pcm")
     }
 
     private fun tempRawVideoFileForItemId(itemId: String): File {
@@ -155,7 +155,7 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     private fun tempRawAudioFileForItemId(itemId: String): File {
-        return File(tempRawDirectory, itemId + "_audio.dat")
+        return File(tempRawDirectory, itemId + "_audio.pcm")
     }
 
     private fun createTempRawFileOutputStream(file: File): OutputStream {

@@ -72,7 +72,7 @@ class ViewImageActivity : Activity() {
         // Mostly duplicated from MainActivity.
         if (event.action == MotionEvent.ACTION_DOWN) {
             if (inEffectSelectionMode) {
-                val gridSize = Math.floor(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
                 val tileWidth = view.width / gridSize
                 val tileHeight = view.height / gridSize
                 val tileX = (event.x / tileWidth).toInt()
