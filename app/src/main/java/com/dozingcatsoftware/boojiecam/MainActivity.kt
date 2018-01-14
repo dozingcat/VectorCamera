@@ -271,9 +271,9 @@ class MainActivity : Activity() {
             videoRecorder = VideoRecorder(videoId, videoStream, this::videoRecorderUpdated)
             videoRecorder!!.start()
 
-            //val audioStream = photoLibrary.createTempRawAudioFileOutputStreamForItemId(videoId)
-            //audioRecorder = AudioRecorder(videoId, audioStream as FileOutputStream)
-            //audioRecorder!!.start()
+            val audioStream = photoLibrary.createTempRawAudioFileOutputStreamForItemId(videoId)
+            audioRecorder = AudioRecorder(videoId, audioStream as FileOutputStream)
+            audioRecorder!!.start()
         }
         else {
             Log.i(TAG, "Stopping video recording")
@@ -283,10 +283,10 @@ class MainActivity : Activity() {
             finally {
                 videoRecorder = null
                 try {
-                    //audioRecorder!!.stop()
+                    audioRecorder!!.stop()
                 }
                 finally {
-                    //audioRecorder = null
+                    audioRecorder = null
                 }
             }
         }

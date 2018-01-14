@@ -40,7 +40,7 @@ import java.util.zip.GZIPOutputStream
  *  "raw_tmp" holds in-progress video recordings, so they can be cleaned up if the recording fails.
  *  Images are stored as flattened YUV data; first (width*height) bytes of Y, then
  *  (width*height/4) bytes of U, then (width*height/4) bytes of V. Video files store individual
- *  frames concatenated together. Audio is 16-bit 44kHz PCM.
+ *  frames concatenated together. Audio is mono 16-bit (little-endian) 44kHz PCM.
  */
 class PhotoLibrary(val rootDirectory: File) {
 
