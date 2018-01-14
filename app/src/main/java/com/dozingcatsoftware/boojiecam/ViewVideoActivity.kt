@@ -26,6 +26,7 @@ class ViewVideoActivity: Activity() {
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private lateinit var videoReader: VideoReader
     private var frameIndex = 0
+    private var isPlaying = false
     private val handler = Handler()
 
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,6 +35,7 @@ class ViewVideoActivity: Activity() {
         rs = RenderScript.create(this)
 
         switchEffectButton.setOnClickListener(this::switchEffect)
+        playButton.setOnClickListener(this::togglePlay)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
         // TODO: sharing
 
@@ -69,6 +71,37 @@ class ViewVideoActivity: Activity() {
             videoReader.effect = originalEffect!!
         }
         loadFrame(frameIndex)
+    }
+
+    private fun togglePlay(view: View) {
+        isPlaying = !isPlaying
+        if (isPlaying) {
+            scheduleNextFrame()
+        }
+    }
+
+    private fun scheduleNextFrame() {
+        if (isPlaying) {
+            handler.postDelayed({showNextFrame()}, delayForNextFrame())
+        }
+    }
+
+    private fun showNextFrame() {
+        if (isPlaying) {
+            if (frameIndex < videoReader.numberOfFrames() - 1) {
+                frameIndex += 1
+                loadFrame(frameIndex)
+                frameSeekBar.progress = frameIndex
+                scheduleNextFrame()
+            }
+            else {
+                isPlaying = false
+            }
+        }
+    }
+
+    private fun delayForNextFrame(): Long {
+        return 25
     }
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {

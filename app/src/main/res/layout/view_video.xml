@@ -39,9 +39,25 @@
         android:layout_height="match_parent"
         android:gravity="bottom">
 
-        <SeekBar
-            android:id="@+id/frameSeekBar"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/playButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="0"
+                android:text="Play" />
+
+            <SeekBar
+                android:id="@+id/frameSeekBar"
+                android:layout_width="0px"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+        </LinearLayout>
+
     </LinearLayout>
 </FrameLayout>
