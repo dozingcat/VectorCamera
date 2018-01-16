@@ -46,4 +46,24 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
         return ProcessedBitmap(effect, cameraImage,
                 effect.createBitmap(cameraImage), effect.createPaintFn(cameraImage))
     }
+
+    fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {
+        val timestamps = metadata.frameTimestamps
+        return Math.abs(timestamps[frame2Index] - timestamps[frame1Index])
+    }
+
+    fun nextFrameIndexForTimeDelta(baseFrameIndex: Int, targetDeltaMillis: Long): Int {
+        var index = baseFrameIndex
+        val maxIndex = numberOfFrames() - 1
+        val timestamps = metadata.frameTimestamps
+        while (true) {
+            if (index >= maxIndex) {
+                return maxIndex
+            }
+            if (millisBetweenFrames(baseFrameIndex, index) > targetDeltaMillis) {
+                return index
+            }
+            index += 1
+        }
+    }
 }

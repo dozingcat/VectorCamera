@@ -2,9 +2,11 @@ package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
 import android.content.Intent
+import android.media.AudioTrack
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.widget.SeekBar
@@ -25,9 +27,14 @@ class ViewVideoActivity: Activity() {
     private var originalEffect: Effect? = null
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private lateinit var videoReader: VideoReader
+    private val handler = Handler()
+
+    var timeFn = System::currentTimeMillis
     private var frameIndex = 0
     private var isPlaying = false
-    private val handler = Handler()
+    private var playbackStartFrame = 0
+    private var playbackStartTimestamp = 0L
+    private var audioPlayer: AudioPlayer? = null
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,12 +53,25 @@ class ViewVideoActivity: Activity() {
         frameSeekBar.max = videoReader.numberOfFrames() - 1
         frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                loadFrame(progress)
+                if (fromUser) {
+                    stopPlaying()
+                    loadFrame(progress)
+                }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar) {}
             override fun onStopTrackingTouch(seekBar: SeekBar) {}
         })
         loadFrame(0)
+
+        val audioFile = photoLibrary.rawAudioRandomAccessFileForItemId(videoId)
+        if (audioFile != null) {
+            audioPlayer = AudioPlayer(audioFile)
+        }
+    }
+
+    public override fun onPause() {
+        stopPlaying()
+        super.onPause()
     }
 
     private fun loadFrame(index: Int) {
@@ -70,38 +90,67 @@ class ViewVideoActivity: Activity() {
         else {
             videoReader.effect = originalEffect!!
         }
-        loadFrame(frameIndex)
+        if (!isPlaying) {
+            loadFrame(frameIndex)
+        }
     }
 
     private fun togglePlay(view: View) {
-        isPlaying = !isPlaying
         if (isPlaying) {
-            scheduleNextFrame()
+            stopPlaying()
+        }
+        else {
+            startPlaying()
         }
     }
+
+    private fun startPlaying() {
+        isPlaying = true
+        if (frameIndex >= videoReader.numberOfFrames() - 1) {
+            showFrame(0, videoReader.bitmapForFrame(0))
+        }
+        playbackStartFrame = frameIndex
+        playbackStartTimestamp = timeFn()
+
+        audioPlayer?.startFromMillisOffset( videoReader.millisBetweenFrames(0, frameIndex))
+
+        scheduleNextFrame()
+    }
+
+    private fun stopPlaying() {
+        isPlaying = false
+        audioPlayer?.stop()
+    }
+
+    private fun millisSincePlaybackStart() = timeFn() - playbackStartTimestamp
 
     private fun scheduleNextFrame() {
-        if (isPlaying) {
-            handler.postDelayed({showNextFrame()}, delayForNextFrame())
+        if (!isPlaying) {
+            return
         }
+        if (frameIndex >= videoReader.numberOfFrames() - 1) {
+            stopPlaying()
+            return
+        }
+        val nextFrameIndex = videoReader.nextFrameIndexForTimeDelta(
+                playbackStartFrame, millisSincePlaybackStart())
+        val nextFrameBitmap = videoReader.bitmapForFrame(nextFrameIndex)
+        val delay = videoReader.millisBetweenFrames(playbackStartFrame, nextFrameIndex) -
+                millisSincePlaybackStart()
+        // Log.i(TAG, "Next frame index: ${nextFrameIndex} delay: ${delay}")
+        handler.postDelayed({
+            showFrame(nextFrameIndex, nextFrameBitmap)
+            handler.post(this::scheduleNextFrame)
+        }, maxOf(delay, 1))
     }
 
-    private fun showNextFrame() {
+    private fun showFrame(index: Int, pb: ProcessedBitmap) {
         if (isPlaying) {
-            if (frameIndex < videoReader.numberOfFrames() - 1) {
-                frameIndex += 1
-                loadFrame(frameIndex)
-                frameSeekBar.progress = frameIndex
-                scheduleNextFrame()
-            }
-            else {
-                isPlaying = false
-            }
+            frameIndex = index
+            overlayView.processedBitmap = pb
+            overlayView.invalidate()
+            frameSeekBar.progress = frameIndex
         }
-    }
-
-    private fun delayForNextFrame(): Long {
-        return 25
     }
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
@@ -119,14 +168,18 @@ class ViewVideoActivity: Activity() {
                 val effect = allEffectFactories[effectIndex](rs)
                 originalEffect = effect
                 videoReader.effect = effect
-                loadFrame(frameIndex)
                 // TODO: Update stored metadata (always? Or separate "save" action?)
                 inEffectSelectionMode = false
+                if (!isPlaying) {
+                    loadFrame(frameIndex)
+                }
             }
         }
     }
 
     companion object {
+        val TAG = "ViewVideoActivity"
+
         fun startActivityWithVideoId(parent: Activity, videoId: String): Intent {
             val intent = Intent(parent, ViewVideoActivity::class.java)
             intent.putExtra("videoId", videoId)

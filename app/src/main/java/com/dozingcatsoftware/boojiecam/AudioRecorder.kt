@@ -20,6 +20,9 @@ class AudioRecorder(val videoId: String, val outputStream: OutputStream,
     val audioSampleSize = 44100
     // Failsafe to make sure we don't keep recording indefinitely.
     val recordingLimitMillis = 120_000L
+    // There seems to be a "pop" in the initial input from AudioRecord. Skip this number of bytes
+    // (50 ms) after starting the recording to avoid it.
+    val skipInitialBytes = 4410
 
     lateinit var audioRecorder: AudioRecord
     var recordingThread: Thread? = null
@@ -54,15 +57,16 @@ class AudioRecorder(val videoId: String, val outputStream: OutputStream,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
                 bufferSize)
-        val readBufferSize = ByteArray(bufferSize / 2)
+        val readBuffer = ByteArray(bufferSize / 2)
         Log.i(TAG, "Starting recording with bufferSize=${bufferSize}")
         recordingStartTimestamp = timeFn()
         audioRecorder.startRecording()
         try {
+            audioRecorder.read(readBuffer, 0, skipInitialBytes)
             while (!shouldStopRecording()) {
-                val numBytes = audioRecorder.read(readBufferSize, 0, readBufferSize.size)
+                val numBytes = audioRecorder.read(readBuffer, 0, readBuffer.size)
                 Log.i(TAG, "Got ${numBytes} audio bytes")
-                outputStream.write(readBufferSize, 0, numBytes)
+                outputStream.write(readBuffer, 0, numBytes)
             }
         }
         finally {
