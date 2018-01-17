@@ -7,7 +7,8 @@ enum class MediaType {IMAGE, VIDEO}
 data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMetadata,
                          val width: Int, val height: Int,
                          val orientation: ImageOrientation, val timestamp: Long,
-                         val frameTimestamps: List<Long> = listOf()) {
+                         val frameTimestamps: List<Long> = listOf(),
+                         val audioStartTimestamp: Long = 0) {
 
     fun toJson(): Map<String, Any> {
         val effectInfo = mapOf(
@@ -22,6 +23,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                 "yFlipped" to orientation.isYFlipped(),
                 "timestamp" to timestamp,
                 "frameTimestamps" to frameTimestamps,
+                "audioStartTimestamp" to audioStartTimestamp,
                 "effect" to effectInfo)
     }
 
@@ -29,6 +31,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
         fun fromJson(json: Map<String, Any>): MediaMetadata {
             val effectDict = json["effect"] as Map<String, Any>
             val frameTimestamps = json.getOrElse("frameTimestamps", {listOf<Long>()})
+            val audioStartTimestamp = json.getOrDefault("audioStartTimestamp", 0) as Number
             return MediaMetadata(
                     MediaType.valueOf((json["type"] as String).toUpperCase()),
                     EffectMetadata(
@@ -39,7 +42,8 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                     ImageOrientation.withXYFlipped(
                             json["xFlipped"] as Boolean, json["yFlipped"] as Boolean),
                     json["timestamp"] as Long,
-                    frameTimestamps as List<Long>)
+                    frameTimestamps as List<Long>,
+                    audioStartTimestamp.toLong())
         }
     }
 }

@@ -61,10 +61,18 @@ class AudioRecorder(val videoId: String, val outputStream: OutputStream,
         Log.i(TAG, "Starting recording with bufferSize=${bufferSize}")
         recordingStartTimestamp = timeFn()
         audioRecorder.startRecording()
+        var firstRead = true
         try {
             audioRecorder.read(readBuffer, 0, skipInitialBytes)
             while (!shouldStopRecording()) {
                 val numBytes = audioRecorder.read(readBuffer, 0, readBuffer.size)
+                // Grab the timestamp of when we started recording audio, which is the time after
+                // the first read minus the duration of the data.
+                if (firstRead) {
+                    val durationMillis = 1000L * numBytes / (2 * audioSampleSize)
+                    recordingStartTimestamp = timeFn() - durationMillis
+                    firstRead = false
+                }
                 Log.i(TAG, "Got ${numBytes} audio bytes")
                 outputStream.write(readBuffer, 0, numBytes)
             }

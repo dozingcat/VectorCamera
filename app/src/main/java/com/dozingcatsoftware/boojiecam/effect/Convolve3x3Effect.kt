@@ -20,7 +20,7 @@ class Convolve3x3Effect(private val rs: RenderScript,
 
     private var convolveOutputAlloc: Allocation? = null
     private var bitmapOutputAlloc: Allocation? = null
-    private var convolveScript: ScriptIntrinsicConvolve3x3? = null
+    private val convolveScript = ScriptIntrinsicConvolve3x3.create(rs, Element.U8(rs))
     private var colorMapScript: ScriptC_colormap? = null
 
     override fun effectName() = EFFECT_NAME
@@ -41,18 +41,14 @@ class Convolve3x3Effect(private val rs: RenderScript,
                     cameraImage.width(), cameraImage.height())
         }
 
-        if (convolveScript == null) {
-            convolveScript = ScriptIntrinsicConvolve3x3.create(rs, Element.U8(rs))
-            convolveScript!!.setCoefficients(coefficients)
-        }
-        val convolveScr = convolveScript!!
+        convolveScript.setCoefficients(coefficients)
         if (cameraImage.singleYuvAllocation != null) {
-            convolveScr.setInput(cameraImage.singleYuvAllocation)
+            convolveScript.setInput(cameraImage.singleYuvAllocation)
         }
         else {
-            convolveScr.setInput(cameraImage.planarYuvAllocations!!.y)
+            convolveScript.setInput(cameraImage.planarYuvAllocations!!.y)
         }
-        convolveScr.forEach(convolveOutputAlloc)
+        convolveScript.forEach(convolveOutputAlloc)
 
         if (colorMapScript == null) {
             colorMapScript = ScriptC_colormap(rs)

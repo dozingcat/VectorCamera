@@ -26,7 +26,7 @@ class PermuteColorEffect(
         private val blueSource: ColorComponentSource): Effect {
 
     private var outputAllocation: Allocation? = null
-    private var script: ScriptC_permute_colors? = null
+    private val script = ScriptC_permute_colors(rs)
 
     override fun effectName() = EFFECT_NAME
 
@@ -37,23 +37,19 @@ class PermuteColorEffect(
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
                     cameraImage.width(), cameraImage.height())
         }
-        if (script == null) {
-            script = ScriptC_permute_colors(rs)
-        }
-        val scr = script!!
-        scr._gRedSource = redSource.rsCode
-        scr._gGreenSource = greenSource.rsCode
-        scr._gBlueSource = blueSource.rsCode
+        script._gRedSource = redSource.rsCode
+        script._gGreenSource = greenSource.rsCode
+        script._gBlueSource = blueSource.rsCode
 
         if (cameraImage.planarYuvAllocations != null) {
-            scr._gYInput = cameraImage.planarYuvAllocations.y
-            scr._gUInput = cameraImage.planarYuvAllocations.u
-            scr._gVInput = cameraImage.planarYuvAllocations.v
-            scr.forEach_permuteColors_planar(outputAllocation)
+            script._gYInput = cameraImage.planarYuvAllocations.y
+            script._gUInput = cameraImage.planarYuvAllocations.u
+            script._gVInput = cameraImage.planarYuvAllocations.v
+            script.forEach_permuteColors_planar(outputAllocation)
         }
         else {
-            scr._gYuvInput = cameraImage.singleYuvAllocation!!
-            scr.forEach_permuteColors(outputAllocation)
+            script._gYuvInput = cameraImage.singleYuvAllocation!!
+            script.forEach_permuteColors(outputAllocation)
         }
 
         val resultBitmap = Bitmap.createBitmap(

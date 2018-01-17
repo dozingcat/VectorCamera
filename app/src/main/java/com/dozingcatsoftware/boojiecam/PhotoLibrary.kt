@@ -188,7 +188,7 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     fun saveVideo(context: Context, itemId: String, imageInfo: MediaMetadata,
-                  frameTimestamps: List<Long>) {
+                  frameTimestamps: List<Long>, audioStartTimestamp: Long) {
         // Move video/audio files from tmp_raw/ to raw/, write metadata.json.
         val videoFile = tempRawVideoFileForItemId(itemId)
         val audioFile = tempRawAudioFileForItemId(itemId)
@@ -201,7 +201,7 @@ class PhotoLibrary(val rootDirectory: File) {
         }
         val metadata = MediaMetadata(
                 MediaType.VIDEO, imageInfo.effectMetadata, imageInfo.width, imageInfo.height,
-                imageInfo.orientation, imageInfo.timestamp, frameTimestamps)
+                imageInfo.orientation, imageInfo.timestamp, frameTimestamps, audioStartTimestamp)
         writeMetadata(metadata, itemId)
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.

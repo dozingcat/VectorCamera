@@ -24,8 +24,8 @@ class CombinationEffect(
                 originalCameraImage.displaySize.height / gridSize))
         // We're rendering several subeffects at low resolution; use the full display resolution
         // for the combined image.
-        val outputWidth = cameraImage.displaySize.width
-        val outputHeight = cameraImage.displaySize.height
+        val outputWidth = originalCameraImage.displaySize.width
+        val outputHeight = originalCameraImage.displaySize.height
         val tileWidth = outputWidth / gridSize
         val tileHeight = outputHeight / gridSize
         val tileBuffer = Bitmap.createBitmap(

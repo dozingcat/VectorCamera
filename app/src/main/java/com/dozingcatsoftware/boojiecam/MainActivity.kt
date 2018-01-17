@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private var videoRecorder: VideoRecorder? = null
     private var videoFrameMetadata: MediaMetadata? = null
     private var audioRecorder: AudioRecorder? = null
+    private var audioStartTimestamp = 0L
     private lateinit var previousImageSize: ImageSize
 
 
@@ -64,6 +65,15 @@ class MainActivity : Activity() {
         libraryButton.setOnClickListener(this::gotoLibrary)
         recordVideoButton.setOnClickListener(this::toggleVideoRecording)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
+
+        // Preload the effect classes so there's not a delay when switching to the effect grid.
+        Thread({
+            Log.i(TAG, "Starting effect loading thread")
+            for (ef in allEffectFactories) {
+                ef(rs)
+            }
+            Log.i(TAG, "Done loading effects")
+        }).start()
     }
 
     override fun onResume() {
@@ -260,12 +270,12 @@ class MainActivity : Activity() {
 
     private fun toggleVideoRecording(view: View) {
         if (videoRecorder == null) {
-            // TODO: audio
             Log.i(TAG, "Starting video recording")
             val videoId = photoLibrary.itemIdForTimestamp(System.currentTimeMillis())
             val videoStream = photoLibrary.createTempRawVideoFileOutputStreamForItemId(videoId)
             previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.VIDEO_RECORDING
+            // This might be cleaner with a MediaRecorder class that encapsulates audio and video.
             videoFrameMetadata = null
             restartCameraImageGenerator(CameraStatus.CAPTURING_VIDEO)
             videoRecorder = VideoRecorder(videoId, videoStream, this::videoRecorderUpdated)
@@ -277,6 +287,7 @@ class MainActivity : Activity() {
         }
         else {
             Log.i(TAG, "Stopping video recording")
+            audioStartTimestamp = audioRecorder!!.recordingStartTimestamp
             try {
                 videoRecorder!!.stop()
             }
@@ -304,8 +315,13 @@ class MainActivity : Activity() {
                     Log.i(TAG, "Video recording stopped, writing to library")
                     preferredImageSize = previousImageSize
                     restartCameraImageGenerator()
+                    // HERE: Get audio start timestamp and persist in metadata.
                     photoLibrary.saveVideo(
-                            this, recorder.videoId, videoFrameMetadata!!, recorder.frameTimestamps)
+                            this,
+                            recorder.videoId,
+                            videoFrameMetadata!!,
+                            recorder.frameTimestamps,
+                            audioStartTimestamp)
                 }
             }
         }

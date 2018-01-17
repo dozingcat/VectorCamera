@@ -14,32 +14,27 @@ class SolidColorEffect(val rs: RenderScript,
                        private val colorScheme: ColorScheme): Effect {
 
     private var outputAllocation: Allocation? = null
-    private var script: ScriptC_solid? = null
+    private val script = ScriptC_solid(rs)
 
     override fun effectName() = EFFECT_NAME
 
     override fun effectParameters() = effectParams
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        if (script == null) {
-            script = ScriptC_solid(rs)
-        }
-        val scr = script!!
-
         if (cameraImage.planarYuvAllocations != null) {
-            scr._yuvInput = cameraImage.planarYuvAllocations.y
+            script._yuvInput = cameraImage.planarYuvAllocations.y
         }
         else {
-            scr._yuvInput = cameraImage.singleYuvAllocation
+            script._yuvInput = cameraImage.singleYuvAllocation
         }
-        scr._colorMap = colorScheme.colorMap
+        script._colorMap = colorScheme.colorMap
 
         if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
                     cameraImage.width(), cameraImage.height())
         }
 
-        scr.forEach_computeColor(outputAllocation)
+        script.forEach_computeColor(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)

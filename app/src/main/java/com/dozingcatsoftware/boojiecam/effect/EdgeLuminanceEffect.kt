@@ -10,7 +10,7 @@ import com.dozingcatsoftware.boojiecam.*
 class EdgeLuminanceEffect(val rs: RenderScript): Effect {
 
     private var outputAllocation: Allocation? = null
-    private var script: ScriptC_edge_color? = null
+    private var script = ScriptC_edge_color(rs)
 
     override fun effectName() = EFFECT_NAME
 
@@ -19,23 +19,19 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
             outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
                     cameraImage.width(), cameraImage.height())
         }
-        if (script == null) {
-            script = ScriptC_edge_color(rs)
-        }
-        val scr = script!!
-        scr._gWidth = cameraImage.width()
-        scr._gHeight = cameraImage.height()
-        scr._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
+        script._gWidth = cameraImage.width()
+        script._gHeight = cameraImage.height()
+        script._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
 
         if (cameraImage.planarYuvAllocations != null) {
-            scr._gYInput = cameraImage.planarYuvAllocations.y
-            scr._gUInput = cameraImage.planarYuvAllocations.u
-            scr._gVInput = cameraImage.planarYuvAllocations.v
-            scr.forEach_setBrightnessToEdgeStrength_planar(outputAllocation)
+            script._gYInput = cameraImage.planarYuvAllocations.y
+            script._gUInput = cameraImage.planarYuvAllocations.u
+            script._gVInput = cameraImage.planarYuvAllocations.v
+            script.forEach_setBrightnessToEdgeStrength_planar(outputAllocation)
         }
         else {
-            scr._gYuvInput = cameraImage.singleYuvAllocation!!
-            scr.forEach_setBrightnessToEdgeStrength(outputAllocation)
+            script._gYuvInput = cameraImage.singleYuvAllocation!!
+            script.forEach_setBrightnessToEdgeStrength(outputAllocation)
         }
 
 
