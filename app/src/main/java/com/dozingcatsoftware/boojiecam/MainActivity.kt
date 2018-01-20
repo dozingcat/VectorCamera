@@ -17,6 +17,8 @@ import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
 
+enum class ShutterMode {IMAGE, VIDEO}
+
 class MainActivity : Activity() {
 
     private val handler = Handler()
@@ -41,7 +43,7 @@ class MainActivity : Activity() {
     private var audioRecorder: AudioRecorder? = null
     private var audioStartTimestamp = 0L
     private lateinit var previousImageSize: ImageSize
-
+    private var shutterMode = ShutterMode.IMAGE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,13 +60,20 @@ class MainActivity : Activity() {
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
 
+        moreOptionsButton.setOnClickListener({_ ->
+            moreOptionsLayout.visibility =
+                    if (moreOptionsLayout.visibility == View.VISIBLE) View.INVISIBLE
+                    else View.VISIBLE
+        })
+
+        toggleVideoButton.setOnClickListener(this::toggleVideoMode)
         switchCameraButton.setOnClickListener(this::switchToNextCamera)
         switchResolutionButton.setOnClickListener(this::switchResolution)
         switchEffectButton.setOnClickListener(this::switchEffect)
-        takePictureButton.setOnClickListener(this::takePicture)
         libraryButton.setOnClickListener(this::gotoLibrary)
-        recordVideoButton.setOnClickListener(this::toggleVideoRecording)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
+        cameraActionButton.onShutterButtonClick = this::handleShutterClick
+        cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
 
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
@@ -87,6 +96,25 @@ class MainActivity : Activity() {
         imageProcessor.pause()
         cameraImageGenerator.stop()
         super.onPause()
+    }
+
+    fun updateControls() {
+        var shutterResId = R.drawable.btn_camera_shutter_holo
+        if (shutterMode == ShutterMode.VIDEO) {
+            shutterResId = if (videoRecorder == null) R.drawable.btn_video_shutter_holo
+                           else R.drawable.btn_video_shutter_recording_holo
+        }
+        cameraActionButton.setImageResource(shutterResId)
+
+        toggleVideoButton.setImageResource(when(shutterMode) {
+            ShutterMode.IMAGE -> R.drawable.ic_photo_camera_white_36dp
+            ShutterMode.VIDEO -> R.drawable.ic_videocam_white_36dp
+        })
+
+        switchCameraButton.setImageResource(
+                if (cameraSelector.isSelectedCameraFrontFacing())
+                    R.drawable.ic_camera_front_white_36dp
+                else R.drawable.ic_camera_rear_white_36dp)
     }
 
     private fun targetCameraImageSize(): Size {
@@ -182,7 +210,8 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun restartCameraImageGenerator(cameraStatus: CameraStatus = CameraStatus.CAPTURING_PREVIEW) {
+    private fun restartCameraImageGenerator(
+            cameraStatus: CameraStatus = CameraStatus.CAPTURING_PREVIEW) {
         // cameraImageGenerator?.pause()
         Log.i(TAG, "recreateCameraImageGenerator: " + this.targetCameraImageSize())
         cameraImageGenerator.start(
@@ -190,6 +219,11 @@ class MainActivity : Activity() {
                 this.targetCameraImageSize(),
                 this::handleAllocationFromCamera)
         this.imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+    }
+
+    private fun toggleVideoMode(view: View) {
+        shutterMode = if (shutterMode == ShutterMode.VIDEO) ShutterMode.IMAGE else ShutterMode.VIDEO
+        updateControls()
     }
 
     private fun switchToNextCamera(view: View) {
@@ -201,6 +235,7 @@ class MainActivity : Activity() {
         cameraImageGenerator.stop()
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
         restartCameraImageGenerator()
+        updateControls()
     }
 
     private fun switchResolution(view: View) {
@@ -250,10 +285,43 @@ class MainActivity : Activity() {
                 imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
                 inEffectSelectionMode = false
             }
+            else {
+                controlLayout.visibility =
+                        if (controlLayout.visibility == View.VISIBLE) View.GONE
+                        else View.VISIBLE
+            }
         }
     }
 
-    private fun takePicture(view: View) {
+    private fun handleShutterClick() {
+        when (shutterMode) {
+            ShutterMode.IMAGE -> takePicture()
+            ShutterMode.VIDEO -> toggleVideoRecording()
+        }
+    }
+
+    private fun handleShutterFocus(pressed: Boolean) {
+        if (pressed) {
+            var resId = R.drawable.btn_camera_shutter_pressed_holo
+            if (shutterMode == ShutterMode.VIDEO) {
+                resId = if (videoRecorder != null)
+                            R.drawable.btn_video_shutter_recording_pressed_holo
+                        else R.drawable.btn_video_shutter_pressed_holo
+            }
+            cameraActionButton.setImageResource(resId)
+        }
+        else {
+            var resId = R.drawable.btn_camera_shutter_holo
+            if (shutterMode == ShutterMode.VIDEO) {
+                resId = if (videoRecorder != null)
+                    R.drawable.btn_video_shutter_recording_holo
+                else R.drawable.btn_video_shutter_holo
+            }
+            cameraActionButton.setImageResource(resId)
+        }
+    }
+
+    private fun takePicture() {
         if (cameraImageGenerator.status != CameraStatus.CAPTURING_PREVIEW) {
             return
         }
@@ -268,7 +336,7 @@ class MainActivity : Activity() {
         this.startActivity(Intent(this, ImageListActivity::class.java))
     }
 
-    private fun toggleVideoRecording(view: View) {
+    private fun toggleVideoRecording() {
         if (videoRecorder == null) {
             Log.i(TAG, "Starting video recording")
             val videoId = photoLibrary.itemIdForTimestamp(System.currentTimeMillis())
@@ -301,6 +369,7 @@ class MainActivity : Activity() {
                 }
             }
         }
+        updateControls()
     }
 
     private fun videoRecorderUpdated(recorder: VideoRecorder, status: VideoRecorder.Status) {

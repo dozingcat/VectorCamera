@@ -1,7 +1,9 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
 import android.renderscript.RenderScript
 
 
@@ -28,5 +30,10 @@ class CameraSelector(val context: Context) {
 
     fun createImageGenerator(rs: RenderScript): CameraImageGenerator {
         return CameraImageGenerator(context, rs, cameraManager, cameraIds[selectedCameraIndex])
+    }
+
+    fun isSelectedCameraFrontFacing(): Boolean {
+        var cc = cameraManager.getCameraCharacteristics(cameraIds[selectedCameraIndex])
+        return cc.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_FRONT
     }
 }

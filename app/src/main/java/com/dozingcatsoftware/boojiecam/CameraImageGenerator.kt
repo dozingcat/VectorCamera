@@ -56,6 +56,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
         if (this.status.isCapturing()) {
             Log.i(TAG, "Restarting capture")
+            captureSession!!.abortCaptures()
             captureSession!!.close()
         }
         else {

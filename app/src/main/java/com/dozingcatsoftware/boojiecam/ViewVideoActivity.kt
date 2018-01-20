@@ -42,7 +42,7 @@ class ViewVideoActivity: Activity() {
         rs = RenderScript.create(this)
 
         switchEffectButton.setOnClickListener(this::switchEffect)
-        playButton.setOnClickListener(this::togglePlay)
+        playPauseButton.setOnClickListener(this::togglePlay)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
         // TODO: sharing
 
@@ -72,6 +72,13 @@ class ViewVideoActivity: Activity() {
     public override fun onPause() {
         stopPlaying()
         super.onPause()
+    }
+
+    private fun updateControls() {
+        frameSeekBar.progress = frameIndex
+        playPauseButton.setImageResource(
+                if (isPlaying) R.drawable.ic_pause_white_36dp
+                else R.drawable.ic_play_arrow_white_36dp)
     }
 
     private fun loadFrame(index: Int) {
@@ -115,11 +122,13 @@ class ViewVideoActivity: Activity() {
         audioPlayer?.startFromMillisOffset( videoReader.millisBetweenFrames(0, frameIndex))
 
         scheduleNextFrame()
+        updateControls()
     }
 
     private fun stopPlaying() {
         isPlaying = false
         audioPlayer?.stop()
+        updateControls()
     }
 
     private fun millisSincePlaybackStart() = timeFn() - playbackStartTimestamp
@@ -149,7 +158,7 @@ class ViewVideoActivity: Activity() {
             frameIndex = index
             overlayView.processedBitmap = pb
             overlayView.invalidate()
-            frameSeekBar.progress = frameIndex
+            updateControls()
         }
     }
 
