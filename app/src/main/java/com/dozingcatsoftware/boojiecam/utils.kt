@@ -154,3 +154,6 @@ fun jsonArrayToList(json: JSONArray): List<Any> {
     return list
 }
 
+fun jsonStringToMap(s: String) = jsonObjectToMap(JSONObject(s))
+
+fun mapToJsonString(map: Map<String, Any>) = JSONObject(map).toString()

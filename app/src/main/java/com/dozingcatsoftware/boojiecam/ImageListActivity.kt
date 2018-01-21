@@ -53,6 +53,7 @@ class ImageListActivity : Activity() {
                 R.layout.imagegrid_cell,
                 arrayOf("thumbnailUri"),
                 intArrayOf(R.id.grid_image))
+        // TODO: Show date, size, and (for videos) duration
         adapter.viewBinder = SimpleAdapter.ViewBinder { view, data, _ ->
             val imageUri = data as Uri
             loadImageIntoViewAsync(imageUri, view as ImageView, CELL_WIDTH, CELL_HEIGHT, this.resources)

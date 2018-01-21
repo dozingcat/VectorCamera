@@ -28,13 +28,15 @@ data class CameraImage(val singleYuvAllocation: Allocation?,
         private val zeroSize = Size(0, 0)
 
         fun withAllocation(allocation: Allocation, orientation: ImageOrientation,
-                           status: CameraStatus, timestamp: Long): CameraImage {
-            return CameraImage(allocation, null, orientation, status, timestamp)
+                           status: CameraStatus, timestamp: Long,
+                           displaySize: Size = zeroSize): CameraImage {
+            return CameraImage(allocation, null, orientation, status, timestamp, displaySize)
         }
 
         fun withAllocationSet(yuv: PlanarYuvAllocations, orientation: ImageOrientation,
-                              status: CameraStatus, timestamp: Long): CameraImage {
-            return CameraImage(null, yuv, orientation, status, timestamp)
+                              status: CameraStatus, timestamp: Long,
+                              displaySize: Size = zeroSize): CameraImage {
+            return CameraImage(null, yuv, orientation, status, timestamp, displaySize)
         }
     }
 }

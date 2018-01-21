@@ -23,7 +23,8 @@
             android:layout_height="match_parent"
             android:layout_gravity="bottom"
             android:layout_weight="1"
-            android:gravity="bottom|center">
+            android:gravity="bottom|center"
+            android:visibility="invisible">
 
             <Button
                 android:id="@+id/helpButton"

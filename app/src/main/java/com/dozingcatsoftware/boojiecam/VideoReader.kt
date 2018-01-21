@@ -11,7 +11,6 @@ import java.io.RandomAccessFile
 class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val videoId: String,
                   var displaySize: Size) {
     private val videoFile: RandomAccessFile
-    private val audioFile: RandomAccessFile?
     private val metadata: MediaMetadata
     private val frameBuffer: ByteArray
     // effect and displaySize can be changed after creation
@@ -19,7 +18,6 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
 
     init {
         videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
-        audioFile = photoLibrary.rawAudioRandomAccessFileForItemId(videoId)
         metadata = photoLibrary.metadataForItemId(videoId)
         effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         frameBuffer = ByteArray(bytesPerFrame())
@@ -40,8 +38,8 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
         videoFile.readFully(frameBuffer)
         val allocation = PlanarYuvAllocations.fromInputStream(
                 rs, ByteArrayInputStream(frameBuffer), metadata.width, metadata.height)
-        val cameraImage = CameraImage(
-                null, allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
+        val cameraImage = CameraImage.withAllocationSet(
+                allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 0L, displaySize)
         return ProcessedBitmap(effect, cameraImage,
                 effect.createBitmap(cameraImage), effect.createPaintFn(cameraImage))

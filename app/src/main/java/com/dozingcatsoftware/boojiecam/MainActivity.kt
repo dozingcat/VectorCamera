@@ -24,6 +24,7 @@ class MainActivity : Activity() {
     private val handler = Handler()
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraImageGenerator: CameraImageGenerator
+    private val preferences = BCPreferences(this)
 
     private lateinit var imageProcessor: CameraAllocationProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
@@ -54,8 +55,8 @@ class MainActivity : Activity() {
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
         imageProcessor = CameraAllocationProcessor(rs)
-        // TODO: Save current effect in preferences.
-        currentEffect = allEffectFactories[effectIndex](rs)
+
+        currentEffect = preferences.effect(rs, {allEffectFactories[effectIndex](rs)})
 
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
@@ -259,6 +260,7 @@ class MainActivity : Activity() {
             currentEffect = CombinationEffect(rs, allEffectFactories)
             previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.EFFECT_GRID
+            controlLayout.visibility = View.GONE
         }
         else {
             currentEffect = allEffectFactories[effectIndex](rs)
@@ -279,7 +281,9 @@ class MainActivity : Activity() {
                 val index = gridSize * tileY + tileX
 
                 effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                currentEffect = allEffectFactories[effectIndex](rs)
+                val eff = allEffectFactories[effectIndex](rs)
+                currentEffect = eff
+                preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
                 preferredImageSize = previousImageSize
                 restartCameraImageGenerator()
                 imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
