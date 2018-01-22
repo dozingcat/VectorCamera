@@ -50,6 +50,7 @@ class PhotoLibrary(val rootDirectory: File) {
     private val tempRawDirectory = File(rootDirectory, "tmp_raw")
     private val imageDirectory = File(rootDirectory, "images")
     private val videoDirectory = File(rootDirectory, "videos")
+    private val tempVideoDirectory = File(rootDirectory, "tmp_video")
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
@@ -174,8 +175,9 @@ class PhotoLibrary(val rootDirectory: File) {
         return createTempRawFileOutputStream(tempRawAudioFileForItemId(itemId))
     }
 
-    fun clearTempRawDirectory() {
+    fun clearTempDirectories() {
         tempRawDirectory.deleteRecursively()
+        tempVideoDirectory.deleteRecursively()
     }
 
     fun rawImageFileInputStreamForItemId(itemId: String): InputStream {
@@ -227,6 +229,14 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun imageFileForItemId(itemId: String): File {
         return File(imageDirectory, itemId + ".jpg")
+    }
+
+    fun tempVideoFileForItemIdWithSuffix(itemId: String, suffix: String): File {
+        return File(tempVideoDirectory, itemId + ".webm." + suffix)
+    }
+
+    fun videoFileForItemId(itemId: String): File {
+        return File(videoDirectory, itemId + ".webm")
     }
 
     fun metadataForItemId(itemId: String): MediaMetadata {

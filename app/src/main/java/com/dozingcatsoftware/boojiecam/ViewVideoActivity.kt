@@ -15,6 +15,7 @@ import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.view_video.*
+import java.io.File
 
 /**
  * Created by brian on 1/1/18.
@@ -41,6 +42,7 @@ class ViewVideoActivity: Activity() {
         setContentView(R.layout.view_video)
         rs = RenderScript.create(this)
 
+        shareButton.setOnClickListener(this::shareVideo)
         switchEffectButton.setOnClickListener(this::switchEffect)
         playPauseButton.setOnClickListener(this::togglePlay)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
@@ -184,6 +186,53 @@ class ViewVideoActivity: Activity() {
                 }
             }
         }
+    }
+
+    private fun encodeVideo() {
+        Log.i(TAG, "Starting video export")
+        val tempVideoOnlyFile = photoLibrary.tempVideoFileForItemIdWithSuffix(videoId, "noaudio")
+        tempVideoOnlyFile.delete()
+        tempVideoOnlyFile.parentFile.mkdirs()
+        Log.i(TAG, "Writing to ${tempVideoOnlyFile.path}")
+
+        val encoder = WebMEncoder(videoReader, tempVideoOnlyFile.path)
+        encoder.startEncoding()
+        var frameIndex = 0
+        while (frameIndex < videoReader.numberOfFrames()) {
+            encoder.encodeFrame(frameIndex)
+            Log.i(TAG, "Encoded frame ${frameIndex}")
+            frameIndex += 1
+        }
+        encoder.finishEncoding()
+        Log.i(TAG, "Finished encoding")
+
+        var fileToMove: File
+
+        val audioFile = photoLibrary.rawAudioFileForItemId(videoId)
+        if (audioFile.exists()) {
+            val tempCombinedFile =
+                    photoLibrary.tempVideoFileForItemIdWithSuffix(videoId, "combined")
+            tempCombinedFile.delete()
+            Log.i(TAG, "Adding audio, saving to ${tempCombinedFile.path}")
+
+            CombineAudioVideo.insertAudioIntoWebm(
+                    audioFile.path, tempVideoOnlyFile.path, tempCombinedFile.path,
+                    {bytesRead -> Log.i(TAG, "Read ${bytesRead} audio bytes")})
+
+            tempVideoOnlyFile.delete()
+            fileToMove = tempCombinedFile
+        }
+        else {
+            fileToMove = tempVideoOnlyFile
+        }
+        val finalOutputFile = photoLibrary.videoFileForItemId(videoId)
+        finalOutputFile.parentFile.mkdirs()
+        fileToMove.renameTo(finalOutputFile)
+        Log.i(TAG, "Wrote to ${finalOutputFile.path}")
+    }
+
+    private fun shareVideo(view: View) {
+        encodeVideo()
     }
 
     companion object {

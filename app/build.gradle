@@ -20,6 +20,9 @@ android {
                 cppFlags "-O3"
             }
         }
+        ndk {
+            abiFilters 'x86', 'armeabi-v7a'
+        }
     }
     buildTypes {
         release {
@@ -44,4 +47,6 @@ dependencies {
     })
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
     compile "org.jetbrains.anko:anko-coroutines:$anko_version"
+
+    compile files('libs/vorbis-java-1.0.0-beta.jar')
 }

@@ -10,22 +10,20 @@ import java.io.RandomAccessFile
 // Maybe get rid of PhotoLibrary parameter and pass files/metadata as individual arguments.
 class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val videoId: String,
                   var displaySize: Size) {
-    private val videoFile: RandomAccessFile
-    private val metadata: MediaMetadata
+    private val videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
+    private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray
     // effect and displaySize can be changed after creation
     var effect: Effect
 
     init {
-        videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
-        metadata = photoLibrary.metadataForItemId(videoId)
         effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         frameBuffer = ByteArray(bytesPerFrame())
     }
 
-    fun numberOfFrames(): Int {
-        return metadata.frameTimestamps.size
-    }
+    fun videoWidth() = metadata.width
+    fun videoHeight() = metadata.height
+    fun numberOfFrames() = metadata.frameTimestamps.size
 
     private fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
 
@@ -48,6 +46,27 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {
         val timestamps = metadata.frameTimestamps
         return Math.abs(timestamps[frame2Index] - timestamps[frame1Index])
+    }
+
+    fun averageFrameDurationMillis(): Long {
+        val timestamps = metadata.frameTimestamps
+        return (timestamps.last() - timestamps.first()) / (numberOfFrames() - 1)
+    }
+
+    // Assume the last frame has a duration equal to the average duration of the other frames.
+    fun frameDurationMillis(frameIndex: Int): Long {
+        if (frameIndex == numberOfFrames() - 1) {
+            return averageFrameDurationMillis()
+        }
+        if (frameIndex >= 0 && frameIndex < numberOfFrames() - 1) {
+            return millisBetweenFrames(frameIndex, frameIndex + 1)
+        }
+        throw IllegalArgumentException("Bad frame index: ${frameIndex}")
+    }
+
+    fun totalDurationMillis(): Long {
+        val timestamps = metadata.frameTimestamps
+        return (timestamps.last() - timestamps.first()) + averageFrameDurationMillis()
     }
 
     fun nextFrameIndexForTimeDelta(baseFrameIndex: Int, targetDeltaMillis: Long): Int {
