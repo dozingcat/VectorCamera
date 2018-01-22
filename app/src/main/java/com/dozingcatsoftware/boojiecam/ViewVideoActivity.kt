@@ -180,6 +180,8 @@ class ViewVideoActivity: Activity() {
                 originalEffect = effect
                 videoReader.effect = effect
                 // TODO: Update stored metadata (always? Or separate "save" action?)
+                // FIXME: Add separate "exportedEffect" to metadata so we know what effect we used
+                // to create the WebM file if it exists.
                 inEffectSelectionMode = false
                 if (!isPlaying) {
                     loadFrame(frameIndex)

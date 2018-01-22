@@ -85,18 +85,7 @@ class PhotoLibrary(val rootDirectory: File) {
                     sourceImage.orientation, sourceImage.timestamp)
             writeMetadata(metadata, photoId)
 
-            // Write full size image and thumbnail.
-            run {
-                val resultBitmap = processedBitmap.renderBitmap(width, height)
-                imageDirectory.mkdirs()
-                val pngFile = imageFileForItemId(photoId)
-                val pngOutputStream = FileOutputStream(pngFile)
-                pngOutputStream.use({
-                    resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
-                })
-                AndroidUtils.scanSavedMediaFile(context, pngFile.path)
-            }
-            writeThumbnail(processedBitmap, photoId)
+            writeImageAndThumbnail(context, processedBitmap, photoId)
 
             successFn(photoId)
         }
@@ -118,6 +107,18 @@ class PhotoLibrary(val rootDirectory: File) {
         FileOutputStream(metadataFileForItemId(itemId)).use({
             it.write(json.toByteArray(Charsets.UTF_8))
         })
+    }
+
+    fun writeImageAndThumbnail(context: Context, pb: ProcessedBitmap, itemId: String) {
+        val resultBitmap = pb.renderBitmap(pb.sourceImage.width(), pb.sourceImage.height())
+        imageDirectory.mkdirs()
+        val pngFile = imageFileForItemId(itemId)
+        val pngOutputStream = FileOutputStream(pngFile)
+        pngOutputStream.use({
+            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
+        })
+        AndroidUtils.scanSavedMediaFile(context, pngFile.path)
+        writeThumbnail(pb, itemId)
     }
 
     fun writeThumbnail(processedBitmap: ProcessedBitmap, itemId: String) {

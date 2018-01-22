@@ -27,6 +27,12 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                 "effect" to effectInfo)
     }
 
+    fun withEffectMetadata(em: EffectMetadata): MediaMetadata {
+        return MediaMetadata(
+                mediaType, em, width, height, orientation,
+                timestamp, frameTimestamps, audioStartTimestamp)
+    }
+
     companion object {
         fun fromJson(json: Map<String, Any>): MediaMetadata {
             val effectDict = json["effect"] as Map<String, Any>

@@ -55,7 +55,7 @@ class ViewImageActivity : Activity() {
         }
     }
 
-    private fun showImage(effect: Effect, metadata: MediaMetadata) {
+    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
         val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
@@ -64,7 +64,11 @@ class ViewImageActivity : Activity() {
 
         val bitmap = effect.createBitmap(inputImage)
         val paintFn = effect.createPaintFn(inputImage)
-        overlayView.processedBitmap = ProcessedBitmap(effect, inputImage, bitmap, paintFn)
+        return ProcessedBitmap(effect, inputImage, bitmap, paintFn)
+    }
+
+    private fun showImage(effect: Effect, metadata: MediaMetadata) {
+        overlayView.processedBitmap = createProcessedBitmap(effect, metadata)
         overlayView.invalidate()
     }
 
@@ -81,8 +85,14 @@ class ViewImageActivity : Activity() {
 
                 val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
                 val effect = allEffectFactories[effectIndex](rs)
-                showImage(effect, photoLibrary.metadataForItemId(imageId))
-                // TODO: Update stored metadata (always? Or separate "save" action?)
+                // Update metadata and thumbnail and full size images.
+                val newMetadata = photoLibrary.metadataForItemId(imageId)
+                        .withEffectMetadata(effect.effectMetadata())
+                val pb = createProcessedBitmap(effect, newMetadata)
+                photoLibrary.writeMetadata(newMetadata, imageId)
+                photoLibrary.writeImageAndThumbnail(this, pb, imageId)
+                overlayView.processedBitmap = pb
+                overlayView.invalidate()
                 inEffectSelectionMode = false
             }
         }
