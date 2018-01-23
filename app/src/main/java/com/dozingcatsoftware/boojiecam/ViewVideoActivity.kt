@@ -179,13 +179,18 @@ class ViewVideoActivity: Activity() {
                 val effect = allEffectFactories[effectIndex](rs)
                 originalEffect = effect
                 videoReader.effect = effect
-                // TODO: Update stored metadata (always? Or separate "save" action?)
-                // FIXME: Add separate "exportedEffect" to metadata so we know what effect we used
-                // to create the WebM file if it exists.
-                inEffectSelectionMode = false
+
+                // Update thumbnail and metadata with effect.
+                val newMetadata = photoLibrary.metadataForItemId(videoId)
+                        .withEffectMetadata(effect.effectMetadata())
+                val firstFrame = videoReader.bitmapForFrame(0)
+                photoLibrary.writeMetadata(newMetadata, videoId)
+                photoLibrary.writeThumbnail(firstFrame, videoId)
+
                 if (!isPlaying) {
                     loadFrame(frameIndex)
                 }
+                inEffectSelectionMode = false
             }
         }
     }
@@ -234,6 +239,8 @@ class ViewVideoActivity: Activity() {
     }
 
     private fun shareVideo(view: View) {
+        // TODO: Export if needed (file doesn't exist, or exported metadata doesn't match)
+        // Also options for zip archive and text/html for ascii effects.
         encodeVideo()
     }
 

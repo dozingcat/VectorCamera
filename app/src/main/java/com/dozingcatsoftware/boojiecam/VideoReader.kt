@@ -13,7 +13,7 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     private val videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
     private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray
-    // effect and displaySize can be changed after creation
+    // effect and displaySize can be changed after creation.
     var effect: Effect
 
     init {

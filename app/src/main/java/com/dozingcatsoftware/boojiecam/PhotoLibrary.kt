@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.os.Environment
 import android.renderscript.RenderScript
 import android.util.Log
-import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectMetadata
 import com.dozingcatsoftware.util.AndroidUtils
 import org.json.JSONObject

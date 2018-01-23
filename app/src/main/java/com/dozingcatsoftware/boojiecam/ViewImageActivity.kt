@@ -87,7 +87,7 @@ class ViewImageActivity : Activity() {
                 val effect = allEffectFactories[effectIndex](rs)
                 // Update metadata and thumbnail and full size images.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
-                        .withEffectMetadata(effect.effectMetadata())
+                        .withExportedEffectMetadata(effect.effectMetadata())
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
                 photoLibrary.writeImageAndThumbnail(this, pb, imageId)
