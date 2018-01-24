@@ -10,10 +10,15 @@ import android.widget.AdapterView.OnItemClickListener
 import android.widget.GridView
 import android.widget.ImageView
 import android.widget.SimpleAdapter
+import android.widget.TextView
 import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.coroutines.experimental.bg
+import java.text.DateFormat
+import java.text.DecimalFormat
+import java.text.NumberFormat
+import java.util.*
 
 
 class ImageListActivity : Activity() {
@@ -47,16 +52,20 @@ class ImageListActivity : Activity() {
 
     private fun displayGrid() {
         gridImageIds = photoLibrary.allItemIds().asReversed()
-        val cellMaps = gridImageIds!!.map(
-                { mapOf("thumbnailUri" to Uri.fromFile(photoLibrary.thumbnailFileForItemId(it)))})
+        val cellMaps = gridImageIds!!.map({mapOf("itemId" to it)})
+        // Bind to the image view, date field, and time field. The view binder will be called
+        // with each of those views and the corresponding map value (always "itemId").
         val adapter = SimpleAdapter(this, cellMaps,
                 R.layout.imagegrid_cell,
-                arrayOf("thumbnailUri"),
-                intArrayOf(R.id.grid_image))
-        // TODO: Show date, size, and (for videos) duration
+                arrayOf("itemId", "itemId", "itemId"),
+                intArrayOf(R.id.grid_image, R.id.dateField, R.id.sizeField))
         adapter.viewBinder = SimpleAdapter.ViewBinder { view, data, _ ->
-            val imageUri = data as Uri
-            loadImageIntoViewAsync(imageUri, view as ImageView, CELL_WIDTH, CELL_HEIGHT, this.resources)
+            val itemId = (data as String)
+            when (view.id) {
+                R.id.grid_image -> loadGridCellImage(view as ImageView, itemId)
+                R.id.dateField -> loadGridCellDateField(view as TextView, itemId)
+                R.id.sizeField -> loadGridCellSizeField(view as TextView, itemId)
+            }
             true
         }
         gridView.adapter = adapter
@@ -68,31 +77,50 @@ class ImageListActivity : Activity() {
         System.gc() // seems to avoid OutOfMemoryErrors when selecting image after deleting earlier image
     }
 
-    private fun loadImageIntoViewAsync(
-            uri: Uri, view: ImageView, width: Int, height: Int, resources: Resources) {
+    private fun loadGridCellImage(view: ImageView, itemId: String) {
         val self = this
         async(UI) {
+            val imageUri = Uri.fromFile(self.photoLibrary.thumbnailFileForItemId(itemId))
             val bitmap = (bg {
-                AndroidUtils.scaledBitmapFromURIWithMinimumSize(self, uri, width, height)
+                AndroidUtils.scaledBitmapFromURIWithMinimumSize(
+                        self, imageUri, ImageListActivity.CELL_WIDTH, ImageListActivity.CELL_HEIGHT)
             }).await()
             view.setImageBitmap(bitmap)
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        /*
-        if (resultCode == ViewImageActivity.DELETE_RESULT) {
-            imageDirectories.removeAt(selectedGridIndex)
-            imageDirectoryMaps.removeAt(selectedGridIndex)
-            displayGrid()
+    private fun loadGridCellDateField(view: TextView, itemId: String) {
+        val self = this
+        async(UI) {
+            val metadata = (bg {
+                self.photoLibrary.metadataForItemId(itemId)
+            }).await()
+            val dateCreated = Date(metadata.timestamp)
+            view.text = ImageListActivity.GRID_DATE_FORMAT.format(dateCreated)
         }
-        */
+    }
+
+    private fun loadGridCellSizeField(view: TextView, itemId: String) {
+        val self = this
+        async(UI) {
+            val sizeInBytes = (bg {
+                self.photoLibrary.fileSizeForItemId(itemId)
+            }).await()
+            val mb = sizeInBytes / 1e6
+            val formatter =
+                    if (mb >= 10) ImageListActivity.GRID_SIZE_FORMAT_LARGE
+                    else ImageListActivity.GRID_SIZE_FORMAT_SMALL
+            view.text = formatter.format(mb) + " MB"
+        }
     }
 
     companion object {
         // These should match the dimensions in imagegrid.xml and imagegrid_cell.xml.
-        internal var CELL_WIDTH = 160
-        internal var CELL_HEIGHT = 120
+        val CELL_WIDTH = 160
+        val CELL_HEIGHT = 120
+        val GRID_DATE_FORMAT = DateFormat.getDateInstance(DateFormat.MEDIUM)
+        val GRID_SIZE_FORMAT_LARGE = NumberFormat.getIntegerInstance()
+        val GRID_SIZE_FORMAT_SMALL = DecimalFormat("0.0")
     }
 
 }

@@ -245,12 +245,22 @@ class PhotoLibrary(val rootDirectory: File) {
         return MediaMetadata.fromJson(mdMap)
     }
 
+    fun fileSizeForItemId(itemId: String): Long {
+        // length() returns 0 for files that don't exist.
+        return (imageFileForItemId(itemId).length() +
+                videoFileForItemId(itemId).length() +
+                rawImageFileForItemId(itemId).length() +
+                rawVideoFileForItemId(itemId).length() +
+                rawAudioFileForItemId(itemId).length())
+    }
+
     fun deleteItem(itemId: String): Boolean {
         // Some or all of these will not exist, which is fine.
-        rawVideoFileForItemId(itemId).delete()
-        rawAudioFileForItemId(itemId).delete()
         imageFileForItemId(itemId).delete()
         videoFileForItemId(itemId).delete()
+        rawImageFileForItemId(itemId).delete()
+        rawVideoFileForItemId(itemId).delete()
+        rawAudioFileForItemId(itemId).delete()
         return metadataFileForItemId(itemId).delete()
     }
 
