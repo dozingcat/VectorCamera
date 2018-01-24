@@ -1,6 +1,8 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.media.AudioTrack
 import android.os.Bundle
@@ -45,6 +47,7 @@ class ViewVideoActivity: Activity() {
         shareButton.setOnClickListener(this::shareVideo)
         switchEffectButton.setOnClickListener(this::switchEffect)
         playPauseButton.setOnClickListener(this::togglePlay)
+        deleteButton.setOnClickListener(this::deleteVideo)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
         // TODO: sharing
 
@@ -242,6 +245,20 @@ class ViewVideoActivity: Activity() {
         // TODO: Export if needed (file doesn't exist, or exported metadata doesn't match)
         // Also options for zip archive and text/html for ascii effects.
         encodeVideo()
+    }
+
+    private fun deleteVideo(view: View) {
+        val deleteFn = { _: DialogInterface, _: Int ->
+            photoLibrary.deleteItem(videoId)
+            finish()
+        }
+
+        AlertDialog.Builder(this)
+                .setCancelable(true)
+                .setMessage("Are you sure you want to delete this video?")
+                .setPositiveButton("Delete", deleteFn)
+                .setNegativeButton("Don't delete", null)
+                .show()
     }
 
     companion object {

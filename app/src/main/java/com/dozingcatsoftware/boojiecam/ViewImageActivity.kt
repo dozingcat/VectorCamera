@@ -1,6 +1,8 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -29,6 +31,7 @@ class ViewImageActivity : Activity() {
 
         switchEffectButton.setOnClickListener(this::switchEffect)
         shareButton.setOnClickListener(this::shareImage)
+        deleteButton.setOnClickListener(this::deleteImage)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         imageId = intent.getStringExtra("imageId")
@@ -111,6 +114,20 @@ class ViewImageActivity : Activity() {
 
         AndroidUtils.scanSavedMediaFile(this, photoLibrary.imageFileForItemId(imageId).path,
                 callback)
+    }
+
+    private fun deleteImage(view: View) {
+        val deleteFn = { _: DialogInterface, _: Int ->
+            photoLibrary.deleteItem(imageId)
+            finish()
+        }
+
+        AlertDialog.Builder(this)
+                .setCancelable(true)
+                .setMessage("Are you sure you want to delete this picture?")
+                .setPositiveButton("Delete", deleteFn)
+                .setNegativeButton("Don't delete", null)
+                .show()
     }
 
     companion object {

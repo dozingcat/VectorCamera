@@ -245,6 +245,15 @@ class PhotoLibrary(val rootDirectory: File) {
         return MediaMetadata.fromJson(mdMap)
     }
 
+    fun deleteItem(itemId: String): Boolean {
+        // Some or all of these will not exist, which is fine.
+        rawVideoFileForItemId(itemId).delete()
+        rawAudioFileForItemId(itemId).delete()
+        imageFileForItemId(itemId).delete()
+        videoFileForItemId(itemId).delete()
+        return metadataFileForItemId(itemId).delete()
+    }
+
     companion object {
         val TAG = "PhotoLibrary"
         val PHOTO_ID_FORMAT = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS")
