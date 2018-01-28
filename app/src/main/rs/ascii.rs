@@ -22,6 +22,9 @@ bool flipVertical;
 
 // 0=monochrome, 1=primary, 2=full
 int colorMode;
+// In primary color mode, if a color component is at least this fraction of the maximum color
+// component, it will be enabled.
+static float PRIMARY_COLOR_RATIO = 0.75f;
 
 // The kernel is called for each rectangle of the input image that will have a character drawn into
 // it, not once for each pixel. The output allocation contains the average color for the rectangle.
@@ -62,9 +65,11 @@ uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
     // Color to use for non-zero modes.
     uchar4 textColor = averageColor;  // for mode 2
     if (colorMode == 1) {
-        textColor.r = (averageColor.r >= 128) ? 255 : 0;
-        textColor.g = (averageColor.g >= 128) ? 255 : 0;
-        textColor.b = (averageColor.b >= 128) ? 255 : 0;
+        uint32_t maxTotalColor = max(max(redTotal, greenTotal), blueTotal);
+        float threshold = maxTotalColor * PRIMARY_COLOR_RATIO;
+        textColor.r = (redTotal >= threshold) ? 255 : 0;
+        textColor.g = (greenTotal >= threshold) ? 255 : 0;
+        textColor.b = (blueTotal >= threshold) ? 255 : 0;
     }
 
     uint32_t averageBrightness = brightnessTotal / numPixels;
@@ -123,9 +128,11 @@ uchar4 RS_KERNEL computeBlockAverages_planar(uint32_t x, uint32_t y) {
     // Color to use for non-zero modes.
     uchar4 textColor = averageColor;  // for mode 2
     if (colorMode == 1) {
-        textColor.r = (averageColor.r >= 128) ? 255 : 0;
-        textColor.g = (averageColor.g >= 128) ? 255 : 0;
-        textColor.b = (averageColor.b >= 128) ? 255 : 0;
+        uint32_t maxTotalColor = max(max(redTotal, greenTotal), blueTotal);
+        float threshold = maxTotalColor * PRIMARY_COLOR_RATIO;
+        textColor.r = (redTotal >= threshold) ? 255 : 0;
+        textColor.g = (greenTotal >= threshold) ? 255 : 0;
+        textColor.b = (blueTotal >= threshold) ? 255 : 0;
     }
 
     uint32_t averageBrightness = brightnessTotal / numPixels;

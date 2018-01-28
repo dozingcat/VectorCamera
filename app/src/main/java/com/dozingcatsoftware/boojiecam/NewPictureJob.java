@@ -40,15 +40,6 @@ public class NewPictureJob extends JobService {
             Environment.DIRECTORY_DCIM).getPath();
 
     static final int JOB_ID = 1;
-    // A pre-built JobInfo we use for scheduling our job.
-    static final JobInfo JOB_INFO =
-            new JobInfo.Builder(JOB_ID, new ComponentName(NewPictureJob.class.getPackage().getName(),
-                    "NewPictureJob"))
-                    .addTriggerContentUri(new JobInfo.TriggerContentUri(
-                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                            JobInfo.TriggerContentUri.FLAG_NOTIFY_FOR_DESCENDANTS))
-                    .addTriggerContentUri(new JobInfo.TriggerContentUri(MEDIA_URI, 0))
-                    .build();
 
     JobParameters jobParams;
 
