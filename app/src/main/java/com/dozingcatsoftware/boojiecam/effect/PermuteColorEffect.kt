@@ -18,12 +18,15 @@ enum class ColorComponentSource(val rsCode: Int) {
     MAX(-1),
 }
 
+// enum for flipUV?
+
 class PermuteColorEffect(
         private val rs: RenderScript,
         private val effectParams: Map<String, Any>,
         private val redSource: ColorComponentSource,
         private val greenSource: ColorComponentSource,
-        private val blueSource: ColorComponentSource): Effect {
+        private val blueSource: ColorComponentSource,
+        private val flipUV: Boolean): Effect {
 
     private var outputAllocation: Allocation? = null
     private val script = ScriptC_permute_colors(rs)
@@ -40,6 +43,7 @@ class PermuteColorEffect(
         script._gRedSource = redSource.rsCode
         script._gGreenSource = greenSource.rsCode
         script._gBlueSource = blueSource.rsCode
+        script._gFlipUV = flipUV
 
         if (cameraImage.planarYuvAllocations != null) {
             script._gYInput = cameraImage.planarYuvAllocations.y
@@ -66,7 +70,8 @@ class PermuteColorEffect(
             val redSource = ColorComponentSource.valueOf(params["red"] as String)
             val greenSource = ColorComponentSource.valueOf(params["green"] as String)
             val blueSource = ColorComponentSource.valueOf(params["blue"] as String)
-            return PermuteColorEffect(rs, params, redSource, greenSource, blueSource)
+            val flipUV = params.getOrDefault("flipUV", false) as Boolean
+            return PermuteColorEffect(rs, params, redSource, greenSource, blueSource, flipUV)
         }
 
         fun noOp(rs: RenderScript) = fromParameters(rs, mapOf(
@@ -85,6 +90,13 @@ class PermuteColorEffect(
                 "red" to ColorComponentSource.BLUE.toString(),
                 "green" to ColorComponentSource.RED.toString(),
                 "blue" to ColorComponentSource.GREEN.toString()
+        ))
+
+        fun flipUV(rs: RenderScript) = fromParameters(rs, mapOf(
+                "red" to ColorComponentSource.RED.toString(),
+                "green" to ColorComponentSource.GREEN.toString(),
+                "blue" to ColorComponentSource.BLUE.toString(),
+                "flipUV" to true
         ))
     }
 }

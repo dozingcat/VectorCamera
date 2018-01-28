@@ -72,6 +72,7 @@ class MainActivity : Activity() {
         switchResolutionButton.setOnClickListener(this::switchResolution)
         switchEffectButton.setOnClickListener(this::switchEffect)
         libraryButton.setOnClickListener(this::gotoLibrary)
+        settingsButton.setOnClickListener(this::gotoPreferences)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
         cameraActionButton.onShutterButtonClick = this::handleShutterClick
         cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
@@ -340,7 +341,11 @@ class MainActivity : Activity() {
     }
 
     private fun gotoLibrary(view: View) {
-        this.startActivity(Intent(this, ImageListActivity::class.java))
+        ImageListActivity.startIntent(this)
+    }
+
+    private fun gotoPreferences(view: View) {
+        BCPreferencesActivity.startIntent(this)
     }
 
     private fun toggleVideoRecording() {

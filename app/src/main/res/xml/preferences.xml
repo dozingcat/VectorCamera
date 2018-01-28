@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="Preferences">
+        <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
+            android:enabled="true"
+            android:title="@string/autoConvertPicturesPrefsTitle" />
+
+        <ListPreference
+            android:key="@string/videoExportTypePrefsKey"
+            android:defaultValue="WEBM"
+            android:entries="@array/videoExportTypeLabels"
+            android:entryValues="@array/videoExportTypeValues"
+            android:title="@string/videoExportTypePrefsTitle" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="ASCII characters">
+        <EditTextPreference android:key="@string/whiteOnBlackPixelCharsPrefId"
+            android:enabled="true"
+            android:title="@string/whiteOnBlackPixelCharsPrefTitle"
+            android:dialogMessage="@string/whiteOnBlackPixelCharsPrefMessage" />
+        <EditTextPreference android:key="@string/blackOnWhitePixelCharsPrefId"
+            android:enabled="true"
+            android:title="@string/blackOnWhitePixelCharsPrefTitle"
+            android:dialogMessage="@string/blackOnWhitePixelCharsPrefMessage" />
+        <EditTextPreference android:key="@string/ansiColorPixelCharsPrefId"
+            android:enabled="true"
+            android:title="@string/ansiColorPixelCharsPrefTitle"
+            android:dialogMessage="@string/ansiColorPixelCharsPrefMessage" />
+        <EditTextPreference android:key="@string/fullColorPixelCharsPrefId"
+            android:enabled="true"
+            android:title="@string/fullColorPixelCharsPrefTitle"
+            android:dialogMessage="@string/fullColorPixelCharsPrefMessage" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

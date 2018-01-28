@@ -10,6 +10,7 @@ object EffectRegistry {
             {rs -> PermuteColorEffect.noOp(rs) },
             {rs -> PermuteColorEffect.rgbToBrg(rs) },
             {rs -> PermuteColorEffect.rgbToGbr(rs) },
+            {rs -> PermuteColorEffect.flipUV(rs) },
 
             {rs ->
                 EdgeEffect.fromParameters(rs, mapOf(

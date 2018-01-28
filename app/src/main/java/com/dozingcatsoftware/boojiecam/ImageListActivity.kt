@@ -1,6 +1,8 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -114,6 +116,10 @@ class ImageListActivity : Activity() {
         val GRID_DATE_FORMAT = DateFormat.getDateInstance(DateFormat.MEDIUM)
         val GRID_SIZE_FORMAT_LARGE = NumberFormat.getIntegerInstance()
         val GRID_SIZE_FORMAT_SMALL = DecimalFormat("0.0")
+
+        fun startIntent(parent: Context) {
+            parent.startActivity(Intent(parent, ImageListActivity::class.java))
+        }
     }
 
 }
