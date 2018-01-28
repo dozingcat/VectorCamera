@@ -122,6 +122,16 @@ object EffectRegistry {
                                 "background" to listOf(255, 255, 255)
                         )
                 ))
+            },
+            {rs ->
+                AsciiEffect.fromParameters(rs, mapOf(
+                        "colorMode" to "primary"
+                ))
+            },
+            { rs ->
+                AsciiEffect.fromParameters(rs, mapOf(
+                        "colorMode" to "full"
+                ))
             }
     )
 

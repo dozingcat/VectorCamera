@@ -20,6 +20,11 @@ int numCharacters;
 bool flipHorizontal;
 bool flipVertical;
 
+// 0=monochrome, 1=primary, 2=full
+int colorMode;
+
+// The kernel is called for each rectangle of the input image that will have a character drawn into
+// it, not once for each pixel. The output allocation contains the average color for the rectangle.
 uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
     int inputPixelsPerCol = inputImageWidth / numCharColumns;
     int inputPixelsPerRow = inputImageHeight / numCharRows;
@@ -48,26 +53,37 @@ uchar4 RS_KERNEL computeBlockAverages(uint32_t x, uint32_t y) {
     }
 
     uint32_t numPixels = inputPixelsPerCol * inputPixelsPerRow;
-    uchar4 ret;
-    ret.r = redTotal / numPixels;
-    ret.g = greenTotal / numPixels;
-    ret.b = blueTotal / numPixels;
-    ret.a = brightnessTotal / numPixels;
+    uchar4 averageColor;
+    averageColor.r = redTotal / numPixels;
+    averageColor.g = greenTotal / numPixels;
+    averageColor.b = blueTotal / numPixels;
+    averageColor.a = 255;
 
-    int xOutMin = x * characterPixelWidth;
-    int yOutMin = y * characterPixelHeight;
-    uint32_t pixelIndex = (uint32_t) (ret.a / 256.0 * numCharacters);
+    // Color to use for non-zero modes.
+    uchar4 textColor = averageColor;  // for mode 2
+    if (colorMode == 1) {
+        textColor.r = (averageColor.r >= 128) ? 255 : 0;
+        textColor.g = (averageColor.g >= 128) ? 255 : 0;
+        textColor.b = (averageColor.b >= 128) ? 255 : 0;
+    }
+
+    uint32_t averageBrightness = brightnessTotal / numPixels;
+    uint32_t xOutMin = x * characterPixelWidth;
+    uint32_t yOutMin = y * characterPixelHeight;
+    uint32_t pixelIndex = (uint32_t) (averageBrightness / 256.0 * numCharacters);
     uint32_t xoff = pixelIndex * characterPixelWidth;
     for (uint32_t dy = 0; dy < characterPixelHeight; dy++) {
         uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
         for (uint32_t dx = 0; dx < characterPixelWidth; dx++) {
             uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
             uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+            if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
+                pixel = textColor;
+            }
             rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
         }
     }
-
-    return ret;
+    return averageColor;
 }
 
 uchar4 RS_KERNEL computeBlockAverages_planar(uint32_t x, uint32_t y) {
@@ -98,24 +114,35 @@ uchar4 RS_KERNEL computeBlockAverages_planar(uint32_t x, uint32_t y) {
     }
 
     uint32_t numPixels = inputPixelsPerCol * inputPixelsPerRow;
-    uchar4 ret;
-    ret.r = redTotal / numPixels;
-    ret.g = greenTotal / numPixels;
-    ret.b = blueTotal / numPixels;
-    ret.a = brightnessTotal / numPixels;
+    uchar4 averageColor;
+    averageColor.r = redTotal / numPixels;
+    averageColor.g = greenTotal / numPixels;
+    averageColor.b = blueTotal / numPixels;
+    averageColor.a = 255;
 
-    int xOutMin = x * characterPixelWidth;
-    int yOutMin = y * characterPixelHeight;
-    uint32_t pixelIndex = (uint32_t) (ret.a / 256.0 * numCharacters);
+    // Color to use for non-zero modes.
+    uchar4 textColor = averageColor;  // for mode 2
+    if (colorMode == 1) {
+        textColor.r = (averageColor.r >= 128) ? 255 : 0;
+        textColor.g = (averageColor.g >= 128) ? 255 : 0;
+        textColor.b = (averageColor.b >= 128) ? 255 : 0;
+    }
+
+    uint32_t averageBrightness = brightnessTotal / numPixels;
+    uint32_t xOutMin = x * characterPixelWidth;
+    uint32_t yOutMin = y * characterPixelHeight;
+    uint32_t pixelIndex = (uint32_t) (averageBrightness / 256.0 * numCharacters);
     uint32_t xoff = pixelIndex * characterPixelWidth;
     for (uint32_t dy = 0; dy < characterPixelHeight; dy++) {
         uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
         for (uint32_t dx = 0; dx < characterPixelWidth; dx++) {
             uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
             uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+            if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
+                pixel = textColor;
+            }
             rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
         }
     }
-
-    return ret;
+    return averageColor;
 }

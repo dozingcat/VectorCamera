@@ -1,22 +1,29 @@
 package com.dozingcatsoftware.boojiecam.effect
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.util.Size
 import com.dozingcatsoftware.boojiecam.*
 
-/**
- * Created by brian on 10/13/17.
- */
+enum class AsciiColorMode(val id: Int) {
+    FIXED(0),
+    PRIMARY(1),
+    FULL(2);
+
+    companion object {
+        fun fromString(s: String): AsciiColorMode {
+            return AsciiColorMode.valueOf(s.toUpperCase())
+        }
+    }
+}
+
 class AsciiEffect(private val rs: RenderScript,
                   private val effectParams: Map<String, Any>,
                   private val textColor: Int,
-                  private val backgroundColor: Int): Effect {
+                  private val backgroundColor: Int,
+                  private val colorMode: AsciiColorMode): Effect {
     var characterWidthInPixels = 15
     var charHeightOverWidth = 9.0 / 7
     var pixelChars = " .:o08#"
@@ -29,6 +36,14 @@ class AsciiEffect(private val rs: RenderScript,
     override fun effectName() = EFFECT_NAME
 
     override fun effectParameters() = effectParams
+
+    private val backgroundPaint = run {
+        val p = Paint()
+        p.color = backgroundColor
+        p
+    }
+
+    override fun createPaintFn(cameraImage: CameraImage) = {_: RectF -> backgroundPaint}
 
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
@@ -44,8 +59,6 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val inputWidth = cameraImage.width()
-        val inputHeight = cameraImage.height()
         val outputWidth = cameraImage.displaySize.width
         val outputHeight = cameraImage.displaySize.height
         // TODO: Reuse resultBitmap and charBitmap if possible.
@@ -111,6 +124,7 @@ class AsciiEffect(private val rs: RenderScript,
         script._numCharacters = pixelChars.length
         script._flipHorizontal = camAllocation.orientation.isXFlipped()
         script._flipVertical = camAllocation.orientation.isYFlipped()
+        script._colorMode = colorMode.id
         if (camAllocation.planarYuvAllocations != null) {
             script._yInput = camAllocation.planarYuvAllocations.y
             script._uInput = camAllocation.planarYuvAllocations.u
@@ -148,7 +162,11 @@ class AsciiEffect(private val rs: RenderScript,
                     colors.getOrElse("text", {listOf(255, 255, 255)}) as List<Int>)
             val backgroundColor = intFromArgbList(
                     colors.getOrElse("background", {listOf(0, 0, 0)}) as List<Int>)
-            return AsciiEffect(rs, params, textColor, backgroundColor)
+            val colorType = try {
+                AsciiColorMode.fromString(params.getOrDefault("colorMode", "fixed") as String)
+            } catch (ex: IllegalArgumentException) {AsciiColorMode.FIXED}
+
+            return AsciiEffect(rs, params, textColor, backgroundColor, colorType)
         }
     }
 }
