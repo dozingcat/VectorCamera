@@ -16,6 +16,7 @@ import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.view_image.*
 
+
 class ViewImageActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
     private lateinit var rs : RenderScript
@@ -90,7 +91,7 @@ class ViewImageActivity : Activity() {
                 val effect = allEffectFactories[effectIndex](rs)
                 // Update metadata and thumbnail and full size images.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
-                        .withExportedEffectMetadata(effect.effectMetadata())
+                        .withExportedEffectMetadata(effect.effectMetadata(), "image")
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
                 photoLibrary.writeImageAndThumbnail(this, pb, imageId)
@@ -131,6 +132,8 @@ class ViewImageActivity : Activity() {
     }
 
     companion object {
+        val TAG = "ViewImageActivity"
+
         fun startActivityWithImageId(parent: Activity, imageId: String): Intent {
             val intent = Intent(parent, ViewImageActivity::class.java)
             intent.putExtra("imageId", imageId)

@@ -170,6 +170,9 @@ class MainActivity : Activity() {
                     photoLibrary.savePhoto(this, pb,
                             fun(photoId: String) {
                                 Log.i(TAG, "Saved $photoId")
+                                handler.post({
+                                    ViewImageActivity.startActivityWithImageId(this, photoId)
+                                })
                             },
                             fun(ex: Exception) {
                                 Log.w(TAG, "Error saving photo: " + ex)
@@ -395,6 +398,7 @@ class MainActivity : Activity() {
                             videoFrameMetadata!!,
                             recorder.frameTimestamps,
                             audioStartTimestamp)
+                    ViewVideoActivity.startActivityWithVideoId(this, recorder.videoId)
                 }
             }
         }

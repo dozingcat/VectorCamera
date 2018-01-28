@@ -1,8 +1,6 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
-import android.content.Intent
-import android.content.res.Resources
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -30,17 +28,14 @@ class ImageListActivity : Activity() {
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.imagegrid)
+        val self = this
         gridView = findViewById(R.id.gridview)
         gridView.onItemClickListener = OnItemClickListener { parent, view, position, id ->
             val itemId = gridImageIds!![position]
             val metadata = photoLibrary.metadataForItemId(itemId)
             when (metadata.mediaType) {
-                MediaType.IMAGE -> {
-                    ViewImageActivity.startActivityWithImageId(this@ImageListActivity, itemId)
-                }
-                MediaType.VIDEO -> {
-                    ViewVideoActivity.startActivityWithVideoId(this@ImageListActivity, itemId)
-                }
+                MediaType.IMAGE -> ViewImageActivity.startActivityWithImageId(self, itemId)
+                MediaType.VIDEO -> ViewVideoActivity.startActivityWithVideoId(self, itemId)
             }
         }
     }
@@ -51,7 +46,7 @@ class ImageListActivity : Activity() {
     }
 
     private fun displayGrid() {
-        gridImageIds = photoLibrary.allItemIds().asReversed()
+        gridImageIds = photoLibrary.allItemIds().sortedDescending()
         val cellMaps = gridImageIds!!.map({mapOf("itemId" to it)})
         // Bind to the image view, date field, and time field. The view binder will be called
         // with each of those views and the corresponding map value (always "itemId").
@@ -73,8 +68,6 @@ class ImageListActivity : Activity() {
         // show text message if no images available
         val noImagesView = findViewById<View>(R.id.noImagesTextView)
         noImagesView.visibility = if (cellMaps.isNotEmpty()) View.GONE else View.VISIBLE
-
-        System.gc() // seems to avoid OutOfMemoryErrors when selecting image after deleting earlier image
     }
 
     private fun loadGridCellImage(view: ImageView, itemId: String) {

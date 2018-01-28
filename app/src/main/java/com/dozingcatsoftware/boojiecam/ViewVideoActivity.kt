@@ -2,16 +2,20 @@ package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
-import android.media.AudioTrack
+import android.net.Uri
+import android.os.AsyncTask
 import android.os.Bundle
 import android.os.Handler
+import android.preference.PreferenceManager
 import android.renderscript.RenderScript
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.widget.SeekBar
+import android.widget.Toast
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
@@ -19,9 +23,33 @@ import com.dozingcatsoftware.util.AndroidUtils
 import kotlinx.android.synthetic.main.view_video.*
 import java.io.File
 
-/**
- * Created by brian on 1/1/18.
- */
+
+// Ways videos can be exported, and the messages shown in the export progress dialog for each.
+internal enum class ExportType private constructor(
+        val id: String,
+        val mimeType: String,
+        val exportedFile: (PhotoLibrary, String) -> File,
+        val formatDescriptionId: Int,
+        val exportDialogTitleId: Int,
+        val exportDialogMessageVideoId: Int,
+        val exportDialogMessageAudioId: Int,
+        val exportConfirmReplaceMessageId: Int) {
+    WEBM("webm", "video/webm",
+            {library: PhotoLibrary, videoId: String -> library.videoFileForItemId(videoId)},
+            R.string.webmVideoFormatDescription,
+            R.string.webmExportDialogTitle,
+            R.string.webmExportDialogMessageVideo,
+            R.string.webmExportDialogMessageAudio,
+            R.string.webmExportConfirmReplaceMessage),
+    ZIP("zip", "application/zip",
+            {library: PhotoLibrary, videoId: String -> library.videoFramesArchiveForItemId(videoId)},
+            R.string.zipVideoFormatDescription,
+            R.string.zipExportDialogTitle,
+            R.string.zipExportDialogMessageVideo,
+            R.string.zipExportDialogMessageAudio,
+            R.string.zipExportConfirmReplaceMessage)
+}
+
 class ViewVideoActivity: Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
     private lateinit var rs : RenderScript
@@ -198,53 +226,80 @@ class ViewVideoActivity: Activity() {
         }
     }
 
-    private fun encodeVideo() {
-        Log.i(TAG, "Starting video export")
-        val tempVideoOnlyFile = photoLibrary.tempVideoFileForItemIdWithSuffix(videoId, "noaudio")
-        tempVideoOnlyFile.delete()
-        tempVideoOnlyFile.parentFile.mkdirs()
-        Log.i(TAG, "Writing to ${tempVideoOnlyFile.path}")
+    private fun encodeVideo(exportType: ExportType) {
+        val progressDialog = ProgressDialog(this)
 
-        val encoder = WebMEncoder(videoReader, tempVideoOnlyFile.path)
-        encoder.startEncoding()
-        var frameIndex = 0
-        while (frameIndex < videoReader.numberOfFrames()) {
-            encoder.encodeFrame(frameIndex)
-            Log.i(TAG, "Encoded frame ${frameIndex}")
-            frameIndex += 1
+        fun handleEncodingProgress(progress: ProcessVideoTask.Progress) {
+            val message = getString(when (progress.mediaType) {
+                ProcessVideoTask.MediaType.AUDIO -> exportType.exportDialogMessageAudioId
+                else -> exportType.exportDialogMessageVideoId
+            })
+            progressDialog.setMessage(message)
+            progressDialog.progress = (100 * progress.fractionDone).toInt()
         }
-        encoder.finishEncoding()
-        Log.i(TAG, "Finished encoding")
 
-        var fileToMove: File
-
-        val audioFile = photoLibrary.rawAudioFileForItemId(videoId)
-        if (audioFile.exists()) {
-            val tempCombinedFile =
-                    photoLibrary.tempVideoFileForItemIdWithSuffix(videoId, "combined")
-            tempCombinedFile.delete()
-            Log.i(TAG, "Adding audio, saving to ${tempCombinedFile.path}")
-
-            CombineAudioVideo.insertAudioIntoWebm(
-                    audioFile.path, tempVideoOnlyFile.path, tempCombinedFile.path,
-                    {bytesRead -> Log.i(TAG, "Read ${bytesRead} audio bytes")})
-
-            tempVideoOnlyFile.delete()
-            fileToMove = tempCombinedFile
+        fun handleEncodingFinished(result: ProcessVideoTask.Result) {
+            progressDialog.dismiss()
+            if (result.status == ProcessVideoTask.ResultStatus.SUCCEEDED) {
+                val metadata = photoLibrary.metadataForItemId(videoId)
+                val newMetadata = metadata.withExportedEffectMetadata(
+                        videoReader.effect.effectMetadata(), exportType.id)
+                photoLibrary.writeMetadata(newMetadata, videoId)
+                runShareActivity(exportType, result.outputFile!!)
+            }
+            else {
+                Toast.makeText(applicationContext, "Encoding failed", Toast.LENGTH_SHORT).show()
+            }
         }
-        else {
-            fileToMove = tempVideoOnlyFile
+
+        val encodeTask = when (exportType) {
+            ExportType.WEBM ->
+                CreateWebmAsyncTask(::handleEncodingProgress, ::handleEncodingFinished)
+            ExportType.ZIP ->
+                CreateVideoZipFileAsyncTask(::handleEncodingProgress, ::handleEncodingFinished)
         }
-        val finalOutputFile = photoLibrary.videoFileForItemId(videoId)
-        finalOutputFile.parentFile.mkdirs()
-        fileToMove.renameTo(finalOutputFile)
-        Log.i(TAG, "Wrote to ${finalOutputFile.path}")
+        encodeTask.execute(ProcessVideoTask.Params(videoReader, photoLibrary, videoId))
+
+        fun handleDialogCanceled(dlg: DialogInterface) {
+            encodeTask.cancel(true)
+            dlg.dismiss()
+        }
+
+        progressDialog.setCancelable(true)
+        progressDialog.setOnCancelListener(::handleDialogCanceled)
+        progressDialog.setTitle(getString(exportType.exportDialogTitleId))
+        progressDialog.setMessage("")
+        progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL)
+        progressDialog.setMax(100)
+        progressDialog.show()
+    }
+
+    private fun runShareActivity(exportType: ExportType, exportedFile: File) {
+        val callback = {path: String, uri: Uri -> handler.post({
+            val shareIntent = Intent(Intent.ACTION_SEND)
+            shareIntent.type = exportType.mimeType
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
+            shareIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(shareIntent, "Share video using:"))
+        }) as Unit}
+
+        AndroidUtils.scanSavedMediaFile(this, exportedFile.path, callback)
     }
 
     private fun shareVideo(view: View) {
-        // TODO: Export if needed (file doesn't exist, or exported metadata doesn't match)
-        // Also options for zip archive and text/html for ascii effects.
-        encodeVideo()
+        stopPlaying()
+        val exportType = exportTypeFromPreferences()
+        val exportedFile = exportType.exportedFile(photoLibrary, videoId)
+        val metadata = photoLibrary.metadataForItemId(videoId)
+        val exportedEffect = metadata.exportedEffectMetadata[exportType.id]
+        val currentEffect = videoReader.effect.effectMetadata()
+        if (exportedFile.exists() && currentEffect == exportedEffect) {
+            runShareActivity(exportType, exportedFile)
+        }
+        else {
+            encodeVideo(exportType)
+        }
     }
 
     private fun deleteVideo(view: View) {
@@ -259,6 +314,18 @@ class ViewVideoActivity: Activity() {
                 .setPositiveButton("Delete", deleteFn)
                 .setNegativeButton("Don't delete", null)
                 .show()
+    }
+
+    private fun exportTypeFromPreferences(): ExportType {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(baseContext)
+        val exportPref = prefs.getString(getString(R.string.videoExportTypePrefsKey), "WEBM")
+        try {
+            return ExportType.valueOf(exportPref)
+        }
+        catch (ex: IllegalArgumentException) {
+            Log.e(TAG, "Unknown export type: " + exportPref, ex)
+            return ExportType.WEBM
+        }
     }
 
     companion object {

@@ -9,10 +9,11 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                          val orientation: ImageOrientation, val timestamp: Long,
                          val frameTimestamps: List<Long> = listOf(),
                          val audioStartTimestamp: Long = 0,
-                         val exportedEffectMetadata: EffectMetadata? = null) {
+                         val exportedEffectMetadata: Map<String, EffectMetadata> = mapOf()) {
 
     fun toJson(): Map<String, Any> {
-        val exportedEffectDict = exportedEffectMetadata?.toJson() ?: mapOf()
+        val exportedEffectDict =
+                exportedEffectMetadata?.mapValues({entry -> entry.value.toJson()}) ?: mapOf()
         return mapOf(
                 "type" to mediaType.name.toLowerCase(),
                 "width" to width,
@@ -23,7 +24,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                 "frameTimestamps" to frameTimestamps,
                 "audioStartTimestamp" to audioStartTimestamp,
                 "effect" to effectMetadata.toJson(),
-                "exportedEffect" to exportedEffectDict)
+                "exportedEffects" to exportedEffectDict)
     }
 
     fun withEffectMetadata(em: EffectMetadata): MediaMetadata {
@@ -32,16 +33,20 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                 timestamp, frameTimestamps, audioStartTimestamp, exportedEffectMetadata)
     }
 
-    fun withExportedEffectMetadata(em: EffectMetadata): MediaMetadata {
+    fun withExportedEffectMetadata(em: EffectMetadata, exportType: String): MediaMetadata {
+        val newExportedEffects = HashMap(exportedEffectMetadata)
+        newExportedEffects[exportType] = em
         return MediaMetadata(
                 mediaType, em, width, height, orientation,
-                timestamp, frameTimestamps, audioStartTimestamp, em)
+                timestamp, frameTimestamps, audioStartTimestamp, newExportedEffects)
     }
 
     companion object {
         fun fromJson(json: Map<String, Any>): MediaMetadata {
             val effectDict = json["effect"] as Map<String, Any>
-            val exportedEffectDict = json["exportedEffect"] as Map<String, Any>?
+            val exportedEffectDict = json["exportedEffects"] as Map<String, Any>?
+            val exportedEffectMetadata = exportedEffectDict?.mapValues(
+                    {entry -> EffectMetadata.fromJson(entry.value as Map<String, Any>)}) ?: mapOf()
             val frameTimestamps = json.getOrElse("frameTimestamps", {listOf<Long>()})
             val audioStartTimestamp = json.getOrDefault("audioStartTimestamp", 0) as Number
             return MediaMetadata(
@@ -54,7 +59,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                     json["timestamp"] as Long,
                     frameTimestamps as List<Long>,
                     audioStartTimestamp.toLong(),
-                    EffectMetadata.fromJson(exportedEffectDict))
+                    exportedEffectMetadata)
         }
     }
 }

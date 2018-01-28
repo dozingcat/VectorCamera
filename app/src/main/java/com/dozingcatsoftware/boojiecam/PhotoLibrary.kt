@@ -239,6 +239,10 @@ class PhotoLibrary(val rootDirectory: File) {
         return File(videoDirectory, itemId + ".webm")
     }
 
+    fun videoFramesArchiveForItemId(itemId: String): File {
+        return File(videoDirectory, itemId + "_frames.zip")
+    }
+
     fun metadataForItemId(itemId: String): MediaMetadata {
         val mdText = metadataFileForItemId(itemId).readText()
         val mdMap = jsonObjectToMap(JSONObject(mdText))
