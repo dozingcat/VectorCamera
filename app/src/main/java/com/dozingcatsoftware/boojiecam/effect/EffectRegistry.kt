@@ -4,15 +4,15 @@ import android.renderscript.RenderScript
 
 object EffectRegistry {
 
-    val baseEffects = listOf<(RenderScript) -> Effect>(
+    val baseEffects = listOf<(RenderScript, (String, String) -> String) -> Effect>(
 
-            {rs -> EdgeLuminanceEffect(rs) },
-            {rs -> PermuteColorEffect.noOp(rs) },
-            {rs -> PermuteColorEffect.rgbToBrg(rs) },
-            {rs -> PermuteColorEffect.rgbToGbr(rs) },
-            {rs -> PermuteColorEffect.flipUV(rs) },
+            {rs, prefsFn -> EdgeLuminanceEffect(rs) },
+            {rs, prefsFn -> PermuteColorEffect.noOp(rs) },
+            {rs, prefsFn -> PermuteColorEffect.rgbToBrg(rs) },
+            {rs, prefsFn -> PermuteColorEffect.rgbToGbr(rs) },
+            {rs, prefsFn -> PermuteColorEffect.flipUV(rs) },
 
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -21,7 +21,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -30,7 +30,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -39,7 +39,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -49,7 +49,7 @@ object EffectRegistry {
                 ))
             },
 
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -58,7 +58,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -67,7 +67,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "linear_gradient",
@@ -77,7 +77,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "radial_gradient",
@@ -88,7 +88,7 @@ object EffectRegistry {
                 ))
             },
 
-            {rs ->
+            {rs, prefsFn ->
                 Convolve3x3Effect.fromParameters(rs, mapOf(
                         "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
                         "colors" to mapOf(
@@ -98,7 +98,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 Convolve3x3Effect.fromParameters(rs, mapOf(
                         "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
                         "colors" to mapOf(
@@ -108,35 +108,39 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "text" to listOf(255, 255, 255),
                                 "background" to listOf(0, 0, 0)
-                        )
+                        ),
+                        "pixelChars" to prefsFn("pixelChars.WHITE_ON_BLACK", " .:oO8@")
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "text" to listOf(0, 0, 0),
                                 "background" to listOf(255, 255, 255)
-                        )
+                        ),
+                        "pixelChars" to prefsFn("pixelChars.BLACK_ON_WHITE", "#o:..  ")
                 ))
             },
-            {rs ->
+            {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
-                        "colorMode" to "primary"
+                        "colorMode" to "primary",
+                        "pixelChars" to prefsFn("pixelChars.ANSI_COLOR", " .:oO8#")
                 ))
             },
-            { rs ->
+            {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
-                        "colorMode" to "full"
+                        "colorMode" to "full",
+                        "pixelChars" to prefsFn("pixelChars.FULL_COLOR", "O8#")
                 ))
             }
     )
 
-    fun defaultEffectFactories(): List<(RenderScript) -> Effect> {
+    fun defaultEffectFactories(): List<(RenderScript, (String, String) -> String) -> Effect> {
         return baseEffects
         /* // Inception
         val f = mutableListOf<(RenderScript) -> Effect>()

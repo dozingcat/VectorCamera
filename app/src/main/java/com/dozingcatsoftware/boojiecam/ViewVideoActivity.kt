@@ -58,6 +58,7 @@ class ViewVideoActivity: Activity() {
     private var originalEffect: Effect? = null
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private lateinit var videoReader: VideoReader
+    private val preferences = BCPreferences(this)
     private val handler = Handler()
 
     var timeFn = System::currentTimeMillis
@@ -134,7 +135,8 @@ class ViewVideoActivity: Activity() {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect
-            videoReader.effect = CombinationEffect(rs, allEffectFactories)
+            videoReader.effect =
+                    CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
         }
         else {
             videoReader.effect = originalEffect!!
@@ -216,7 +218,7 @@ class ViewVideoActivity: Activity() {
                 val index = gridSize * tileY + tileX
 
                 val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                val effect = allEffectFactories[effectIndex](rs)
+                val effect = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
                 originalEffect = effect
                 videoReader.effect = effect
 

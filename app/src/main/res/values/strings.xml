@@ -16,8 +16,8 @@
     <string name="blackOnWhitePixelCharsPrefMessage">Enter characters to use for black on white images from darkest to brightest, or leave blank for the default of #o:..</string>
 
     <string name="ansiColorPixelCharsPrefId">pixelChars.ANSI_COLOR</string>
-    <string name="ansiColorPixelCharsPrefTitle">ANSI color characters</string>
-    <string name="ansiColorPixelCharsPrefSummary">Characters for ANSI color mode.</string>
+    <string name="ansiColorPixelCharsPrefTitle">Primary color characters</string>
+    <string name="ansiColorPixelCharsPrefSummary">Characters for primary color mode.</string>
     <string name="ansiColorPixelCharsPrefMessage">Enter characters to use in images from darkest to brightest, or leave blank for the default of .:oO8@</string>
 
     <string name="fullColorPixelCharsPrefId">pixelChars.FULL_COLOR</string>

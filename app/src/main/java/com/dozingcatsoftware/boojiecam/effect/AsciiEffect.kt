@@ -23,10 +23,10 @@ class AsciiEffect(private val rs: RenderScript,
                   private val effectParams: Map<String, Any>,
                   private val textColor: Int,
                   private val backgroundColor: Int,
+                  private val pixelChars: String,
                   private val colorMode: AsciiColorMode): Effect {
     var characterWidthInPixels = 15
     var charHeightOverWidth = 9.0 / 7
-    var pixelChars = " .:o08#"
 
     private var asciiBlockAllocation: Allocation? = null
     private var characterTemplateAllocation: Allocation? = null
@@ -162,11 +162,13 @@ class AsciiEffect(private val rs: RenderScript,
                     colors.getOrElse("text", {listOf(255, 255, 255)}) as List<Int>)
             val backgroundColor = intFromArgbList(
                     colors.getOrElse("background", {listOf(0, 0, 0)}) as List<Int>)
+            val pixelChars = params["pixelChars"] as String
             val colorType = try {
                 AsciiColorMode.fromString(params.getOrDefault("colorMode", "fixed") as String)
             } catch (ex: IllegalArgumentException) {AsciiColorMode.FIXED}
 
-            return AsciiEffect(rs, params, textColor, backgroundColor, colorType)
+
+            return AsciiEffect(rs, params, textColor, backgroundColor, pixelChars, colorType)
         }
     }
 }

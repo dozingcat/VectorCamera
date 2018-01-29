@@ -20,6 +20,13 @@ class BCPreferences(val context: Context) {
 
     fun effectName() = sharedPrefs().getString(EFFECT_NAME_KEY, "")
 
+    val lookupFunction = fun(key: String, defaultValue: String): String {
+        val v = sharedPrefs().getString(key, defaultValue)
+        Log.i(TAG, "Got value: ${v} for key: ${key}")
+        return v
+        // return sharedPrefs().getString(key, defaultValue)
+    }
+
     fun saveEffectInfo(effectName: String, params: Map<String, Any>) {
         withPrefsEditor {
             it.putString(EFFECT_NAME_KEY, effectName)

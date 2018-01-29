@@ -13,7 +13,9 @@ import com.dozingcatsoftware.boojiecam.CameraImage
  */
 class CombinationEffect(
         private val rs: RenderScript,
-        private val effectFactories: List<(RenderScript) -> Effect>): Effect {
+        private val prefsFn: (String, String) -> String,
+        private val effectFactories:
+                List<(RenderScript, (String, String) -> String) -> Effect>): Effect {
 
     override fun effectName() = "combination"
 
@@ -37,7 +39,7 @@ class CombinationEffect(
 
         val srcRect = RectF(0f, 0f, tileBuffer.width.toFloat(), tileBuffer.height.toFloat())
         for (i in 0 until effectFactories.size) {
-            val effect = effectFactories[i](rs)
+            val effect = effectFactories[i](rs, prefsFn)
             val tileBitmap = effect.createBitmap(cameraImage)
             val tileBitmapRect = Rect(0, 0, tileBitmap.width, tileBitmap.height)
             val tilePaint = effect.createPaintFn(cameraImage)(srcRect)

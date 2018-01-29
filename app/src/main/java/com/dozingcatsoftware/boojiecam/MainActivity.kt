@@ -80,7 +80,7 @@ class MainActivity : Activity() {
         Thread({
             Log.i(TAG, "Starting effect loading thread")
             for (ef in allEffectFactories) {
-                ef(rs)
+                ef(rs, preferences.lookupFunction)
             }
             Log.i(TAG, "Done loading effects")
         }).start()
@@ -203,7 +203,7 @@ class MainActivity : Activity() {
     }
 
     private fun effectFromPreferences(): Effect {
-        return preferences.effect(rs, {allEffectFactories[0](rs)})
+        return preferences.effect(rs, {allEffectFactories[0](rs, preferences.lookupFunction)})
     }
 
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
@@ -267,7 +267,7 @@ class MainActivity : Activity() {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             previousEffect = currentEffect
-            currentEffect = CombinationEffect(rs, allEffectFactories)
+            currentEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
             previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.EFFECT_GRID
             controlLayout.visibility = View.GONE
@@ -291,7 +291,7 @@ class MainActivity : Activity() {
                 val index = gridSize * tileY + tileX
 
                 val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                val eff = allEffectFactories[effectIndex](rs)
+                val eff = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
                 currentEffect = eff
                 preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
                 preferredImageSize = previousImageSize

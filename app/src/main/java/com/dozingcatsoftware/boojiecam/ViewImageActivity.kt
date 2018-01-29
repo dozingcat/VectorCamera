@@ -23,6 +23,7 @@ class ViewImageActivity : Activity() {
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
+    private val preferences = BCPreferences(this)
     private val handler = Handler()
 
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,8 +38,6 @@ class ViewImageActivity : Activity() {
 
         imageId = intent.getStringExtra("imageId")
         loadImage()
-
-        // TODO: Controls to delete, (maybe) save .
     }
 
     override fun onBackPressed() {
@@ -59,7 +58,7 @@ class ViewImageActivity : Activity() {
     private fun toggleEffectSelectionMode(view: View?) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
-            val comboEffect = CombinationEffect(rs, allEffectFactories)
+            val comboEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
             // FIXME: This is slow because the saved image is high resolution.
             showImage(comboEffect, photoLibrary.metadataForItemId(imageId))
         }
@@ -97,7 +96,7 @@ class ViewImageActivity : Activity() {
                 val index = gridSize * tileY + tileX
 
                 val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                val effect = allEffectFactories[effectIndex](rs)
+                val effect = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
                 // Update metadata and thumbnail and full size images.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
                         .withExportedEffectMetadata(effect.effectMetadata(), "image")
