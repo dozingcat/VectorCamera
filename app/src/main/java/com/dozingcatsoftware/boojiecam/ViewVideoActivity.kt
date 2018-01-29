@@ -73,7 +73,7 @@ class ViewVideoActivity: Activity() {
         rs = RenderScript.create(this)
 
         shareButton.setOnClickListener(this::shareVideo)
-        switchEffectButton.setOnClickListener(this::switchEffect)
+        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         playPauseButton.setOnClickListener(this::togglePlay)
         deleteButton.setOnClickListener(this::deleteVideo)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
@@ -107,6 +107,15 @@ class ViewVideoActivity: Activity() {
         super.onPause()
     }
 
+    override fun onBackPressed() {
+        if (inEffectSelectionMode) {
+            toggleEffectSelectionMode(null)
+        }
+        else {
+            super.onBackPressed()
+        }
+    }
+
     private fun updateControls() {
         frameSeekBar.progress = frameIndex
         playPauseButton.setImageResource(
@@ -121,7 +130,7 @@ class ViewVideoActivity: Activity() {
         overlayView.invalidate()
     }
 
-    private fun switchEffect(view: View) {
+    private fun toggleEffectSelectionMode(view: View?) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect

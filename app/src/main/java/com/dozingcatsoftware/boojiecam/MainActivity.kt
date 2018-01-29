@@ -1,7 +1,6 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
@@ -34,8 +33,8 @@ class MainActivity : Activity() {
     private lateinit var rs: RenderScript
     private lateinit var displaySize: Size
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
-    private var effectIndex = 0
     private var currentEffect: Effect? = null
+    private var previousEffect: Effect? = null
     private var inEffectSelectionMode = false
     private var lastBitmapTimestamp = 0L
 
@@ -56,7 +55,7 @@ class MainActivity : Activity() {
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
         imageProcessor = CameraAllocationProcessor(rs)
 
-        currentEffect = preferences.effect(rs, {allEffectFactories[effectIndex](rs)})
+        currentEffect = effectFromPreferences()
 
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
@@ -70,7 +69,7 @@ class MainActivity : Activity() {
         toggleVideoButton.setOnClickListener(this::toggleVideoMode)
         switchCameraButton.setOnClickListener(this::switchToNextCamera)
         switchResolutionButton.setOnClickListener(this::switchResolution)
-        switchEffectButton.setOnClickListener(this::switchEffect)
+        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         libraryButton.setOnClickListener(this::gotoLibrary)
         settingsButton.setOnClickListener(this::gotoPreferences)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
@@ -203,6 +202,10 @@ class MainActivity : Activity() {
         })
     }
 
+    private fun effectFromPreferences(): Effect {
+        return preferences.effect(rs, {allEffectFactories[0](rs)})
+    }
+
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
         handler.post(fun() {
             // Slightly ugly but some effects need the display size.
@@ -217,8 +220,10 @@ class MainActivity : Activity() {
 
     private fun restartCameraImageGenerator(
             cameraStatus: CameraStatus = CameraStatus.CAPTURING_PREVIEW) {
-        // cameraImageGenerator?.pause()
         Log.i(TAG, "recreateCameraImageGenerator: " + this.targetCameraImageSize())
+        if (!inEffectSelectionMode) {
+            currentEffect = effectFromPreferences()
+        }
         cameraImageGenerator.start(
                 cameraStatus,
                 this.targetCameraImageSize(),
@@ -258,16 +263,17 @@ class MainActivity : Activity() {
         restartCameraImageGenerator()
     }
 
-    private fun switchEffect(view: View) {
+    private fun toggleEffectSelectionMode(view: View?) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
+            previousEffect = currentEffect
             currentEffect = CombinationEffect(rs, allEffectFactories)
             previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.EFFECT_GRID
             controlLayout.visibility = View.GONE
         }
         else {
-            currentEffect = allEffectFactories[effectIndex](rs)
+            currentEffect = previousEffect
             preferredImageSize = previousImageSize
         }
         restartCameraImageGenerator()
@@ -284,7 +290,7 @@ class MainActivity : Activity() {
                 val tileY = (event.y / tileHeight).toInt()
                 val index = gridSize * tileY + tileX
 
-                effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
+                val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
                 val eff = allEffectFactories[effectIndex](rs)
                 currentEffect = eff
                 preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
@@ -298,6 +304,15 @@ class MainActivity : Activity() {
                         if (controlLayout.visibility == View.VISIBLE) View.GONE
                         else View.VISIBLE
             }
+        }
+    }
+
+    override fun onBackPressed() {
+        if (inEffectSelectionMode) {
+            toggleEffectSelectionMode(null)
+        }
+        else {
+            super.onBackPressed()
         }
     }
 
@@ -396,7 +411,7 @@ class MainActivity : Activity() {
                     Log.i(TAG, "Video recording stopped, writing to library")
                     preferredImageSize = previousImageSize
                     restartCameraImageGenerator()
-                    // HERE: Get audio start timestamp and persist in metadata.
+                    // TODO: Get audio start timestamp and persist in metadata.
                     photoLibrary.saveVideo(
                             this,
                             recorder.videoId,

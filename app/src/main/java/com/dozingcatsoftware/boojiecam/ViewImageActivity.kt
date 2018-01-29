@@ -30,7 +30,7 @@ class ViewImageActivity : Activity() {
         setContentView(R.layout.view_image)
         rs = RenderScript.create(this)
 
-        switchEffectButton.setOnClickListener(this::switchEffect)
+        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         shareButton.setOnClickListener(this::shareImage)
         deleteButton.setOnClickListener(this::deleteImage)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
@@ -41,13 +41,22 @@ class ViewImageActivity : Activity() {
         // TODO: Controls to delete, (maybe) save .
     }
 
+    override fun onBackPressed() {
+        if (inEffectSelectionMode) {
+            toggleEffectSelectionMode(null)
+        }
+        else {
+            super.onBackPressed()
+        }
+    }
+
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
         val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         showImage(effect, metadata)
     }
 
-    private fun switchEffect(view: View) {
+    private fun toggleEffectSelectionMode(view: View?) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             val comboEffect = CombinationEffect(rs, allEffectFactories)
