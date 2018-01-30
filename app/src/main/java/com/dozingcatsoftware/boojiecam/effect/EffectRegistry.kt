@@ -108,13 +108,15 @@ object EffectRegistry {
                         )
                 ))
             },
+
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "text" to listOf(255, 255, 255),
                                 "background" to listOf(0, 0, 0)
                         ),
-                        "pixelChars" to prefsFn("pixelChars.WHITE_ON_BLACK", " .:oO8@")
+                        "pixelChars" to prefsFn("pixelChars.WHITE_ON_BLACK", " .:oO8@"),
+                        "prefId" to "pixelChars.WHITE_ON_BLACK"
                 ))
             },
             {rs, prefsFn ->
@@ -123,19 +125,22 @@ object EffectRegistry {
                                 "text" to listOf(0, 0, 0),
                                 "background" to listOf(255, 255, 255)
                         ),
-                        "pixelChars" to prefsFn("pixelChars.BLACK_ON_WHITE", "#o:..  ")
+                        "pixelChars" to prefsFn("pixelChars.BLACK_ON_WHITE", "#o:..  "),
+                        "prefId" to "pixelChars.BLACK_ON_WHITE"
                 ))
             },
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "primary",
-                        "pixelChars" to prefsFn("pixelChars.ANSI_COLOR", " .:oO8#")
+                        "pixelChars" to prefsFn("pixelChars.ANSI_COLOR", " .:oO8#"),
+                        "prefId" to "pixelChars.ANSI_COLOR"
                 ))
             },
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "full",
-                        "pixelChars" to prefsFn("pixelChars.FULL_COLOR", "O8#")
+                        "pixelChars" to prefsFn("pixelChars.FULL_COLOR", "O8#"),
+                        "prefId" to "pixelChars.FULL_COLOR"
                 ))
             }
     )

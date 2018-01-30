@@ -361,6 +361,7 @@ class MainActivity : Activity() {
 
     private fun gotoPreferences(view: View) {
         BCPreferencesActivity.startIntent(this)
+        // FIXME: Changing ASCII characters and returning doesn't take effect.
     }
 
     private fun toggleVideoRecording() {

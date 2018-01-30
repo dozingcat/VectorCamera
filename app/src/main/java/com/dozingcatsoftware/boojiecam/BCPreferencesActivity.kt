@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.preference.Preference
 import android.preference.PreferenceActivity
 
@@ -14,16 +15,46 @@ import android.preference.PreferenceActivity
  * Created by brian on 1/28/18.
  */
 class BCPreferencesActivity: PreferenceActivity() {
+    val handler = Handler()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         addPreferencesFromResource(R.xml.preferences)
 
-        val autoConvertPref = preferenceManager.findPreference(getString(R.string.autoConvertPicturesPrefsKey))
-        autoConvertPref!!.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+        val autoConvertPref =
+                preferenceManager.findPreference(getString(R.string.autoConvertPicturesPrefsKey))
+        autoConvertPref!!.setOnPreferenceChangeListener({pref, value ->
             // Update broadcast receivers immediately so the change takes effect even if the user
             // doesn't go back to the main activity.
             setAutoConvertEnabled(this@BCPreferencesActivity, java.lang.Boolean.TRUE == value)
             true
+        })
+
+        // HACK: when the user updates the character set of an ASCII effect, update the current
+        // effect if it matches. This is so when they return to the main activity the effect will
+        // be loaded with the new characters.
+        val asciiPrefIds = arrayOf(
+                getString(R.string.whiteOnBlackPixelCharsPrefId),
+                getString(R.string.blackOnWhitePixelCharsPrefId),
+                getString(R.string.ansiColorPixelCharsPrefId),
+                getString(R.string.fullColorPixelCharsPrefId))
+        val asciiColorModes = arrayOf("")
+        for (prefId in asciiPrefIds) {
+            val p = preferenceManager.findPreference(prefId)
+            preferenceManager.findPreference(prefId).setOnPreferenceChangeListener({pref, value ->
+                handler.post({
+                    val storedPrefs = BCPreferences(this)
+                    if (storedPrefs.effectName() == "ascii") {
+                        val params = storedPrefs.effectParameters()
+                        if (params["prefId"] == prefId) {
+                            val newEffectParams = HashMap(params)
+                            newEffectParams["pixelChars"] = value
+                            storedPrefs.saveEffectInfo("ascii", newEffectParams)
+                        }
+                    }
+                })
+                true
+            })
         }
     }
 
