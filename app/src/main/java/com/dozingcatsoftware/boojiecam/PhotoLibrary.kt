@@ -56,8 +56,9 @@ class PhotoLibrary(val rootDirectory: File) {
     fun savePhoto(context: Context, processedBitmap: ProcessedBitmap,
                   successFn: (String) -> Unit,
                   errorFn: (Exception) -> Unit) {
-        if (processedBitmap.yuvBytes == null) {
-            throw IllegalArgumentException("yuvBytes not set in ProcessedBitmap")
+        if (processedBitmap.yuvBytes == null &&
+                processedBitmap.sourceImage.planarYuvAllocations == null) {
+            throw IllegalArgumentException("YUV bytes not set in ProcessedBitmap")
         }
         try {
             Log.i(TAG, "savePhoto start")
@@ -71,12 +72,24 @@ class PhotoLibrary(val rootDirectory: File) {
             val rawImageFile = rawImageFileForItemId(photoId)
             // gzip compression usually saves about 50%.
             GZIPOutputStream(FileOutputStream(rawImageFile)).use({
-                it.write(processedBitmap.yuvBytes)
+                if (processedBitmap.yuvBytes != null) {
+                    it.write(processedBitmap.yuvBytes)
+                }
+                else {
+                    val allocBytes = ByteArray(width * height)
+                    val planarYuv = processedBitmap.sourceImage.planarYuvAllocations!!
+                    planarYuv.y.copyTo(allocBytes)
+                    it.write(allocBytes, 0, width * height)
+                    planarYuv.u.copyTo(allocBytes)
+                    it.write(allocBytes, 0, width * height / 4)
+                    planarYuv.v.copyTo(allocBytes)
+                    it.write(allocBytes, 0, width * height / 4)
+                }
             })
             val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
             val compressedSize = rawImageFile.length()
             val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
-            Log.i(TAG, "Wrote $compressedSize bytes, compressed to $compressedPercent")
+            Log.i(TAG, "Wrote $compressedSize bytes, compressed by ${compressedPercent}%")
 
             val effectMetadata = EffectMetadata(
                     processedBitmap.effect.effectName(), processedBitmap.effect.effectParameters())
