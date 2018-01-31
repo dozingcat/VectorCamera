@@ -193,16 +193,15 @@ class MainActivity : Activity() {
                     Log.w(TAG, "yuvBytes not set for saved image")
                 }
                 Thread({
-                    photoLibrary.savePhoto(this, pb,
-                            fun(photoId: String) {
-                                Log.i(TAG, "Saved $photoId")
-                                handler.post({
-                                    ViewImageActivity.startActivityWithImageId(this, photoId)
-                                })
-                            },
-                            fun(ex: Exception) {
-                                Log.w(TAG, "Error saving photo: " + ex)
-                            })
+                    try {
+                        val photoId = photoLibrary.savePhoto(this, pb)
+                        handler.post({
+                            ViewImageActivity.startActivityWithImageId(this, photoId)
+                        })
+                    }
+                    catch (ex: Exception) {
+                        Log.w(TAG, "Error saving photo: " + ex)
+                    }
                 }).start()
             }
             if (pb.sourceImage.status == CameraStatus.CAPTURING_VIDEO) {

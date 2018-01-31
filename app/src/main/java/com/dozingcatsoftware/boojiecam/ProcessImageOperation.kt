@@ -35,9 +35,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         val processedBitmap = ProcessedBitmap(effect, inputImage, outputBitmap, paintFn)
 
         val t4 = timeFn()
-        val photoId = photoLibrary.savePhoto(context, processedBitmap,
-                {Log.i(TAG, "Saved photo, times ${t3-t2} ${t4-t3} ${timeFn()-t4}")},
-                {ex -> throw ex})
+        val photoId = photoLibrary.savePhoto(context, processedBitmap)
         return photoId
     }
 

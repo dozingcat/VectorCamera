@@ -53,60 +53,49 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
-    // TODO: Remove successFn and errorFn, just return photo ID and throw exceptions.
-    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap,
-                  successFn: (String) -> Unit,
-                  errorFn: (Exception) -> Unit): String {
+    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap): String {
         if (processedBitmap.yuvBytes == null &&
                 processedBitmap.sourceImage.planarYuvAllocations == null) {
             throw IllegalArgumentException("YUV bytes not set in ProcessedBitmap")
         }
-        try {
-            Log.i(TAG, "savePhoto start")
-            val sourceImage = processedBitmap.sourceImage
-            val width = sourceImage.width()
-            val height = sourceImage.height()
+        Log.i(TAG, "savePhoto start")
+        val sourceImage = processedBitmap.sourceImage
+        val width = sourceImage.width()
+        val height = sourceImage.height()
 
-            val photoId = itemIdForTimestamp(sourceImage.timestamp)
+        val photoId = itemIdForTimestamp(sourceImage.timestamp)
 
-            rawDirectory.mkdirs()
-            val rawImageFile = rawImageFileForItemId(photoId)
-            // gzip compression usually saves about 50%.
-            GZIPOutputStream(FileOutputStream(rawImageFile)).use({
-                if (processedBitmap.yuvBytes != null) {
-                    it.write(processedBitmap.yuvBytes)
-                }
-                else {
-                    val allocBytes = ByteArray(width * height)
-                    val planarYuv = processedBitmap.sourceImage.planarYuvAllocations!!
-                    planarYuv.y.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height)
-                    planarYuv.u.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height / 4)
-                    planarYuv.v.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height / 4)
-                }
-            })
-            val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
-            val compressedSize = rawImageFile.length()
-            val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
-            Log.i(TAG, "Wrote $compressedSize bytes, compressed by ${compressedPercent}%")
+        rawDirectory.mkdirs()
+        val rawImageFile = rawImageFileForItemId(photoId)
+        // gzip compression usually saves about 50%.
+        GZIPOutputStream(FileOutputStream(rawImageFile)).use({
+            if (processedBitmap.yuvBytes != null) {
+                it.write(processedBitmap.yuvBytes)
+            }
+            else {
+                val allocBytes = ByteArray(width * height)
+                val planarYuv = processedBitmap.sourceImage.planarYuvAllocations!!
+                planarYuv.y.copyTo(allocBytes)
+                it.write(allocBytes, 0, width * height)
+                planarYuv.u.copyTo(allocBytes)
+                it.write(allocBytes, 0, width * height / 4)
+                planarYuv.v.copyTo(allocBytes)
+                it.write(allocBytes, 0, width * height / 4)
+            }
+        })
+        val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
+        val compressedSize = rawImageFile.length()
+        val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
+        Log.i(TAG, "Wrote $compressedSize bytes, compressed by ${compressedPercent}%")
 
-            val effectMetadata = EffectMetadata(
-                    processedBitmap.effect.effectName(), processedBitmap.effect.effectParameters())
-            val metadata = MediaMetadata(MediaType.IMAGE, effectMetadata, width, height,
-                    sourceImage.orientation, sourceImage.timestamp)
-            writeMetadata(metadata, photoId)
+        val effectMetadata = EffectMetadata(
+                processedBitmap.effect.effectName(), processedBitmap.effect.effectParameters())
+        val metadata = MediaMetadata(MediaType.IMAGE, effectMetadata, width, height,
+                sourceImage.orientation, sourceImage.timestamp)
+        writeMetadata(metadata, photoId)
 
-            writeImageAndThumbnail(context, processedBitmap, photoId)
-
-            successFn(photoId)
-            return photoId
-        }
-        catch (ex: Exception) {
-            errorFn(ex)
-            return ""
-        }
+        writeImageAndThumbnail(context, processedBitmap, photoId)
+        return photoId
     }
 
     fun allItemIds(): List<String> {
