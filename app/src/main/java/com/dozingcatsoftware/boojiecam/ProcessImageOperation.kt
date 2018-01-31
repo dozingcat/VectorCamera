@@ -14,14 +14,14 @@ import com.dozingcatsoftware.util.AndroidUtils
 class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis) {
     val photoLibrary = PhotoLibrary.defaultLibrary()
 
-    fun processImage(context: Context, imageUri: Uri) {
+    fun processImage(context: Context, imageUri: Uri): String {
         Log.i(TAG, "Processing image: ${imageUri}")
         val rs = RenderScript.create(context)
-        val t1 = System.currentTimeMillis()
+        val t1 = timeFn()
         var bitmap: Bitmap? =
                 AndroidUtils.scaledBitmapFromURIWithMaximumSize(context, imageUri, 2560, 1600)
         val planarYuv = PlanarYuvAllocations.fromBitmap(rs, bitmap!!)
-        val t2 = System.currentTimeMillis()
+        val t2 = timeFn()
         Log.i(TAG, "Read bitmap in ${t2-t1} ms")
         val inputImage = CameraImage(null, planarYuv, ImageOrientation.NORMAL,
                 CameraStatus.CAPTURING_PHOTO, timeFn(), Size(bitmap!!.width, bitmap!!.height))
@@ -29,16 +29,19 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         bitmap = null
         val prefs = BCPreferences(context)
         val effect = prefs.effect(rs, {throw IllegalStateException()})
+        val t3 = timeFn()
         val outputBitmap = effect.createBitmap(inputImage)
         val paintFn = effect.createPaintFn(inputImage)
         val processedBitmap = ProcessedBitmap(effect, inputImage, outputBitmap, paintFn)
 
-        photoLibrary.savePhoto(context, processedBitmap,
-                {Log.i(TAG, "Saved photo")},
+        val t4 = timeFn()
+        val photoId = photoLibrary.savePhoto(context, processedBitmap,
+                {Log.i(TAG, "Saved photo, times ${t3-t2} ${t4-t3} ${timeFn()-t4}")},
                 {ex -> throw ex})
+        return photoId
     }
 
     companion object {
-        val TAG = "ProcessImageOperation"
+        const val TAG = "ProcessImageOperation"
     }
 }

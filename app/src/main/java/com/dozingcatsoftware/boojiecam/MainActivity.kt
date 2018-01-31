@@ -1,8 +1,10 @@
 package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
+import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
@@ -72,6 +74,7 @@ class MainActivity : Activity() {
         switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         libraryButton.setOnClickListener(this::gotoLibrary)
         settingsButton.setOnClickListener(this::gotoPreferences)
+        convertPictureButton.setOnClickListener(this::convertExistingPicture)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
         cameraActionButton.onShutterButtonClick = this::handleShutterClick
         cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
@@ -97,6 +100,29 @@ class MainActivity : Activity() {
         imageProcessor.pause()
         cameraImageGenerator.stop()
         super.onPause()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
+        super.onActivityResult(requestCode, resultCode, intent)
+
+        when (requestCode) {
+            ACTIVITY_CHOOSE_PICTURE -> {
+                if (resultCode == RESULT_OK) {
+                    Log.i(TAG, "Selected photo: ${intent!!.data}")
+                    Thread({
+                        try {
+                            val imageId = ProcessImageOperation().processImage(this, intent!!.data)
+                            handler.post({
+                                ViewImageActivity.startActivityWithImageId(this, imageId)
+                            })
+                        }
+                        catch (ex: Exception) {
+                            Log.w(TAG, "Error processing image", ex)
+                        }
+                    }).start()
+                }
+            }
+        }
     }
 
     fun updateControls() {
@@ -361,7 +387,11 @@ class MainActivity : Activity() {
 
     private fun gotoPreferences(view: View) {
         BCPreferencesActivity.startIntent(this)
-        // FIXME: Changing ASCII characters and returning doesn't take effect.
+    }
+
+    private fun convertExistingPicture(view: View) {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
+        this.startActivityForResult(intent, ACTIVITY_CHOOSE_PICTURE)
     }
 
     private fun toggleVideoRecording() {
@@ -426,6 +456,8 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        val TAG = "MainActivity"
+        const val TAG = "MainActivity"
+
+        const val ACTIVITY_CHOOSE_PICTURE = 1
     }
 }

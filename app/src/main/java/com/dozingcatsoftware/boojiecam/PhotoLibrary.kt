@@ -53,9 +53,10 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
+    // TODO: Remove successFn and errorFn, just return photo ID and throw exceptions.
     fun savePhoto(context: Context, processedBitmap: ProcessedBitmap,
                   successFn: (String) -> Unit,
-                  errorFn: (Exception) -> Unit) {
+                  errorFn: (Exception) -> Unit): String {
         if (processedBitmap.yuvBytes == null &&
                 processedBitmap.sourceImage.planarYuvAllocations == null) {
             throw IllegalArgumentException("YUV bytes not set in ProcessedBitmap")
@@ -100,9 +101,11 @@ class PhotoLibrary(val rootDirectory: File) {
             writeImageAndThumbnail(context, processedBitmap, photoId)
 
             successFn(photoId)
+            return photoId
         }
         catch (ex: Exception) {
             errorFn(ex)
+            return ""
         }
     }
 
@@ -282,7 +285,7 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     companion object {
-        val TAG = "PhotoLibrary"
+        const val TAG = "PhotoLibrary"
         val PHOTO_ID_FORMAT = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS")
         val thumbnailWidth = 320
         val thumbnailHeight = 240
