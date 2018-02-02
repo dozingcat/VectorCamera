@@ -4,6 +4,7 @@ import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import android.renderscript.Script
 import android.util.Size
 import com.dozingcatsoftware.boojiecam.*
 
@@ -45,6 +46,7 @@ class AsciiEffect(private val rs: RenderScript,
 
     override fun createPaintFn(cameraImage: CameraImage) = {_: RectF -> backgroundPaint}
 
+    // HERE: Update to hold colors and add HTML/text output.
     class AsciiResult(val numRows: Int, val numCols: Int) {
         val characters = CharArray(numRows * numCols)
         val colors = IntArray(numRows * numCols)
@@ -85,23 +87,19 @@ class AsciiEffect(private val rs: RenderScript,
                     pixelChars[i].toString(), (i * charPixelWidth).toFloat(), charPixelHeight - 1f, paint)
         }
 
-        val result = computeAsciiResult(
-                cameraImage, pixelChars,
-                charPixelWidth, charPixelHeight, numCharacterColumns, numCharacterRows, charBitmap)
+        writeToCharacterBitmap(
+                cameraImage, pixelChars, charPixelWidth, charPixelHeight,
+                numCharacterColumns, numCharacterRows, charBitmap)
 
         bitmapOutputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap
     }
 
-    fun computeAsciiResult(camAllocation: CameraImage, pixelChars: String,
-                           charPixelWidth: Int, charPixelHeight: Int,
-                           numCharacterColumns: Int, numCharacterRows: Int,
-                           charBitmap: Bitmap): AsciiResult {
-        if (!allocationHas2DSize(asciiBlockAllocation, numCharacterColumns, numCharacterRows)) {
-            asciiBlockAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    numCharacterColumns, numCharacterRows)
-        }
+    fun writeToCharacterBitmap(camAllocation: CameraImage, pixelChars: String,
+                               charPixelWidth: Int, charPixelHeight: Int,
+                               numCharacterColumns: Int, numCharacterRows: Int,
+                               charBitmap: Bitmap) {
         val ds = camAllocation.displaySize
         if (!allocationHas2DSize(bitmapOutputAllocation, ds.width, ds.height)) {
             bitmapOutputAllocation = create2dAllocation(rs, Element::RGBA_8888, ds.width, ds.height)
@@ -125,17 +123,28 @@ class AsciiEffect(private val rs: RenderScript,
         script._flipHorizontal = camAllocation.orientation.isXFlipped()
         script._flipVertical = camAllocation.orientation.isYFlipped()
         script._colorMode = colorMode.id
+        // There's no input allocation passed directly to the kernel so we manually set x/y ranges.
+        val options = Script.LaunchOptions().setX(0, numCharacterColumns).setY(0, numCharacterRows)
         if (camAllocation.planarYuvAllocations != null) {
+            script._hasSingleYuvAllocation = false
             script._yInput = camAllocation.planarYuvAllocations.y
             script._uInput = camAllocation.planarYuvAllocations.u
             script._vInput = camAllocation.planarYuvAllocations.v
-            script.forEach_computeBlockAverages_planar(asciiBlockAllocation)
+            script.forEach_writeCharacterToBitmap(options)
         }
         else {
+            script._hasSingleYuvAllocation = true
             script._yuvInput = camAllocation.singleYuvAllocation
-            script.forEach_computeBlockAverages(asciiBlockAllocation)
+            script.forEach_writeCharacterToBitmap(options)
         }
+    }
 
+    fun getCharacterInfo() {
+        /*
+        if (!allocationHas2DSize(asciiBlockAllocation, numCharacterColumns, numCharacterRows)) {
+            asciiBlockAllocation = create2dAllocation(rs, Element::RGBA_8888,
+                    numCharacterColumns, numCharacterRows)
+        }
         val allocBytes = ByteArray(4 * numCharacterColumns * numCharacterRows)
         asciiBlockAllocation!!.copyTo(allocBytes)
 
@@ -151,10 +160,11 @@ class AsciiEffect(private val rs: RenderScript,
             }
         }
         return result
+        */
     }
 
     companion object {
-        val EFFECT_NAME = "ascii"
+        const val EFFECT_NAME = "ascii"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): AsciiEffect {
             val colors = params.getOrElse("colors", {mapOf<String, Any>()}) as Map<String, Any>

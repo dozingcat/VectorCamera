@@ -54,6 +54,7 @@ class PhotoLibrary(val rootDirectory: File) {
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
     fun savePhoto(context: Context, processedBitmap: ProcessedBitmap): String {
+        val t1 = System.currentTimeMillis()
         if (processedBitmap.yuvBytes == null &&
                 processedBitmap.sourceImage.planarYuvAllocations == null) {
             throw IllegalArgumentException("YUV bytes not set in ProcessedBitmap")
@@ -68,7 +69,9 @@ class PhotoLibrary(val rootDirectory: File) {
         rawDirectory.mkdirs()
         val rawImageFile = rawImageFileForItemId(photoId)
         // gzip compression usually saves about 50%.
-        GZIPOutputStream(FileOutputStream(rawImageFile)).use({
+        val gzipBufferSize = 8192
+        val t2 = System.currentTimeMillis()
+        GZIPOutputStream(FileOutputStream(rawImageFile), gzipBufferSize).use({
             if (processedBitmap.yuvBytes != null) {
                 it.write(processedBitmap.yuvBytes)
             }
@@ -83,6 +86,7 @@ class PhotoLibrary(val rootDirectory: File) {
                 it.write(allocBytes, 0, width * height / 4)
             }
         })
+        val t3 = System.currentTimeMillis()
         val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
         val compressedSize = rawImageFile.length()
         val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
@@ -95,6 +99,8 @@ class PhotoLibrary(val rootDirectory: File) {
         writeMetadata(metadata, photoId)
 
         writeImageAndThumbnail(context, processedBitmap, photoId)
+        val t4 = System.currentTimeMillis()
+        Log.i(TAG, "savePhoto times: ${t2-t1} ${t3-t2} ${t4-t3}")
         return photoId
     }
 
