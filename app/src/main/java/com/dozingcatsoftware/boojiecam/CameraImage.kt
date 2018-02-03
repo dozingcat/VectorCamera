@@ -19,6 +19,8 @@ data class CameraImage(val singleYuvAllocation: Allocation?,
         return singleYuvAllocation?.type?.y ?: planarYuvAllocations!!.y.type.y
     }
 
+    fun size() = Size(width(), height())
+
     fun withDisplaySize(ds: Size): CameraImage {
         return CameraImage(
                 singleYuvAllocation, planarYuvAllocations, orientation, status, timestamp, ds)

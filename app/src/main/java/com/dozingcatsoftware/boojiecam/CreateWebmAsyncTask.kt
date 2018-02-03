@@ -27,8 +27,7 @@ class CreateWebmAsyncTask(
             val mediaLibrary = params[0]!!.mediaLibrary
             val videoId = params[0]!!.videoId
 
-            val tempVideoOnlyFile =
-                    mediaLibrary.tempVideoFileForItemIdWithSuffix(videoId, "noaudio")
+            val tempVideoOnlyFile = mediaLibrary.tempFileWithName(videoId + ".webm.noaudio")
             tempVideoOnlyFile.delete()
             tempVideoOnlyFile.parentFile.mkdirs()
             Log.i(TAG, "Writing to ${tempVideoOnlyFile.path}")
@@ -53,8 +52,7 @@ class CreateWebmAsyncTask(
             val audioFile = mediaLibrary.rawAudioFileForItemId(videoId)
             if (audioFile.exists()) {
                 val audioFileSize = audioFile.length()
-                val tempCombinedFile =
-                        mediaLibrary.tempVideoFileForItemIdWithSuffix(videoId, "combined")
+                val tempCombinedFile = mediaLibrary.tempFileWithName(videoId + ".webm.combined")
                 tempCombinedFile.delete()
                 Log.i(TAG, "Adding audio, saving to ${tempCombinedFile.path}")
 

@@ -10,6 +10,7 @@ import android.os.Handler
 import android.renderscript.RenderScript
 import android.view.MotionEvent
 import android.view.View
+import com.dozingcatsoftware.boojiecam.effect.AsciiEffect
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
@@ -67,13 +68,16 @@ class ViewImageActivity : Activity() {
         }
     }
 
-    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
+    private fun createCameraImage(metadata: MediaMetadata): CameraImage {
         val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
-        val inputImage = CameraImage(null, planarYuv, metadata.orientation,
+        return CameraImage(null, planarYuv, metadata.orientation,
                 CameraStatus.CAPTURING_PHOTO, 0, AndroidUtils.displaySize(this))
+    }
 
+    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
+        val inputImage = createCameraImage(metadata)
         val bitmap = effect.createBitmap(inputImage)
         val paintFn = effect.createPaintFn(inputImage)
         return ProcessedBitmap(effect, inputImage, bitmap, paintFn)
@@ -111,15 +115,38 @@ class ViewImageActivity : Activity() {
     }
 
     private fun shareImage(view: View) {
+        // Stop reading metadata so often?
+        val metadata = photoLibrary.metadataForItemId(imageId)
+        val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
+        if (effect is AsciiEffect) {
+            val inputImage = createCameraImage(metadata)
+
+            val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
+            val textStream = photoLibrary.createTempFileOutputStream(textFile)
+            effect.writeText(inputImage, textStream)
+            textStream.close()
+            val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
+            val htmlStream = photoLibrary.createTempFileOutputStream(htmlFile)
+            effect.writeHtml(inputImage, htmlStream)
+            htmlStream.close()
+
+            shareJpeg()
+        }
+        else {
+            shareJpeg()
+        }
+    }
+
+    private fun shareJpeg() {
         val callback = {path: String, uri: Uri -> handler.post({
             val shareIntent = Intent(Intent.ACTION_SEND)
             shareIntent.type = "image/jpeg"
             shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "BoojieCam Picture")
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
             shareIntent.addFlags(
                     Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             startActivity(Intent.createChooser(shareIntent, "Share Picture Using:"))
-        }) as Unit}
+        }); Unit}
 
         AndroidUtils.scanSavedMediaFile(this, photoLibrary.imageFileForItemId(imageId).path,
                 callback)

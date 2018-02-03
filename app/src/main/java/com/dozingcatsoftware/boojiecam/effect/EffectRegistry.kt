@@ -115,7 +115,7 @@ object EffectRegistry {
                                 "text" to listOf(255, 255, 255),
                                 "background" to listOf(0, 0, 0)
                         ),
-                        "pixelChars" to prefsFn("pixelChars.WHITE_ON_BLACK", " .:oO8@"),
+                        "pixelChars" to prefsFn("pixelChars.WHITE_ON_BLACK", " .:oO8#"),
                         "prefId" to "pixelChars.WHITE_ON_BLACK"
                 ))
             },
