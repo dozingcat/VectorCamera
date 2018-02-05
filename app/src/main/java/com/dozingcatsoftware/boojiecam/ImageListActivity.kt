@@ -11,7 +11,7 @@ import android.widget.GridView
 import android.widget.ImageView
 import android.widget.SimpleAdapter
 import android.widget.TextView
-import com.dozingcatsoftware.util.AndroidUtils
+import com.dozingcatsoftware.util.scaledBitmapFromURIWithMinimumSize
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.coroutines.experimental.bg
@@ -77,7 +77,7 @@ class ImageListActivity : Activity() {
         async(UI) {
             val imageUri = Uri.fromFile(self.photoLibrary.thumbnailFileForItemId(itemId))
             val bitmap = (bg {
-                AndroidUtils.scaledBitmapFromURIWithMinimumSize(
+                scaledBitmapFromURIWithMinimumSize(
                         self, imageUri, ImageListActivity.CELL_WIDTH, ImageListActivity.CELL_HEIGHT)
             }).await()
             view.setImageBitmap(bitmap)

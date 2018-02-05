@@ -9,6 +9,8 @@ import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.ScriptIntrinsicConvolve3x3
 import com.dozingcatsoftware.boojiecam.*
+import com.dozingcatsoftware.util.allocationHas2DSize
+import com.dozingcatsoftware.util.create2dAllocation
 
 /**
  * Created by brian on 1/6/18.

@@ -6,7 +6,7 @@ import android.net.Uri
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
-import com.dozingcatsoftware.util.AndroidUtils
+import com.dozingcatsoftware.util.scaledBitmapFromURIWithMaximumSize
 
 /**
  * Created by brian on 1/28/18.
@@ -19,7 +19,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         val rs = RenderScript.create(context)
         val t1 = timeFn()
         var bitmap: Bitmap? =
-                AndroidUtils.scaledBitmapFromURIWithMaximumSize(context, imageUri, 2560, 1600)
+                scaledBitmapFromURIWithMaximumSize(context, imageUri, 2560, 1600)
         val planarYuv = PlanarYuvAllocations.fromBitmap(rs, bitmap!!)
         val t2 = timeFn()
         Log.i(TAG, "Read bitmap in ${t2-t1} ms")

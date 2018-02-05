@@ -14,7 +14,7 @@ import android.view.Window
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
-import com.dozingcatsoftware.util.AndroidUtils
+import com.dozingcatsoftware.util.getDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
 
@@ -52,7 +52,7 @@ class MainActivity : Activity() {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_main)
 
-        displaySize = AndroidUtils.displaySize(this)
+        displaySize = getDisplaySize(this)
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
         imageProcessor = CameraAllocationProcessor(rs)
@@ -198,6 +198,8 @@ class MainActivity : Activity() {
                         handler.post({
                             ViewImageActivity.startActivityWithImageId(this, photoId)
                         })
+                        // Write the PNG in the background since it's slower.
+                        photoLibrary.writePngImage(this, pb, photoId)
                     }
                     catch (ex: Exception) {
                         Log.w(TAG, "Error saving photo: " + ex)
@@ -292,10 +294,13 @@ class MainActivity : Activity() {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             previousEffect = currentEffect
+            val t1 = System.currentTimeMillis()
             currentEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
+            val t2 = System.currentTimeMillis()
             previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.EFFECT_GRID
             controlLayout.visibility = View.GONE
+            Log.i(TAG, "CombinationEffect time: ${t2-t1}")
         }
         else {
             currentEffect = previousEffect

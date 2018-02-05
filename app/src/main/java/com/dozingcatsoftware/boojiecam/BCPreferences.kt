@@ -7,6 +7,8 @@ import android.renderscript.RenderScript
 import android.util.Log
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
+import com.dozingcatsoftware.util.jsonStringToMap
+import com.dozingcatsoftware.util.mapToJsonString
 import java.util.*
 
 /**

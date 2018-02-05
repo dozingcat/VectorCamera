@@ -5,6 +5,8 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import com.dozingcatsoftware.boojiecam.*
+import com.dozingcatsoftware.util.allocationHas2DSize
+import com.dozingcatsoftware.util.create2dAllocation
 
 /**
  * Created by brian on 12/11/17.

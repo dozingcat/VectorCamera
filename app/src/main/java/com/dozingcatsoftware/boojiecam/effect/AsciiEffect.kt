@@ -7,6 +7,10 @@ import android.renderscript.RenderScript
 import android.renderscript.Script
 import android.util.Size
 import com.dozingcatsoftware.boojiecam.*
+import com.dozingcatsoftware.util.allocationHas2DSize
+import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.intFromArgbList
+import com.dozingcatsoftware.util.toUInt
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import kotlin.math.roundToInt

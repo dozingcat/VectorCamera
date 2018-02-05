@@ -25,6 +25,20 @@
     <string name="fullColorPixelCharsPrefSummary">Characters for full color mode.</string>
     <string name="fullColorPixelCharsPrefMessage">Enter characters to use in images from darkest to brightest. Full color mode usually works best with fewer or even just one character. Leave blank for default of O8@</string>
 
+    <string name="shareDialogYesLabel">Share</string>
+    <string name="shareDialogNoLabel">Cancel</string>
+    <string name="shareActionTitle">Share using</string>
+
+    <string name="sharePictureDialogTitle">Share picture as</string>
+    <string name="sharePictureJpegOptionLabel">Image</string>
+    <string name="sharePictureHtmlOptionLabel">HTML</string>
+    <string name="sharePictureTextOptionLabel">Text</string>
+
+    <string name="shareVideoDialogTitle">Share video as</string>
+    <string name="shareVideoWebmOptionLabel">WebM video</string>
+    <string name="shareVideoFrameArchiveOptionLabel">All frames as ZIP archive</string>
+    <string name="shareVideoSingleFrameOptionLabel">Current frame as image</string>
+
     <string name="videoExportTypePrefsKey">videoExportType</string>
     <string name="videoExportTypePrefsTitle">Export recorded video as</string>
     <string name="videoShareActionTitle">Share video using:</string>

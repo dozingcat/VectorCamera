@@ -14,7 +14,8 @@ import com.dozingcatsoftware.boojiecam.effect.AsciiEffect
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
-import com.dozingcatsoftware.util.AndroidUtils
+import com.dozingcatsoftware.util.getDisplaySize
+import com.dozingcatsoftware.util.scanSavedMediaFile
 import kotlinx.android.synthetic.main.view_image.*
 
 
@@ -73,7 +74,7 @@ class ViewImageActivity : Activity() {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
         return CameraImage(null, planarYuv, metadata.orientation,
-                CameraStatus.CAPTURING_PHOTO, 0, AndroidUtils.displaySize(this))
+                CameraStatus.CAPTURING_PHOTO, 0, getDisplaySize(this))
     }
 
     private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
@@ -106,7 +107,7 @@ class ViewImageActivity : Activity() {
                         .withExportedEffectMetadata(effect.effectMetadata(), "image")
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
-                photoLibrary.writeImageAndThumbnail(this, pb, imageId)
+                photoLibrary.writeThumbnail(pb, imageId)
                 overlayView.processedBitmap = pb
                 overlayView.invalidate()
                 inEffectSelectionMode = false
@@ -119,37 +120,71 @@ class ViewImageActivity : Activity() {
         val metadata = photoLibrary.metadataForItemId(imageId)
         val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         if (effect is AsciiEffect) {
-            val inputImage = createCameraImage(metadata)
-
-            val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
-            val textStream = photoLibrary.createTempFileOutputStream(textFile)
-            effect.writeText(inputImage, textStream)
-            textStream.close()
-            val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
-            val htmlStream = photoLibrary.createTempFileOutputStream(htmlFile)
-            effect.writeHtml(inputImage, htmlStream)
-            htmlStream.close()
-
-            shareJpeg()
+            showAsciiTypeShareDialog(metadata, effect)
         }
         else {
-            shareJpeg()
+            shareImage()
         }
     }
 
-    private fun shareJpeg() {
-        val callback = {path: String, uri: Uri -> handler.post({
-            val shareIntent = Intent(Intent.ACTION_SEND)
-            shareIntent.type = "image/jpeg"
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
-            shareIntent.addFlags(
-                    Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(shareIntent, "Share Picture Using:"))
-        }); Unit}
+    private fun shareFile(path: String, mimeType: String) {
+        scanSavedMediaFile(this, path, {p: String, uri: Uri ->
+            handler.post({
+                val shareIntent = Intent(Intent.ACTION_SEND)
+                shareIntent.type = mimeType
+                shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
+                shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
+                shareIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                startActivity(
+                        Intent.createChooser(shareIntent, getString(R.string.shareActionTitle)))
+            })
+        })
+    }
 
-        AndroidUtils.scanSavedMediaFile(this, photoLibrary.imageFileForItemId(imageId).path,
-                callback)
+    private fun shareImage() {
+        shareFile(photoLibrary.imageFileForItemId(imageId).path, "image/png")
+    }
+
+    private fun shareText(metadata: MediaMetadata, effect: AsciiEffect) {
+        val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
+        val textStream = photoLibrary.createTempFileOutputStream(textFile)
+        val inputImage = createCameraImage(metadata)
+        effect.writeText(inputImage, textStream)
+        textStream.close()
+        shareFile(textFile.path, "text/plain")
+    }
+
+    private fun shareHtml(metadata: MediaMetadata, effect: AsciiEffect) {
+        val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
+        val htmlStream = photoLibrary.createTempFileOutputStream(htmlFile)
+        val inputImage = createCameraImage(metadata)
+        effect.writeHtml(inputImage, htmlStream)
+        htmlStream.close()
+        shareFile(htmlFile.path, "text/html")
+    }
+
+    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: AsciiEffect) {
+        val shareTypes = arrayOf("image", "html", "text")
+        var selectedShareType = "image"
+        val shareTypeLabels = arrayOf(
+                getString(R.string.sharePictureJpegOptionLabel),
+                getString(R.string.sharePictureHtmlOptionLabel),
+                getString(R.string.sharePictureTextOptionLabel))
+        AlertDialog.Builder(this)
+                .setTitle(R.string.sharePictureDialogTitle)
+                .setSingleChoiceItems(shareTypeLabels, 0, {
+                    d: DialogInterface, which: Int -> selectedShareType = shareTypes[which]
+                })
+                .setPositiveButton(R.string.shareDialogYesLabel, {d: DialogInterface, w: Int ->
+                    when (selectedShareType) {
+                        "jpeg" -> shareImage()
+                        "html" -> shareHtml(metadata, effect)
+                        "text" -> shareText(metadata, effect)
+                    }
+                })
+                .setNegativeButton(R.string.shareDialogNoLabel, null)
+                .show()
     }
 
     private fun deleteImage(view: View) {

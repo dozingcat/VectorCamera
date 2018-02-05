@@ -3,6 +3,8 @@ package com.dozingcatsoftware.boojiecam.effect
 import android.graphics.Bitmap
 import android.renderscript.*
 import com.dozingcatsoftware.boojiecam.*
+import com.dozingcatsoftware.util.allocationHas2DSize
+import com.dozingcatsoftware.util.create2dAllocation
 
 /**
  * Created by brian on 10/16/17.

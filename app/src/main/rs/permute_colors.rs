@@ -1,5 +1,5 @@
 #pragma version(1)
-#pragma rs java_package_name(com.dozingcatsoftware.boojiecam)
+#pragma rs java_package_name(com.dozingcatsoftware.boojiecam.effect)
 #pragma rs_fp_relaxed
 
 // 1=red, 2=green, 3=blue

@@ -4,6 +4,10 @@ import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.RenderScript
 import com.dozingcatsoftware.boojiecam.*
+import com.dozingcatsoftware.util.addAlpha
+import com.dozingcatsoftware.util.intFromArgbList
+import com.dozingcatsoftware.util.makeAllocationColorMap
+import com.dozingcatsoftware.util.makeAlphaAllocation
 
 /**
  * Created by brian on 1/7/18.

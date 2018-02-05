@@ -1,5 +1,5 @@
 #pragma version(1)
-#pragma rs java_package_name(com.dozingcatsoftware.boojiecam)
+#pragma rs java_package_name(com.dozingcatsoftware.boojiecam.effect)
 #pragma rs_fp_relaxed
 
 // May be YUV data (the U and V planes will be ignored), or just the Y plane.

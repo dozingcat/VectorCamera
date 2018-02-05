@@ -1,41 +1,9 @@
-package com.dozingcatsoftware.boojiecam
+package com.dozingcatsoftware.util
 
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.Type
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.InputStream
-
-inline fun toUInt(b: Byte): Int {
-    return b.toInt() and 0xff
-}
-
-inline fun addAlpha(color: Int): Int {
-    return 0xff000000.toInt() or color
-}
-
-fun argbArrayFromInt(argb: Int): List<Int> {
-    return listOf(argb shr 24, (argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
-}
-
-fun intFromArgbList(a: List<Int>): Int {
-    if (a.size == 4) {
-        return (a[0] shl 24) or (a[1] shl 16) or (a[2] shl 8) or a[3]
-    }
-    if (a.size == 3) {
-        return (255 shl 24) or (a[0] shl 16) or (a[1] shl 8) or a[2]
-    }
-    throw IllegalArgumentException("List must have 3 or 4 items")
-}
-
-fun readBytesIntoBuffer(input: InputStream, bytesToRead: Int, buffer: ByteArray, offset: Int = 0) {
-    var totalBytesRead = 0
-    while (totalBytesRead < bytesToRead) {
-        totalBytesRead += input.read(buffer, offset + totalBytesRead, bytesToRead - totalBytesRead)
-    }
-}
 
 fun flattenedYuvImageBytes(rs: RenderScript, yuvAlloc: Allocation): ByteArray {
     // There's no way to directly read the U and V bytes from a YUV allocation(?), but we can
@@ -128,32 +96,3 @@ fun makeAlphaAllocation(rs: RenderScript, color: Int): Allocation {
     allocation.copyFrom(colors)
     return allocation
 }
-
-fun convertJsonValue(value: Any): Any {
-    // JSONObject.NULL will be unmodified.
-    return when (value) {
-        is JSONObject -> jsonObjectToMap(value)
-        is JSONArray -> jsonArrayToList(value)
-        else -> value
-    }
-}
-
-fun jsonObjectToMap(json: JSONObject): Map<String, Any> {
-    val m = mutableMapOf<String, Any>()
-    for (key in json.keys()) {
-        m[key] = convertJsonValue(json.get(key))
-    }
-    return m
-}
-
-fun jsonArrayToList(json: JSONArray): List<Any> {
-    val list = mutableListOf<Any>()
-    for (i in 0 until json.length()) {
-        list.add(convertJsonValue(json.get(i)))
-    }
-    return list
-}
-
-fun jsonStringToMap(s: String) = jsonObjectToMap(JSONObject(s))
-
-fun mapToJsonString(map: Map<String, Any>) = JSONObject(map).toString()

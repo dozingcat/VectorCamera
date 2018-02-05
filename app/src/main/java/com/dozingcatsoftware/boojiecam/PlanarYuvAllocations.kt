@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.readBytesIntoBuffer
 import java.io.InputStream
 
 class PlanarYuvAllocations(val y: Allocation, val u: Allocation, val v: Allocation) {

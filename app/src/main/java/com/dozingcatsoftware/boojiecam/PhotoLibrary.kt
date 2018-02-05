@@ -5,8 +5,9 @@ import android.graphics.Bitmap
 import android.os.Environment
 import android.renderscript.RenderScript
 import android.util.Log
+import android.util.Size
 import com.dozingcatsoftware.boojiecam.effect.EffectMetadata
-import com.dozingcatsoftware.util.AndroidUtils
+import com.dozingcatsoftware.util.*
 import org.json.JSONObject
 import java.io.*
 import java.text.SimpleDateFormat
@@ -28,8 +29,8 @@ import java.util.zip.GZIPOutputStream
  *         [video_id]_video.dat
  *         [video_id]_audio.pcm
  *     images/
- *         [image_id].jpg
- *         [video_id].jpg (if exported)
+ *         [image_id].png
+ *         [video_id].png (if exported)
  *     videos/
  *         [video_id].webm (if exported)
  *     raw_tmp/
@@ -70,19 +71,21 @@ class PhotoLibrary(val rootDirectory: File) {
         // gzip compression usually saves about 50%.
         val gzipBufferSize = 8192
         val t2 = System.currentTimeMillis()
-        GZIPOutputStream(FileOutputStream(rawImageFile), gzipBufferSize).use({
-            if (processedBitmap.yuvBytes != null) {
-                it.write(processedBitmap.yuvBytes)
-            }
-            else {
-                val allocBytes = ByteArray(width * height)
-                val planarYuv = processedBitmap.sourceImage.planarYuvAllocations!!
-                planarYuv.y.copyTo(allocBytes)
-                it.write(allocBytes, 0, width * height)
-                planarYuv.u.copyTo(allocBytes)
-                it.write(allocBytes, 0, width * height / 4)
-                planarYuv.v.copyTo(allocBytes)
-                it.write(allocBytes, 0, width * height / 4)
+        writeFileAtomicallyUsingTempDir(rawImageFile, getTempDirectory(), {fos ->
+            GZIPOutputStream(fos, gzipBufferSize).use {
+                if (processedBitmap.yuvBytes != null) {
+                    it.write(processedBitmap.yuvBytes)
+                }
+                else {
+                    val allocBytes = ByteArray(width * height)
+                    val planarYuv = processedBitmap.sourceImage.planarYuvAllocations!!
+                    planarYuv.y.copyTo(allocBytes)
+                    it.write(allocBytes, 0, width * height)
+                    planarYuv.u.copyTo(allocBytes)
+                    it.write(allocBytes, 0, width * height / 4)
+                    planarYuv.v.copyTo(allocBytes)
+                    it.write(allocBytes, 0, width * height / 4)
+                }
             }
         })
         val t3 = System.currentTimeMillis()
@@ -97,7 +100,7 @@ class PhotoLibrary(val rootDirectory: File) {
                 sourceImage.orientation, sourceImage.timestamp)
         writeMetadata(metadata, photoId)
 
-        writeImageAndThumbnail(context, processedBitmap, photoId)
+        writeThumbnail(processedBitmap, photoId)
         val t4 = System.currentTimeMillis()
         Log.i(TAG, "savePhoto times: ${t2-t1} ${t3-t2} ${t4-t3}")
         return photoId
@@ -113,21 +116,27 @@ class PhotoLibrary(val rootDirectory: File) {
     fun writeMetadata(metadata: MediaMetadata, itemId: String) {
         val json = JSONObject(metadata.toJson()).toString(2)
         metadataDirectory.mkdirs()
-        FileOutputStream(metadataFileForItemId(itemId)).use({
+        writeFileAtomicallyUsingTempDir(metadataFileForItemId(itemId), getTempDirectory(), {
             it.write(json.toByteArray(Charsets.UTF_8))
         })
     }
 
-    fun writeImageAndThumbnail(context: Context, pb: ProcessedBitmap, itemId: String) {
+    /**
+     * Writes a full size PNG image to the image directory. This can be slow; calling it on the
+     * main thread may block for several seconds.
+     * (JPEG would be much faster, but can have noticeably worse quality depending on the effect).
+     */
+    fun writePngImage(context: Context, pb: ProcessedBitmap, itemId: String) {
+        val t1 = System.currentTimeMillis()
         val resultBitmap = pb.renderBitmap(pb.sourceImage.width(), pb.sourceImage.height())
         imageDirectory.mkdirs()
-        val pngFile = imageFileForItemId(itemId)
-        val pngOutputStream = FileOutputStream(pngFile)
-        pngOutputStream.use({
-            resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
+        val imageFile = imageFileForItemId(itemId)
+        writeFileAtomicallyUsingTempDir(imageFile, getTempDirectory(), {
+            resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         })
-        AndroidUtils.scanSavedMediaFile(context, pngFile.path)
-        writeThumbnail(pb, itemId)
+        val t2 = System.currentTimeMillis()
+        scanSavedMediaFile(context, imageFile.path)
+        Log.i(TAG, "writePngImage: ${t2-t1}")
     }
 
     fun writeThumbnail(processedBitmap: ProcessedBitmap, itemId: String) {
@@ -136,13 +145,16 @@ class PhotoLibrary(val rootDirectory: File) {
         if (!noMediaFile.exists()) {
             noMediaFile.createNewFile()
         }
-        val thumbnailOutputStream =
-                FileOutputStream(File(thumbnailDirectory, itemId + ".jpg"))
-        // Preserve aspect ratio?
-        val thumbnailBitmap = processedBitmap.renderBitmap(thumbnailWidth, thumbnailHeight)
-        thumbnailOutputStream.use({
+        val thumbSize = scaleToTargetSize(processedBitmap.sourceImage.size(), THUMBNAIL_MAX_SIZE)
+        val thumbnailBitmap = processedBitmap.renderBitmap(thumbSize.width, thumbSize.height)
+        writeFileAtomicallyUsingTempDir(thumbnailFileForItemId(itemId), getTempDirectory(), {
             thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)
         })
+    }
+
+    fun getTempDirectory(): File {
+        tempDirectory.mkdirs()
+        return tempDirectory
     }
 
     fun thumbnailFileForItemId(itemId: String): File {
@@ -215,7 +227,7 @@ class PhotoLibrary(val rootDirectory: File) {
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.
         val rs = RenderScript.create(context)
-        val videoReader = VideoReader(rs, this, itemId, AndroidUtils.displaySize(context))
+        val videoReader = VideoReader(rs, this, itemId, getDisplaySize(context))
         writeThumbnail(videoReader.bitmapForFrame(0), itemId)
     }
 
@@ -235,7 +247,7 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     fun imageFileForItemId(itemId: String): File {
-        return File(imageDirectory, itemId + ".jpg")
+        return File(imageDirectory, itemId + ".png")
     }
 
     fun videoFileForItemId(itemId: String): File {
@@ -280,8 +292,7 @@ class PhotoLibrary(val rootDirectory: File) {
     companion object {
         const val TAG = "PhotoLibrary"
         val PHOTO_ID_FORMAT = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS")
-        val thumbnailWidth = 320
-        val thumbnailHeight = 240
+        val THUMBNAIL_MAX_SIZE = Size(480, 360)
 
         init {
             PHOTO_ID_FORMAT.timeZone = TimeZone.getTimeZone("UTC")

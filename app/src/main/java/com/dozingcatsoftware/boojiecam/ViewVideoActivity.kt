@@ -19,7 +19,8 @@ import android.widget.Toast
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
-import com.dozingcatsoftware.util.AndroidUtils
+import com.dozingcatsoftware.util.getDisplaySize
+import com.dozingcatsoftware.util.scanSavedMediaFile
 import kotlinx.android.synthetic.main.view_video.*
 import java.io.File
 
@@ -82,7 +83,7 @@ class ViewVideoActivity: Activity() {
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")
-        videoReader = VideoReader(rs, photoLibrary, videoId, AndroidUtils.displaySize(this))
+        videoReader = VideoReader(rs, photoLibrary, videoId, getDisplaySize(this))
 
         frameSeekBar.max = videoReader.numberOfFrames() - 1
         frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
@@ -295,7 +296,7 @@ class ViewVideoActivity: Activity() {
             startActivity(Intent.createChooser(shareIntent, "Share video using:"))
         }) as Unit}
 
-        AndroidUtils.scanSavedMediaFile(this, exportedFile.path, callback)
+        scanSavedMediaFile(this, exportedFile.path, callback)
     }
 
     private fun shareVideo(view: View) {

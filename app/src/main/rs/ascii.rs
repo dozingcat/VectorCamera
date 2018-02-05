@@ -1,5 +1,5 @@
 #pragma version(1)
-#pragma rs java_package_name(com.dozingcatsoftware.boojiecam)
+#pragma rs java_package_name(com.dozingcatsoftware.boojiecam.effect)
 #pragma rs_fp_relaxed
 
 // YUV allocation from camera input. Either this or individual planes should be set,

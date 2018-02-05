@@ -7,8 +7,8 @@
 
     <ImageView
         android:id="@+id/grid_image"
-        android:scaleType="fitStart"
-        android:background="#ff0000"
+        android:scaleType="fitCenter"
+        android:background="#000"
         android:layout_width="match_parent"
         android:layout_height="120dp" />
 
