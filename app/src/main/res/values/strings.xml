@@ -33,6 +33,7 @@
     <string name="sharePictureJpegOptionLabel">Image</string>
     <string name="sharePictureHtmlOptionLabel">HTML</string>
     <string name="sharePictureTextOptionLabel">Text</string>
+    <string name="sharePictureExporting">Exporting image...</string>
 
     <string name="shareVideoDialogTitle">Share video as</string>
     <string name="shareVideoWebmOptionLabel">WebM video</string>

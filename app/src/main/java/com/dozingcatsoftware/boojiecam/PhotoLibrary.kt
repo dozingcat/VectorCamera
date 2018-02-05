@@ -136,6 +136,10 @@ class PhotoLibrary(val rootDirectory: File) {
         })
         val t2 = System.currentTimeMillis()
         scanSavedMediaFile(context, imageFile.path)
+        // Update the exported effect.
+        val metadata = metadataForItemId(itemId)
+        val updatedMetadata = metadata.withExportedEffectMetadata(pb.effect.effectMetadata(), "png")
+        writeMetadata(updatedMetadata, itemId)
         Log.i(TAG, "writePngImage: ${t2-t1}")
     }
 

@@ -40,7 +40,6 @@ fun writeFileAtomicallyUsingTempDir(target: File, tmpDir: File, block: (FileOutp
     try {
         FileOutputStream(tmpFile).use(block)
         val result = tmpFile.renameTo(target)
-        Log.i(TAG, "Renamed to ${target}: ${result}")
         if (!result) {
             throw FileNotFoundException("Failed to rename temp file")
         }
@@ -49,5 +48,3 @@ fun writeFileAtomicallyUsingTempDir(target: File, tmpDir: File, block: (FileOutp
         tmpFile.delete()
     }
 }
-
-private const val TAG = "misc.kt"

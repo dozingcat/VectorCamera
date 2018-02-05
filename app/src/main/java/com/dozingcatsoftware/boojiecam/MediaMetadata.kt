@@ -37,7 +37,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
         val newExportedEffects = HashMap(exportedEffectMetadata)
         newExportedEffects[exportType] = em
         return MediaMetadata(
-                mediaType, em, width, height, orientation,
+                mediaType, effectMetadata, width, height, orientation,
                 timestamp, frameTimestamps, audioStartTimestamp, newExportedEffects)
     }
 

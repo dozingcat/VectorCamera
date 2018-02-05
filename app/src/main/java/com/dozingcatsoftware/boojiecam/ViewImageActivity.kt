@@ -2,14 +2,17 @@ package com.dozingcatsoftware.boojiecam
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
+import android.widget.Toast
 import com.dozingcatsoftware.boojiecam.effect.AsciiEffect
 import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
@@ -102,9 +105,9 @@ class ViewImageActivity : Activity() {
 
                 val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
                 val effect = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
-                // Update metadata and thumbnail and full size images.
+                // Update metadata and thumbnail, *not* the full size image because that's slow.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
-                        .withExportedEffectMetadata(effect.effectMetadata(), "image")
+                        .withEffectMetadata(effect.effectMetadata())
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
                 photoLibrary.writeThumbnail(pb, imageId)
@@ -123,7 +126,7 @@ class ViewImageActivity : Activity() {
             showAsciiTypeShareDialog(metadata, effect)
         }
         else {
-            shareImage()
+            shareImage(metadata, effect)
         }
     }
 
@@ -142,8 +145,88 @@ class ViewImageActivity : Activity() {
         })
     }
 
-    private fun shareImage() {
-        shareFile(photoLibrary.imageFileForItemId(imageId).path, "image/png")
+    private fun shareImage(metadata: MediaMetadata, effect: Effect) {
+        // This is moderately complicated. If the effect of the exported PNG file doesn't match the
+        // current effect, we need to export again. Except that we could have just taken a picture
+        // and the export could be in progress. There's no good way to detect that, so we check if
+        // the metadata timestamp is later than 10 seconds ago and if so give it a chance to finish.
+        // While the export is in progress we show a progress spinner, which isn't ideal but at
+        // least lets the user know there's something happening.
+        var waitDialog: ProgressDialog? = null
+        var pngFile = photoLibrary.imageFileForItemId(imageId)
+        var firstCheckTimestamp: Long? = null
+
+        fun doShare() {
+            waitDialog?.cancel()
+            waitDialog = null
+            shareFile(pngFile.path, "image/png")
+        }
+
+        fun showWaitDialog() {
+            if (waitDialog == null) {
+                waitDialog = ProgressDialog(this)
+                waitDialog!!.isIndeterminate = true
+                waitDialog!!.setMessage(getString(R.string.sharePictureExporting))
+                waitDialog!!.setCancelable(false)
+                Log.i(TAG, "Showing wait dialog")
+                waitDialog!!.show()
+            }
+        }
+
+        fun exportAndShare() {
+            showWaitDialog()
+            Thread({
+                try {
+                    val pb = createProcessedBitmap(effect, metadata)
+                    photoLibrary.writePngImage(this, pb, imageId)
+                    handler.post({doShare()})
+                }
+                catch (ex: Exception) {
+                    handler.post({
+                        Toast.makeText(this, "Error exporting image", Toast.LENGTH_LONG).show()
+                    })
+                }
+                finally {
+                    handler.post({waitDialog?.cancel()})
+
+                }
+            }).start()
+        }
+
+        fun shareIfExists() {
+            if (pngFile.exists()) {
+                val exportedEffect =
+                        photoLibrary.metadataForItemId(imageId).exportedEffectMetadata["png"]
+                if (effect.effectMetadata().equals(exportedEffect)) {
+                    Log.i(TAG, "Exported effect matches")
+                    doShare()
+                }
+                else {
+                    Log.i(TAG, "Exported effect doesn't match, re-exporting")
+                    exportAndShare()
+                }
+            }
+            else {
+                // No file at all, we could be waiting for the initial export.
+                val now = System.currentTimeMillis()
+                if (firstCheckTimestamp == null) {
+                    firstCheckTimestamp = now
+                }
+                if ((now - metadata.timestamp < 10000) && (now - firstCheckTimestamp!! < 10000)) {
+                    // Give the initial export a chance to finish.
+                    // firstCheckTimestamp avoids waiting indefinitely if the timestamp is bogus.
+                    Log.i(TAG, "Waiting for initial export")
+                    showWaitDialog()
+                    handler.postDelayed({shareIfExists()}, 1000L)
+                }
+                else {
+                    Log.i(TAG, "Giving up on initial export")
+                    // Probably not waiting on initial export, do it ourselves.
+                    exportAndShare()
+                }
+            }
+        }
+        shareIfExists()
     }
 
     private fun shareText(metadata: MediaMetadata, effect: AsciiEffect) {
@@ -178,7 +261,7 @@ class ViewImageActivity : Activity() {
                 })
                 .setPositiveButton(R.string.shareDialogYesLabel, {d: DialogInterface, w: Int ->
                     when (selectedShareType) {
-                        "jpeg" -> shareImage()
+                        "image" -> shareImage(metadata, effect)
                         "html" -> shareHtml(metadata, effect)
                         "text" -> shareText(metadata, effect)
                     }
