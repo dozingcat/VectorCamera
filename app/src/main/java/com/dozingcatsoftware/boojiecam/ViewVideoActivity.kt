@@ -6,7 +6,6 @@ import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
-import android.os.AsyncTask
 import android.os.Bundle
 import android.os.Handler
 import android.preference.PreferenceManager
@@ -74,7 +73,7 @@ class ViewVideoActivity: Activity() {
         setContentView(R.layout.view_video)
         rs = RenderScript.create(this)
 
-        shareButton.setOnClickListener(this::shareVideo)
+        shareButton.setOnClickListener(this::doShare)
         switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         playPauseButton.setOnClickListener(this::togglePlay)
         deleteButton.setOnClickListener(this::deleteVideo)
@@ -138,9 +137,11 @@ class ViewVideoActivity: Activity() {
             originalEffect = videoReader.effect
             videoReader.effect =
                     CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
+            controlBar.visibility = View.GONE
         }
         else {
             videoReader.effect = originalEffect!!
+            controlBar.visibility = View.VISIBLE
         }
         if (!isPlaying) {
             loadFrame(frameIndex)
@@ -234,8 +235,48 @@ class ViewVideoActivity: Activity() {
                     loadFrame(frameIndex)
                 }
                 inEffectSelectionMode = false
+                controlBar.visibility = View.VISIBLE
             }
         }
+    }
+
+    private fun doShare(view: View) {
+        stopPlaying()
+        val shareTypes = arrayOf("webm", "zip", "frame")
+        var selectedShareType = "webm"
+        val shareTypeLabels = arrayOf(
+                getString(R.string.shareVideoWebmOptionLabel),
+                getString(R.string.shareVideoFrameArchiveOptionLabel),
+                getString(R.string.shareVideoSingleFrameOptionLabel)
+        )
+        AlertDialog.Builder(this)
+                .setTitle(R.string.shareVideoDialogTitle)
+                .setSingleChoiceItems(shareTypeLabels, 0, {
+                    _: DialogInterface, which: Int -> selectedShareType = shareTypes[which]
+                })
+                .setPositiveButton(R.string.shareDialogYesLabel, {_: DialogInterface, _: Int ->
+                    when (selectedShareType) {
+                        "webm" -> shareVideo(ExportType.WEBM)
+                        "zip" -> shareVideo(ExportType.ZIP)
+                        "frame" -> shareCurrentFrame()
+                    }
+                })
+                .setNegativeButton(R.string.shareDialogNoLabel, null)
+                .show()
+    }
+
+    private fun runShareActivity(exportType: ExportType, exportedFile: File) {
+        val callback = {path: String, uri: Uri -> handler.post({
+            val shareIntent = Intent(Intent.ACTION_SEND)
+            shareIntent.type = exportType.mimeType
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
+            shareIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(shareIntent, "Share video using:"))
+        }) as Unit}
+
+        scanSavedMediaFile(this, exportedFile.path, callback)
     }
 
     private fun encodeVideo(exportType: ExportType) {
@@ -286,22 +327,8 @@ class ViewVideoActivity: Activity() {
         progressDialog.show()
     }
 
-    private fun runShareActivity(exportType: ExportType, exportedFile: File) {
-        val callback = {path: String, uri: Uri -> handler.post({
-            val shareIntent = Intent(Intent.ACTION_SEND)
-            shareIntent.type = exportType.mimeType
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
-            shareIntent.addFlags(
-                    Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(shareIntent, "Share video using:"))
-        }) as Unit}
-
-        scanSavedMediaFile(this, exportedFile.path, callback)
-    }
-
-    private fun shareVideo(view: View) {
+    private fun shareVideo(exportType: ExportType) {
         stopPlaying()
-        val exportType = exportTypeFromPreferences()
         val exportedFile = exportType.exportedFile(photoLibrary, videoId)
         val metadata = photoLibrary.metadataForItemId(videoId)
         val exportedEffect = metadata.exportedEffectMetadata[exportType.id]
@@ -312,6 +339,10 @@ class ViewVideoActivity: Activity() {
         else {
             encodeVideo(exportType)
         }
+    }
+
+    private fun shareCurrentFrame() {
+
     }
 
     private fun deleteVideo(view: View) {
@@ -326,18 +357,6 @@ class ViewVideoActivity: Activity() {
                 .setPositiveButton("Delete", deleteFn)
                 .setNegativeButton("Don't delete", null)
                 .show()
-    }
-
-    private fun exportTypeFromPreferences(): ExportType {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(baseContext)
-        val exportPref = prefs.getString(getString(R.string.videoExportTypePrefsKey), "WEBM")
-        try {
-            return ExportType.valueOf(exportPref)
-        }
-        catch (ex: IllegalArgumentException) {
-            Log.e(TAG, "Unknown export type: " + exportPref, ex)
-            return ExportType.WEBM
-        }
     }
 
     companion object {

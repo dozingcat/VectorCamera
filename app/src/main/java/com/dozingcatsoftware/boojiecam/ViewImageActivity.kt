@@ -66,9 +66,11 @@ class ViewImageActivity : Activity() {
             val comboEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
             // FIXME: This is slow because the saved image is high resolution.
             showImage(comboEffect, photoLibrary.metadataForItemId(imageId))
+            controlBar.visibility = View.GONE
         }
         else {
             loadImage()
+            controlBar.visibility = View.VISIBLE
         }
     }
 
@@ -114,6 +116,7 @@ class ViewImageActivity : Activity() {
                 overlayView.processedBitmap = pb
                 overlayView.invalidate()
                 inEffectSelectionMode = false
+                controlBar.visibility = View.VISIBLE
             }
         }
     }
@@ -257,9 +260,9 @@ class ViewImageActivity : Activity() {
         AlertDialog.Builder(this)
                 .setTitle(R.string.sharePictureDialogTitle)
                 .setSingleChoiceItems(shareTypeLabels, 0, {
-                    d: DialogInterface, which: Int -> selectedShareType = shareTypes[which]
+                    _: DialogInterface, which: Int -> selectedShareType = shareTypes[which]
                 })
-                .setPositiveButton(R.string.shareDialogYesLabel, {d: DialogInterface, w: Int ->
+                .setPositiveButton(R.string.shareDialogYesLabel, {_: DialogInterface, _: Int ->
                     when (selectedShareType) {
                         "image" -> shareImage(metadata, effect)
                         "html" -> shareHtml(metadata, effect)

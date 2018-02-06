@@ -34,18 +34,17 @@ class CreateVideoZipFileAsyncTask(
             val videoWidth = videoReader.videoWidth()
             val videoHeight = videoReader.videoHeight()
 
-
-            val zipFile = mediaLibrary.videoFramesArchiveForItemId(videoId)
+            // Frames are JPEGs because PNG encoding is very slow.
+            zipFile = mediaLibrary.videoFramesArchiveForItemId(videoId)
             tmpZipFile = File(zipFile.parentFile, zipFile.name + ".tmp")
             val out = ZipOutputStream(FileOutputStream(tmpZipFile))
-            var frameIndex = 0
-            while (frameIndex in 0 until videoReader.numberOfFrames() - 1) {
-                val filename = String.format("/%s/%05d.png", videoId, frameIndex)
+            for (frameIndex in 0 until videoReader.numberOfFrames() - 1) {
+                val filename = String.format("/%s/%05d.jpg", videoId, frameIndex)
                 out.putNextEntry(ZipEntry(filename))
 
                 val pb = videoReader.bitmapForFrame(frameIndex)
-                // 0 is "quality" argument, ignored since PNG is lossless.
-                pb.renderBitmap(videoWidth, videoHeight).compress(Bitmap.CompressFormat.PNG, 0, out)
+                pb.renderBitmap(videoWidth, videoHeight)
+                        .compress(Bitmap.CompressFormat.JPEG, 90, out)
 
                 out.closeEntry()
                 if (this.isCancelled()) {
@@ -70,7 +69,7 @@ class CreateVideoZipFileAsyncTask(
             tmpZipFile?.delete()
         }
 
-        return return ProcessVideoTask.Result(ProcessVideoTask.ResultStatus.SUCCEEDED, zipFile)
+        return ProcessVideoTask.Result(ProcessVideoTask.ResultStatus.SUCCEEDED, zipFile)
     }
 
     companion object {

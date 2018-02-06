@@ -5,13 +5,6 @@
         <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
             android:enabled="true"
             android:title="@string/autoConvertPicturesPrefsTitle" />
-
-        <ListPreference
-            android:key="@string/videoExportTypePrefsKey"
-            android:defaultValue="WEBM"
-            android:entries="@array/videoExportTypeLabels"
-            android:entryValues="@array/videoExportTypeValues"
-            android:title="@string/videoExportTypePrefsTitle" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="ASCII characters">
