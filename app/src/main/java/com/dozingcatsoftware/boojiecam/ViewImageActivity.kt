@@ -5,10 +5,10 @@ import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
+import android.support.v4.content.FileProvider
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
@@ -18,8 +18,8 @@ import com.dozingcatsoftware.boojiecam.effect.CombinationEffect
 import com.dozingcatsoftware.boojiecam.effect.Effect
 import com.dozingcatsoftware.boojiecam.effect.EffectRegistry
 import com.dozingcatsoftware.util.getDisplaySize
-import com.dozingcatsoftware.util.scanSavedMediaFile
 import kotlinx.android.synthetic.main.view_image.*
+import java.io.File
 
 
 class ViewImageActivity : Activity() {
@@ -134,18 +134,16 @@ class ViewImageActivity : Activity() {
     }
 
     private fun shareFile(path: String, mimeType: String) {
-        scanSavedMediaFile(this, path, {p: String, uri: Uri ->
-            handler.post({
-                val shareIntent = Intent(Intent.ACTION_SEND)
-                shareIntent.type = mimeType
-                shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
-                shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
-                shareIntent.addFlags(
-                        Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                startActivity(
-                        Intent.createChooser(shareIntent, getString(R.string.shareActionTitle)))
-            })
-        })
+        val fileUri = FileProvider.getUriForFile(this,
+                BuildConfig.APPLICATION_ID + ".fileprovider", File(path))
+        val shareIntent = Intent(Intent.ACTION_SEND)
+        shareIntent.type = mimeType
+        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
+        shareIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(
+                Intent.createChooser(shareIntent, getString(R.string.shareActionTitle)))
     }
 
     private fun shareImage(metadata: MediaMetadata, effect: Effect) {
@@ -234,19 +232,19 @@ class ViewImageActivity : Activity() {
 
     private fun shareText(metadata: MediaMetadata, effect: AsciiEffect) {
         val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
-        val textStream = photoLibrary.createTempFileOutputStream(textFile)
         val inputImage = createCameraImage(metadata)
-        effect.writeText(inputImage, textStream)
-        textStream.close()
+        photoLibrary.createTempFileOutputStream(textFile).use {
+            effect.writeText(inputImage, it)
+        }
         shareFile(textFile.path, "text/plain")
     }
 
     private fun shareHtml(metadata: MediaMetadata, effect: AsciiEffect) {
         val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
-        val htmlStream = photoLibrary.createTempFileOutputStream(htmlFile)
         val inputImage = createCameraImage(metadata)
-        effect.writeHtml(inputImage, htmlStream)
-        htmlStream.close()
+        photoLibrary.createTempFileOutputStream(htmlFile).use {
+            effect.writeHtml(inputImage, it)
+        }
         shareFile(htmlFile.path, "text/html")
     }
 

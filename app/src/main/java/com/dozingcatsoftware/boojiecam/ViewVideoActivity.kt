@@ -5,11 +5,13 @@ import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.preference.PreferenceManager
 import android.renderscript.RenderScript
+import android.support.v4.content.FileProvider
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
@@ -266,17 +268,15 @@ class ViewVideoActivity: Activity() {
     }
 
     private fun runShareActivity(exportType: ExportType, exportedFile: File) {
-        val callback = {path: String, uri: Uri -> handler.post({
-            val shareIntent = Intent(Intent.ACTION_SEND)
-            shareIntent.type = exportType.mimeType
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
-            shareIntent.addFlags(
-                    Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(shareIntent, "Share video using:"))
-        }) as Unit}
-
-        scanSavedMediaFile(this, exportedFile.path, callback)
+        val fileUri = FileProvider.getUriForFile(this,
+                BuildConfig.APPLICATION_ID + ".fileprovider", exportedFile)
+        val shareIntent = Intent(Intent.ACTION_SEND)
+        shareIntent.type = exportType.mimeType
+        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Video")
+        shareIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(shareIntent, "Share video using:"))
     }
 
     private fun encodeVideo(exportType: ExportType) {
@@ -294,6 +294,9 @@ class ViewVideoActivity: Activity() {
         fun handleEncodingFinished(result: ProcessVideoTask.Result) {
             progressDialog.dismiss()
             if (result.status == ProcessVideoTask.ResultStatus.SUCCEEDED) {
+                if (exportType == ExportType.WEBM) {
+                    scanSavedMediaFile(this, result.outputFile!!.path)
+                }
                 val metadata = photoLibrary.metadataForItemId(videoId)
                 val newMetadata = metadata.withExportedEffectMetadata(
                         videoReader.effect.effectMetadata(), exportType.id)
@@ -342,7 +345,22 @@ class ViewVideoActivity: Activity() {
     }
 
     private fun shareCurrentFrame() {
-
+        val pb = videoReader.bitmapForFrame(frameIndex)
+        val bitmap = pb.renderBitmap(pb.sourceImage.width(), pb.sourceImage.height())
+        val frameFile = photoLibrary.tempFileWithName(videoId + "_frame.png")
+        photoLibrary.createTempFileOutputStream(frameFile).use {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        val fileUri = FileProvider.getUriForFile(this,
+                BuildConfig.APPLICATION_ID + ".fileprovider", frameFile)
+        val shareIntent = Intent(Intent.ACTION_SEND)
+        shareIntent.type = "image/png"
+        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
+        shareIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(
+                Intent.createChooser(shareIntent, getString(R.string.shareActionTitle)))
     }
 
     private fun deleteVideo(view: View) {
