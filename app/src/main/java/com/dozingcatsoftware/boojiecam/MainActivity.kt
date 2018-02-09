@@ -73,6 +73,7 @@ class MainActivity : Activity() {
         switchResolutionButton.setOnClickListener(this::switchResolution)
         switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         libraryButton.setOnClickListener(this::gotoLibrary)
+        helpButton.setOnClickListener(this::gotoHelp)
         settingsButton.setOnClickListener(this::gotoPreferences)
         convertPictureButton.setOnClickListener(this::convertExistingPicture)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
@@ -391,6 +392,10 @@ class MainActivity : Activity() {
 
     private fun gotoPreferences(view: View) {
         BCPreferencesActivity.startIntent(this)
+    }
+
+    private fun gotoHelp(view: View) {
+        AboutActivity.startIntent(this)
     }
 
     private fun convertExistingPicture(view: View) {

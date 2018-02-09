@@ -87,10 +87,10 @@ class BCPreferencesActivity: PreferenceActivity() {
     companion object {
         // sets FLAG_ACTIVITY_NO_HISTORY so exiting and relaunching won't go back to this screen
         fun startIntent(parent: Activity): Intent {
-            val aboutIntent = Intent(parent, BCPreferencesActivity::class.java)
-            aboutIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
-            parent.startActivity(aboutIntent)
-            return aboutIntent
+            val prefsIntent = Intent(parent, BCPreferencesActivity::class.java)
+            prefsIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+            parent.startActivity(prefsIntent)
+            return prefsIntent
         }
     }
 }

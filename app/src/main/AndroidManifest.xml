@@ -18,6 +18,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+
         <activity android:name=".MainActivity"
                   android:screenOrientation="landscape"
                   android:configChanges="keyboard|keyboardHidden">
@@ -31,17 +32,22 @@
         <activity
             android:name=".ImageListActivity">
         </activity>
+
         <activity
             android:name=".ViewImageActivity"
             android:screenOrientation="landscape">
         </activity>
+
         <activity
             android:name=".ViewVideoActivity"
             android:screenOrientation="landscape">
         </activity>
-        <activity android:name=".BCPreferencesActivity">
+
+        <activity android:name=".AboutActivity">
         </activity>
 
+        <activity android:name=".BCPreferencesActivity">
+        </activity>
 
         <receiver android:name=".NewPictureReceiver" android:label="NewPictureReceiver"
             android:enabled="false">
