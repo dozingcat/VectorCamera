@@ -79,16 +79,19 @@ fun makeAllocationColorMap(rs: RenderScript,
 }
 
 fun makeAlphaAllocation(rs: RenderScript, color: Int): Allocation {
-    val r = ((color shr 16) and 0xff).toByte()
-    val g = ((color shr 8) and 0xff).toByte()
-    val b = ((color) and 0xff).toByte()
+    // Premultiplied alpha
+    // https://stackoverflow.com/questions/12310400/how-does-android-apply-alpha-channel-when-using-copypixelstobuffer
+    val r = (color shr 16) and 0xff
+    val g = (color shr 8) and 0xff
+    val b = color and 0xff
     val colors = ByteArray(4 * 256)
     var bindex = 0
     for (index in 0 until 256) {
-        colors[bindex++] = r
-        colors[bindex++] = g
-        colors[bindex++] = b
-        colors[bindex++] = (255 - index).toByte()
+        val alpha = 255 - index
+        colors[bindex++] = (r * alpha / 255).toByte()
+        colors[bindex++] = (g * alpha / 255).toByte()
+        colors[bindex++] = (b * alpha / 255).toByte()
+        colors[bindex++] = alpha.toByte()
     }
     val type = Type.Builder(rs, Element.RGBA_8888(rs))
     type.setX(256)

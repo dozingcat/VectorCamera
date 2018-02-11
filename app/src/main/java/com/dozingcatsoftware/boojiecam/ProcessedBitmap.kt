@@ -37,13 +37,8 @@ data class ProcessedBitmap(
             canvas.drawRect(0f, height - yOffset, width.toFloat(), height.toFloat(), outsidePaint)
         }
         dstRect.set(xOffset, yOffset, xOffset + scaledWidth, yOffset + scaledHeight)
+
         effect.drawBackground(sourceImage, canvas, dstRect)
-        /*
-        val paint = backgroundPaintFn(dstRect)
-        if (paint != null) {
-            canvas.drawRect(dstRect, paint)
-        }
-        */
         canvas.drawBitmap(bitmap, flipMatrix, null)
     }
 

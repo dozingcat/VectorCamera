@@ -49,7 +49,6 @@ class Animated2dGradient(val cellCornerColors: List<List<List<Int>>>,
         // windowX and windowY are in thousandths of grid cells. Normalize to [0, num_cells).
         val normX = (windowX % (numColumnCells * 1000).toBigInteger()).toDouble() / 1000
         val normY = (windowY % (numRowCells * 1000).toBigInteger()).toDouble() / 1000
-        Log.i(TAG, "gradient coords: ${timestamp} ${windowX} ${windowY} ${normX} ${normY}")
         // Convert to bitmap pixels and see if we have to wrap around.
         val bitmapX = (normX * gridBitmap.width).roundToInt() % gridBitmap.width
         val bitmapY = (normY * gridBitmap.height).roundToInt() % gridBitmap.height

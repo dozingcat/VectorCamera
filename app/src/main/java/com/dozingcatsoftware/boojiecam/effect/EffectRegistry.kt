@@ -154,14 +154,45 @@ object EffectRegistry {
                                         listOf(
                                                 listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255)
                                         )
+                                )//,
+                                //"sizeX" to 0.25,
+                                //"sizeY" to 0.25,
+                                //"speedX" to 500,
+                                //"speedY" to 500
+                        )
+                ))
+            },
+            // Gradient2DColorScheme(255,255,192, 255,0,0, 0,192,0, 0,0,255, 0,0,0),
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(255, 255, 192),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,0,0, 0,192,0, 0,0,255, 0,0,0)
+                                        )
+                                )
+                        )
+                ))
+            },
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 0, 0),
+                                "grid" to listOf(
+                                        listOf(
+                                                //listOf(255,255,255, 255,255,255, 255,255,255, 255,255,255)
+                                                listOf(255,0,0, 0,255,0, 255,0,0, 0,255,0),
+                                                listOf(0,255,0, 255,0,0, 0,255,0, 255,0,0)
+                                        )
                                 ),
-                                "sizeX" to 0.25,
-                                "sizeY" to 0.25,
-                                "speedX" to 500,
-                                "speedY" to 500
+                                "speedX" to 250
                         )
                 ))
             }
+
     )
 
     fun defaultEffectFactories(): List<(RenderScript, (String, String) -> String) -> Effect> {
