@@ -62,7 +62,7 @@ class BCPreferencesActivity: PreferenceActivity() {
      * Sets whether pictures saved by the camera app (or other apps which broadcast the appropriate intent)
      * should automatically be converted to ascii via the NewPictureReceiver broadcast receiver.
      */
-    fun setAutoConvertEnabled(context: Context, enabled: Boolean) {
+    private fun setAutoConvertEnabled(context: Context, enabled: Boolean) {
         // For N and above, schedule or cancel a JobService.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             if (enabled) {

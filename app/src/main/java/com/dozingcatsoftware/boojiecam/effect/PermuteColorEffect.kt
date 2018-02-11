@@ -66,7 +66,7 @@ class PermuteColorEffect(
     }
 
     companion object {
-        val EFFECT_NAME = "permute_colors"
+        const val EFFECT_NAME = "permute_colors"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): PermuteColorEffect {
             val redSource = ColorComponentSource.valueOf(params["red"] as String)

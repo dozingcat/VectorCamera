@@ -31,8 +31,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         val effect = prefs.effect(rs, {throw IllegalStateException()})
         val t3 = timeFn()
         val outputBitmap = effect.createBitmap(inputImage)
-        val paintFn = effect.createPaintFn(inputImage)
-        val processedBitmap = ProcessedBitmap(effect, inputImage, outputBitmap, paintFn)
+        val processedBitmap = ProcessedBitmap(effect, inputImage, outputBitmap)
 
         val t4 = timeFn()
         val photoId = photoLibrary.savePhoto(context, processedBitmap)

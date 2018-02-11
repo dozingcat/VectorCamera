@@ -79,14 +79,13 @@ class ViewImageActivity : Activity() {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
         return CameraImage(null, planarYuv, metadata.orientation,
-                CameraStatus.CAPTURING_PHOTO, 0, getDisplaySize(this))
+                CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getDisplaySize(this))
     }
 
     private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
         val inputImage = createCameraImage(metadata)
         val bitmap = effect.createBitmap(inputImage)
-        val paintFn = effect.createPaintFn(inputImage)
-        return ProcessedBitmap(effect, inputImage, bitmap, paintFn)
+        return ProcessedBitmap(effect, inputImage, bitmap)
     }
 
     private fun showImage(effect: Effect, metadata: MediaMetadata) {

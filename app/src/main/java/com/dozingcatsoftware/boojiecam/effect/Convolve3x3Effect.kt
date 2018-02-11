@@ -1,9 +1,6 @@
 package com.dozingcatsoftware.boojiecam.effect
 
-import android.graphics.Bitmap
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
+import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
@@ -29,8 +26,8 @@ class Convolve3x3Effect(private val rs: RenderScript,
 
     override fun effectParameters() = effectParams
 
-    override fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
-        return {rect -> colorScheme.paintFn(cameraImage, rect)}
+    override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+        colorScheme.backgroundFn?.invoke(cameraImage, canvas, rect)
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
@@ -67,7 +64,7 @@ class Convolve3x3Effect(private val rs: RenderScript,
     }
 
     companion object {
-        val EFFECT_NAME = "convolve3x3"
+        const val EFFECT_NAME = "convolve3x3"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): Convolve3x3Effect {
             val coeffs = FloatArray(9)

@@ -22,6 +22,10 @@ class SolidColorEffect(val rs: RenderScript,
 
     override fun effectParameters() = effectParams
 
+    override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+        colorScheme.backgroundFn?.invoke(cameraImage, canvas, rect)
+    }
+
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         if (cameraImage.planarYuvAllocations != null) {
             script._yuvInput = cameraImage.planarYuvAllocations.y
@@ -45,12 +49,8 @@ class SolidColorEffect(val rs: RenderScript,
         return resultBitmap
     }
 
-    override fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
-        return {rect -> colorScheme.paintFn(cameraImage, rect)}
-    }
-
     companion object {
-        val EFFECT_NAME = "solid_color"
+        const val EFFECT_NAME = "solid_color"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): SolidColorEffect {
             // Hack for backwards compatibility.

@@ -12,7 +12,9 @@ import com.dozingcatsoftware.util.makeAlphaAllocation
 /**
  * Created by brian on 1/7/18.
  */
-data class ColorScheme(val colorMap: Allocation, val paintFn: ((CameraImage, RectF) -> Paint?)) {
+// Not paint function, instead backgroundFn taking Canvas and RectF?
+data class ColorScheme(val colorMap: Allocation,
+                       val backgroundFn: (CameraImage, Canvas, RectF) -> Unit) {
 
     companion object {
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): ColorScheme {
@@ -31,35 +33,51 @@ data class ColorScheme(val colorMap: Allocation, val paintFn: ((CameraImage, Rec
                     val minColor = colorAsInt("minColor", "minEdgeColor")
                     val maxColor = colorAsInt("maxColor", "maxEdgeColor")
                     val colorMap = makeAllocationColorMap(rs, minColor, maxColor)
-                    return ColorScheme(colorMap, { _, _ -> null })
+                    return ColorScheme(colorMap, { _, _, _ -> null })
                 }
                 "linear_gradient" -> {
                     val minColor = colorAsInt("minColor", "minEdgeColor")
                     val gradientStartColor = colorAsInt("gradientStartColor")
                     val gradientEndColor = colorAsInt("gradientEndColor")
-                    val paintFn = fun(_: CameraImage, rect: RectF): Paint {
+                    val backgroundFn = fun(_: CameraImage, canvas: Canvas, rect: RectF) {
                         val p = Paint()
                         p.shader = LinearGradient(
                                 rect.left, rect.top, rect.right, rect.bottom,
                                 addAlpha(gradientStartColor), addAlpha(gradientEndColor),
                                 Shader.TileMode.MIRROR)
-                        return p
+                        canvas.drawRect(rect, p)
                     }
-                    return ColorScheme(makeAlphaAllocation(rs, minColor), paintFn)
+                    return ColorScheme(makeAlphaAllocation(rs, minColor), backgroundFn)
                 }
                 "radial_gradient" -> {
                     val minColor = colorAsInt("minColor", "minEdgeColor")
                     val centerColor = colorAsInt("centerColor")
                     val outerColor = colorAsInt("outerColor")
-                    val paintFn = fun(_: CameraImage, rect: RectF): Paint {
+                    val backgroundFn = fun(_: CameraImage, canvas: Canvas, rect: RectF) {
                         val p = Paint()
                         p.shader = RadialGradient(
                                 rect.width() / 2, rect.height() / 2,
                                 maxOf(rect.width(), rect.height()) / 2f,
                                 addAlpha(centerColor), addAlpha(outerColor), Shader.TileMode.MIRROR)
-                        return p
+                        canvas.drawRect(rect, p)
                     }
-                    return ColorScheme(makeAlphaAllocation(rs, minColor), paintFn)
+                    return ColorScheme(makeAlphaAllocation(rs, minColor), backgroundFn)
+                }
+                "grid_gradient" -> {
+                    val minColor = colorAsInt("minColor")
+                    val gridColors = params["grid"] as List<List<List<Int>>>
+                    val speedX = params.getOrDefault("speedX", 0) as Number
+                    val speedY = params.getOrDefault("speedY", 0) as Number
+                    val sizeX = params.getOrDefault("sizeX", 1) as Number
+                    val sizeY = params.getOrDefault("sizeY", 1) as Number
+                    val pixPerCell = params.getOrDefault(
+                            "pixelsPerCell", Animated2dGradient.DEFAULT_PIXELS_PER_CELL) as Number
+                    val gradient = Animated2dGradient(gridColors, speedX.toInt(), speedY.toInt(),
+                            sizeX.toFloat(), sizeY.toFloat(), pixPerCell.toInt())
+                    val backgroundFn = fun(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+                        gradient.drawToCanvas(canvas, rect, cameraImage.timestamp)
+                    }
+                    return ColorScheme(makeAlphaAllocation(rs, minColor), backgroundFn)
                 }
             }
             throw IllegalArgumentException("Unknown parameters: " + params)

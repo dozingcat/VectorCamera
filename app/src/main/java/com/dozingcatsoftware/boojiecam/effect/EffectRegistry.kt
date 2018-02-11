@@ -142,6 +142,25 @@ object EffectRegistry {
                         "pixelChars" to prefsFn("pixelChars.FULL_COLOR", "O8#"),
                         "prefId" to "pixelChars.FULL_COLOR"
                 ))
+            },
+
+            // Animated?
+            {rs, prefsFn ->
+                SolidColorEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 0, 0),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255)
+                                        )
+                                ),
+                                "sizeX" to 0.25,
+                                "sizeY" to 0.25,
+                                "speedX" to 500,
+                                "speedY" to 500
+                        )
+                ))
             }
     )
 

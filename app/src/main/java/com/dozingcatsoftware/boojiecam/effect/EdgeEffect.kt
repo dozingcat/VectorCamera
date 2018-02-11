@@ -19,6 +19,10 @@ class EdgeEffect(private val rs: RenderScript,
 
     override fun effectParameters() = effectParams
 
+    override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+        colorScheme.backgroundFn?.invoke(cameraImage, canvas, rect)
+    }
+
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         script._gWidth = cameraImage.width()
         script._gHeight = cameraImage.height()
@@ -45,12 +49,8 @@ class EdgeEffect(private val rs: RenderScript,
         return resultBitmap
     }
 
-    override fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
-        return {rect -> colorScheme.paintFn(cameraImage, rect)}
-    }
-
     companion object {
-        val EFFECT_NAME = "edge"
+        const val EFFECT_NAME = "edge"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): EdgeEffect {
             // Hack for backwards compatibility.

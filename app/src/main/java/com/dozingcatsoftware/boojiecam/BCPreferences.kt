@@ -15,8 +15,6 @@ import java.util.*
  * Created by brian on 1/20/18.
  */
 class BCPreferences(val context: Context) {
-    val EFFECT_NAME_KEY = "effectName"
-    val EFFECT_PARAMETERS_KEY = "effectParams"
 
     private fun sharedPrefs() = PreferenceManager.getDefaultSharedPreferences(context)
 
@@ -62,6 +60,8 @@ class BCPreferences(val context: Context) {
     }
 
     companion object {
-        val TAG = "BCPreferences"
+        const val TAG = "BCPreferences"
+        const val EFFECT_NAME_KEY = "effectName"
+        const val EFFECT_PARAMETERS_KEY = "effectParams"
     }
 }

@@ -113,7 +113,6 @@ class CameraAllocationProcessor(val rs: RenderScript) {
             }
 
             val bitmap = effect.createBitmap(currentCamAllocation!!)
-            val backgroundPaintFn = effect.createPaintFn(currentCamAllocation!!)
             // Get the flattened bytes if we need them. RenderScript seems to not play well with
             // threads, so we don't want to try to parallelize this.
             val yuvBytes =
@@ -121,13 +120,13 @@ class CameraAllocationProcessor(val rs: RenderScript) {
                         flattenedYuvImageBytes(rs, currentCamAllocation!!.singleYuvAllocation!!)
                     else null
             callback(ProcessedBitmap(
-                    effect, currentCamAllocation!!, bitmap, backgroundPaintFn, yuvBytes))
+                    effect, currentCamAllocation!!, bitmap, yuvBytes))
             currentCamAllocation = null
         }
     }
 
     companion object {
-        val TAG = "CameraAllocProcessor"
+        const val TAG = "CameraAllocProcessor"
         var DEBUG = false
         var TIMING = false
 

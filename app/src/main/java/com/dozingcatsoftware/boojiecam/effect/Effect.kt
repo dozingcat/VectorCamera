@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.boojiecam.effect
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.Size
@@ -26,9 +27,11 @@ data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
 interface Effect {
     fun createBitmap(cameraImage: CameraImage): Bitmap
 
-    fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
-        return {null}
-    }
+    fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {}
+
+//    fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
+//        return {null}
+//    }
 
     fun effectName(): String
 

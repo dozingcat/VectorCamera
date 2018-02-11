@@ -51,7 +51,9 @@ class AsciiEffect(private val rs: RenderScript,
         p
     }
 
-    override fun createPaintFn(cameraImage: CameraImage) = {_: RectF -> backgroundPaint}
+    override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+        canvas.drawRect(rect, backgroundPaint)
+    }
 
     // HERE: Update to hold colors and add HTML/text output.
     class AsciiResult(val numRows: Int, val numCols: Int) {

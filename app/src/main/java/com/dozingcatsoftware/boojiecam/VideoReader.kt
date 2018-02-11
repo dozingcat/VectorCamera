@@ -38,9 +38,8 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
                 rs, ByteArrayInputStream(frameBuffer), metadata.width, metadata.height)
         val cameraImage = CameraImage.withAllocationSet(
                 allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
-                0L, displaySize)
-        return ProcessedBitmap(effect, cameraImage,
-                effect.createBitmap(cameraImage), effect.createPaintFn(cameraImage))
+                metadata.frameTimestamps[frameIndex], displaySize)
+        return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
     }
 
     fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {

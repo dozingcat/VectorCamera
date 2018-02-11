@@ -42,10 +42,7 @@ class CombinationEffect(
             val effect = effectFactories[i](rs, prefsFn)
             val tileBitmap = effect.createBitmap(cameraImage)
             val tileBitmapRect = Rect(0, 0, tileBitmap.width, tileBitmap.height)
-            val tilePaint = effect.createPaintFn(cameraImage)(srcRect)
-            if (tilePaint != null) {
-                tileCanvas.drawRect(srcRect, tilePaint)
-            }
+            effect.drawBackground(cameraImage, tileCanvas, srcRect)
             tileCanvas.drawBitmap(tileBitmap, tileBitmapRect, srcRect, null)
 
             var gridX = i % gridSize
