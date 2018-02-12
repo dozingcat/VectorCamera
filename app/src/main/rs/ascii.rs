@@ -12,13 +12,13 @@ rs_allocation vInput;
 
 rs_allocation characterBitmapInput;
 rs_allocation imageOutput;
-int inputImageWidth;
-int inputImageHeight;
-int numCharRows;
-int numCharColumns;
-int characterPixelWidth;
-int characterPixelHeight;
-int numCharacters;
+int32_t inputImageWidth;
+int32_t inputImageHeight;
+int32_t numCharRows;
+int32_t numCharColumns;
+int32_t characterPixelWidth;
+int32_t characterPixelHeight;
+int32_t numCharacters;
 bool flipHorizontal;
 bool flipVertical;
 
@@ -123,7 +123,9 @@ void RS_KERNEL writeCharacterToBitmap(uint32_t x, uint32_t y) {
 // This is used when rendering to HTML or text, so setting brightness lets the caller determine
 // which character to draw.
 uchar4 RS_KERNEL computeCharacterInfoForBlock(uint32_t x, uint32_t y) {
-    uchar4 averageColor = computeBlockAverageColor(x, y);
+    uint32_t actualX = flipHorizontal ? numCharColumns - 1 - x : x;
+    uint32_t actualY = flipVertical ? numCharRows - 1 - y : y;
+    uchar4 averageColor = computeBlockAverageColor(actualX, actualY);
     uchar4 textColor = textColorForBlockAverage(averageColor);
     textColor.a = averageColor.a;
     return textColor;

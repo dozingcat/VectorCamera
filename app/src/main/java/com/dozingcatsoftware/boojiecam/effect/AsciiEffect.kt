@@ -203,6 +203,8 @@ class AsciiEffect(private val rs: RenderScript,
         val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
         val numCharacterRows = outputSize.height / charPixelHeight
 
+        val flipHorizontal = cameraImage.orientation.isXFlipped()
+        val flipVertical = cameraImage.orientation.isYFlipped()
         val asciiResult = getCharacterInfo(
                 cameraImage, pixelChars, charPixelWidth, charPixelHeight,
                 numCharacterColumns, numCharacterRows)
@@ -223,6 +225,8 @@ class AsciiEffect(private val rs: RenderScript,
         val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
         val numCharacterRows = outputSize.height / charPixelHeight
 
+        val flipHorizontal = cameraImage.orientation.isXFlipped()
+        val flipVertical = cameraImage.orientation.isYFlipped()
         val asciiResult = getCharacterInfo(
                 cameraImage, pixelChars, charPixelWidth, charPixelHeight,
                 numCharacterColumns, numCharacterRows)
