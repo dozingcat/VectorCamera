@@ -20,9 +20,9 @@ class BCPreferencesActivity: PreferenceActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         addPreferencesFromResource(R.xml.preferences)
+        val pm = this.preferenceManager
 
-        val autoConvertPref =
-                preferenceManager.findPreference(getString(R.string.autoConvertPicturesPrefsKey))
+        val autoConvertPref = pm.findPreference(getString(R.string.autoConvertPicturesPrefsKey))
         autoConvertPref!!.setOnPreferenceChangeListener({pref, value ->
             // Update broadcast receivers immediately so the change takes effect even if the user
             // doesn't go back to the main activity.
@@ -38,10 +38,8 @@ class BCPreferencesActivity: PreferenceActivity() {
                 getString(R.string.blackOnWhitePixelCharsPrefId),
                 getString(R.string.ansiColorPixelCharsPrefId),
                 getString(R.string.fullColorPixelCharsPrefId))
-        val asciiColorModes = arrayOf("")
         for (prefId in asciiPrefIds) {
-            val p = preferenceManager.findPreference(prefId)
-            preferenceManager.findPreference(prefId).setOnPreferenceChangeListener({pref, value ->
+            pm.findPreference(prefId).setOnPreferenceChangeListener({pref, value ->
                 handler.post({
                     val storedPrefs = BCPreferences(this)
                     if (storedPrefs.effectName() == "ascii") {
@@ -56,6 +54,20 @@ class BCPreferencesActivity: PreferenceActivity() {
                 true
             })
         }
+        // Same for number of characters.
+        val numColumnsPrefId = getString(R.string.numAsciiColumnsPrefId)
+        pm.findPreference(numColumnsPrefId).setOnPreferenceChangeListener({pref, value ->
+            handler.post({
+                val storedPrefs = BCPreferences(this)
+                if (storedPrefs.effectName() == "ascii") {
+                    val params = storedPrefs.effectParameters()
+                    val newEffectParams = HashMap(params)
+                    newEffectParams["numColumns"] = Integer.parseInt(value as String)
+                    storedPrefs.saveEffectInfo("ascii", newEffectParams)
+                }
+            })
+            true
+        })
     }
 
     /**

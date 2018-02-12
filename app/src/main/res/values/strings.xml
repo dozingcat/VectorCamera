@@ -5,6 +5,10 @@
     <string name="autoConvertPicturesPrefsKey">autoConvertPictures</string>
     <string name="autoConvertPicturesPrefsTitle">Automatically convert camera pictures</string>
 
+    <string name="numAsciiColumnsPrefId">numAsciiColumns</string>
+    <string name="numAsciiColumnsPrefTitle">Number of text columns</string>
+    <string name="numAsciiColumnsPrefMessage">Choose the number of columns of text to create when using text effects.</string>
+
     <string name="whiteOnBlackPixelCharsPrefId">pixelChars.WHITE_ON_BLACK</string>
     <string name="whiteOnBlackPixelCharsPrefTitle">White on black characters</string>
     <string name="whiteOnBlackPixelCharsPrefSummary">Characters for white on black mode.</string>

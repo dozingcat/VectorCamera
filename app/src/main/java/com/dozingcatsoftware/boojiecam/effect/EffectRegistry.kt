@@ -115,7 +115,8 @@ object EffectRegistry {
                                 "text" to listOf(255, 255, 255),
                                 "background" to listOf(0, 0, 0)
                         ),
-                        "pixelChars" to prefsFn("pixelChars.WHITE_ON_BLACK", " .:oO8#"),
+                        "pixelChars" to asciiChars(prefsFn, "pixelChars.WHITE_ON_BLACK", " .:oO8#"),
+                        "numColumns" to numAsciiColumns(prefsFn),
                         "prefId" to "pixelChars.WHITE_ON_BLACK"
                 ))
             },
@@ -125,26 +126,29 @@ object EffectRegistry {
                                 "text" to listOf(0, 0, 0),
                                 "background" to listOf(255, 255, 255)
                         ),
-                        "pixelChars" to prefsFn("pixelChars.BLACK_ON_WHITE", "#o:..  "),
+                        "pixelChars" to asciiChars(prefsFn, "pixelChars.BLACK_ON_WHITE", "#o:..  "),
+                        "numColumns" to numAsciiColumns(prefsFn),
                         "prefId" to "pixelChars.BLACK_ON_WHITE"
                 ))
             },
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "primary",
-                        "pixelChars" to prefsFn("pixelChars.ANSI_COLOR", " .:oO8#"),
+                        "pixelChars" to asciiChars(prefsFn, "pixelChars.ANSI_COLOR", " .:oO8#"),
+                        "numColumns" to numAsciiColumns(prefsFn),
                         "prefId" to "pixelChars.ANSI_COLOR"
                 ))
             },
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "full",
-                        "pixelChars" to prefsFn("pixelChars.FULL_COLOR", "O8#"),
+                        "pixelChars" to asciiChars(prefsFn, "pixelChars.FULL_COLOR", "O8#"),
+                        "numColumns" to numAsciiColumns(prefsFn),
                         "prefId" to "pixelChars.FULL_COLOR"
                 ))
             },
 
-            // Animated?
+            // 2d gradient colors.
             {rs, prefsFn ->
                 SolidColorEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -154,15 +158,11 @@ object EffectRegistry {
                                         listOf(
                                                 listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255)
                                         )
-                                )//,
-                                //"sizeX" to 0.25,
-                                //"sizeY" to 0.25,
-                                //"speedX" to 500,
-                                //"speedY" to 500
+                                )
                         )
                 ))
             },
-            // Gradient2DColorScheme(255,255,192, 255,0,0, 0,192,0, 0,0,255, 0,0,0),
+            // Yellow background, 2d gradient colors.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -176,6 +176,7 @@ object EffectRegistry {
                         )
                 ))
             },
+            // Animated colors.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -220,4 +221,24 @@ object EffectRegistry {
 
     fun forMetadata(rs: RenderScript, metadata: EffectMetadata) =
             forNameAndParameters(rs, metadata.name, metadata.parameters)
+}
+
+private fun numAsciiColumns(prefsFn: (String, String) -> String): Int {
+    val prefsVal = prefsFn("numAsciiColumns", "")
+    if (!prefsVal.isEmpty()) {
+        try {
+            return Integer.parseInt(prefsVal)
+        }
+        catch (ex: NumberFormatException) {}
+    }
+    return AsciiEffect.DEFAULT_CHARACTER_COLUMNS
+}
+
+private fun asciiChars(
+        prefsFn: (String, String) -> String, prefId: String, defValue: String): String {
+    val prefsVal = prefsFn(prefId, defValue)
+    if (prefsVal.isEmpty()) {
+        return defValue
+    }
+    return prefsVal
 }

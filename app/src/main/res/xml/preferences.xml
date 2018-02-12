@@ -7,7 +7,16 @@
             android:title="@string/autoConvertPicturesPrefsTitle" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="ASCII characters">
+    <PreferenceCategory android:title="Text characters">
+        <!-- Adding android:dialogMessage to ListPreferences makes the list not appear?? -->
+        <ListPreference android:key="@string/numAsciiColumnsPrefId"
+            android:enabled="true"
+            android:title="@string/numAsciiColumnsPrefTitle"
+            android:entries="@array/numAsciiColumnsOptions"
+            android:entryValues="@array/numAsciiColumnsOptions"
+            android:defaultValue="120"
+            android:summary="%s" />
+
         <EditTextPreference android:key="@string/whiteOnBlackPixelCharsPrefId"
             android:enabled="true"
             android:title="@string/whiteOnBlackPixelCharsPrefTitle"

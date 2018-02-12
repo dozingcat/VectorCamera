@@ -5,12 +5,10 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.Script
+import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.boojiecam.*
-import com.dozingcatsoftware.util.allocationHas2DSize
-import com.dozingcatsoftware.util.create2dAllocation
-import com.dozingcatsoftware.util.intFromArgbList
-import com.dozingcatsoftware.util.toUInt
+import com.dozingcatsoftware.util.*
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import kotlin.math.roundToInt
@@ -29,11 +27,12 @@ enum class AsciiColorMode(val id: Int) {
 
 class AsciiEffect(private val rs: RenderScript,
                   private val effectParams: Map<String, Any>,
+                  private val numPreferredCharColumns: Int,
                   private val textColor: Int,
                   private val backgroundColor: Int,
                   private val pixelChars: String,
                   private val colorMode: AsciiColorMode): Effect {
-    var characterWidthInPixels = 15
+    var minCharWidth = 10
     var charHeightOverWidth = 1.8
 
     private var asciiBlockAllocation: Allocation? = null
@@ -79,11 +78,11 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val outputSize = computeOutputSize(cameraImage.size(), cameraImage.displaySize)
-        val charPixelWidth = characterWidthInPixels
+        val outputSize = scaleToTargetSize(cameraImage.size(), cameraImage.displaySize)
+        val numCharacterColumns = Math.min(numPreferredCharColumns, outputSize.width / minCharWidth)
+        val charPixelWidth = outputSize.width / numCharacterColumns
         val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
         val numCharacterRows = outputSize.height / charPixelHeight
-        val numCharacterColumns = outputSize.width / charPixelWidth
 
         val outputWidth = numCharacterColumns * charPixelWidth
         val outputHeight = numCharacterRows * charPixelHeight
@@ -198,11 +197,11 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     fun writeText(cameraImage: CameraImage, out: OutputStream) {
-        val outputSize = computeOutputSize(cameraImage.size(), EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
-        val charPixelWidth = characterWidthInPixels
+        val outputSize = scaleToTargetSize(cameraImage.size(), EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
+        val numCharacterColumns = numPreferredCharColumns
+        val charPixelWidth = outputSize.width / numCharacterColumns
         val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
         val numCharacterRows = outputSize.height / charPixelHeight
-        val numCharacterColumns = outputSize.width / charPixelWidth
 
         val asciiResult = getCharacterInfo(
                 cameraImage, pixelChars, charPixelWidth, charPixelHeight,
@@ -218,11 +217,11 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     fun writeHtml(cameraImage: CameraImage, out: OutputStream) {
-        val outputSize = computeOutputSize(cameraImage.size(), EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
-        val charPixelWidth = characterWidthInPixels
+        val outputSize = scaleToTargetSize(cameraImage.size(), EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
+        val numCharacterColumns = numPreferredCharColumns
+        val charPixelWidth = outputSize.width / numCharacterColumns
         val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
         val numCharacterRows = outputSize.height / charPixelHeight
-        val numCharacterColumns = outputSize.width / charPixelWidth
 
         val asciiResult = getCharacterInfo(
                 cameraImage, pixelChars, charPixelWidth, charPixelHeight,
@@ -274,6 +273,7 @@ class AsciiEffect(private val rs: RenderScript,
 
     companion object {
         const val EFFECT_NAME = "ascii"
+        const val DEFAULT_CHARACTER_COLUMNS = 120
         val EFFECTIVE_SIZE_FOR_TEXT_OUTPUT = Size(2560, 1600)
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): AsciiEffect {
@@ -282,21 +282,20 @@ class AsciiEffect(private val rs: RenderScript,
                     colors.getOrElse("text", {listOf(255, 255, 255)}) as List<Int>)
             val backgroundColor = intFromArgbList(
                     colors.getOrElse("background", {listOf(0, 0, 0)}) as List<Int>)
-            val pixelChars = params["pixelChars"] as String
+            val numCharColumns = params.getOrDefault("numColumns", DEFAULT_CHARACTER_COLUMNS) as Int
+
+            var pixelChars = params.getOrDefault("pixelChars", "") as String
+            if (pixelChars.isEmpty()) {
+                // Shouldn't happen, set a reasonable default.
+                pixelChars = " .o8"
+            }
+
             val colorType = try {
                 AsciiColorMode.fromString(params.getOrDefault("colorMode", "fixed") as String)
             } catch (ex: IllegalArgumentException) {AsciiColorMode.FIXED}
 
-
-            return AsciiEffect(rs, params, textColor, backgroundColor, pixelChars, colorType)
-        }
-
-        private fun computeOutputSize(inputSize: Size, targetOutputSize: Size): Size {
-            val widthRatio = targetOutputSize.width.toDouble() / inputSize.width
-            val heightRatio = targetOutputSize.height.toDouble() / inputSize.height
-            val scale = Math.min(widthRatio, heightRatio)
-            return Size(
-                    (inputSize.width * scale).roundToInt(), (inputSize.height * scale).roundToInt())
+            return AsciiEffect(
+                    rs, params, numCharColumns, textColor, backgroundColor, pixelChars, colorType)
         }
 
         private fun cssHexColor(color: Int): String {
