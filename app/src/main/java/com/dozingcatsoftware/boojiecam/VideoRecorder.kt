@@ -93,7 +93,7 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
                 Log.i(TAG, "Got frame ${framesRead}")
                 frameTimestamps.add(currentFrame.timestamp)
                 // We could gzip the frames, but compression is very slow.
-                videoOutput.write(currentFrame!!.data)
+                videoOutput.write(currentFrame.data)
                 frameCallback?.invoke(this, this.status)
                 currentFrame = null
             }

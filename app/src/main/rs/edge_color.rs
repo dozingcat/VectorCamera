@@ -2,9 +2,9 @@
 #pragma rs java_package_name(com.dozingcatsoftware.boojiecam.effect)
 #pragma rs_fp_relaxed
 
-int gMultiplier = 2;
-int gWidth;
-int gHeight;
+int32_t gMultiplier = 2;
+int32_t gWidth;
+int32_t gHeight;
 // YUV allocation from camera input. Either this or individual planes should be set, not both.
 rs_allocation gYuvInput;
 // Individual Y/U/V planes.

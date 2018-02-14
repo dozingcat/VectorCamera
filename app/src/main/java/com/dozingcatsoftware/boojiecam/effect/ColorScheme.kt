@@ -33,7 +33,7 @@ data class ColorScheme(val colorMap: Allocation,
                     val minColor = colorAsInt("minColor", "minEdgeColor")
                     val maxColor = colorAsInt("maxColor", "maxEdgeColor")
                     val colorMap = makeAllocationColorMap(rs, minColor, maxColor)
-                    return ColorScheme(colorMap, { _, _, _ -> null })
+                    return ColorScheme(colorMap, { _, _, _ -> Unit })
                 }
                 "linear_gradient" -> {
                     val minColor = colorAsInt("minColor", "minEdgeColor")

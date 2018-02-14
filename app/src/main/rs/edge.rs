@@ -2,9 +2,9 @@
 #pragma rs java_package_name(com.dozingcatsoftware.boojiecam.effect)
 #pragma rs_fp_relaxed
 
-int gMultiplier = 2;
-int gWidth;
-int gHeight;
+int32_t gMultiplier = 2;
+int32_t gWidth;
+int32_t gHeight;
 // May be YUV data (the U and V planes will be ignored), or just the Y plane.
 rs_allocation gYuvInput;
 // Element.RGBA_8888, created from packed RGBA byte array.

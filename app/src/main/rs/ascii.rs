@@ -23,7 +23,7 @@ bool flipHorizontal;
 bool flipVertical;
 
 // 0=monochrome, 1=primary, 2=full
-int colorMode;
+int32_t colorMode;
 // In primary color mode, if a color component is at least this fraction of the maximum color
 // component, it will be enabled.
 static float PRIMARY_COLOR_RATIO = 0.75f;

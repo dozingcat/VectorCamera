@@ -4,14 +4,13 @@ import android.renderscript.RenderScript
 
 object EffectRegistry {
 
+    // 25 effects, shown in 5x5 grid.
     val baseEffects = listOf<(RenderScript, (String, String) -> String) -> Effect>(
 
+            // Row 1, edges on black.
+            // Edge strength->brightness, preserve colors.
             {rs, prefsFn -> EdgeLuminanceEffect(rs) },
-            {rs, prefsFn -> PermuteColorEffect.noOp(rs) },
-            {rs, prefsFn -> PermuteColorEffect.rgbToBrg(rs) },
-            {rs, prefsFn -> PermuteColorEffect.rgbToGbr(rs) },
-            {rs, prefsFn -> PermuteColorEffect.flipUV(rs) },
-
+            // White
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -21,15 +20,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs, prefsFn ->
-                EdgeEffect.fromParameters(rs, mapOf(
-                        "colors" to mapOf(
-                                "type" to "fixed",
-                                "minColor" to listOf(0, 0, 0),
-                                "maxColor" to listOf(255, 0, 0)
-                        )
-                ))
-            },
+            // Green
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -39,16 +30,29 @@ object EffectRegistry {
                         )
                 ))
             },
+            // Red
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(0, 0, 0),
-                                "maxColor" to listOf(0, 0, 255)
+                                "maxColor" to listOf(255, 0, 0)
+                        )
+                ))
+            },
+            // Cyan
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(0, 255, 255)
                         )
                 ))
             },
 
+            // Row 2, edges on non-black.
+            // Black on white.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -58,6 +62,7 @@ object EffectRegistry {
                         )
                 ))
             },
+            // Blue on white.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -67,6 +72,48 @@ object EffectRegistry {
                         )
                 ))
             },
+            // Red on white.
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(255, 255, 255),
+                                "maxColor" to listOf(255, 0, 0)
+                        )
+                ))
+            },
+            // Yellow background, 2d gradient colors.
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(255, 255, 192),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,0,0, 0,192,0, 0,0,255, 0,0,0)
+                                        )
+                                )
+                        )
+                ))
+            },
+            // Pink background, 2d gradient colors.
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(255,182,193),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(0,128,0, 128,0,0, 0,128,128, 128,0,128)
+                                        )
+                                )
+                        )
+                ))
+            },
+
+            // Row 3, animations.
+            // Animated colors.
+            // Blue-green edges on black.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -77,6 +124,7 @@ object EffectRegistry {
                         )
                 ))
             },
+            // Radial gradient background.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -87,7 +135,84 @@ object EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 0, 0),
+                                "grid" to listOf(
+                                        listOf(
+                                                //listOf(255,255,255, 255,255,255, 255,255,255, 255,255,255)
+                                                listOf(255,0,0, 0,255,0, 255,0,0, 0,255,0),
+                                                listOf(0,255,0, 255,0,0, 0,255,0, 255,0,0)
+                                        )
+                                ),
+                                "speedX" to 250
+                        )
+                ))
+            },
+            // Animated colors with 2d sliding window.
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 0, 0),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,0,0, 0,255,0, 0,0,255, 255,255,255),
+                                                listOf(0,255,0, 255,0,0, 255,255,255, 0,0,255)
+                                        ),
+                                        listOf(
+                                                listOf(0,0,255, 255,255,255, 255,0,0, 0,255,0),
+                                                listOf(255,255,255, 0,0,255, 0,255,0, 255,0,0)
+                                        )
+                                ),
+                                "sizeX" to 0.5,
+                                "sizeY" to 0.5,
+                                "speedX" to 300,
+                                "speedY" to 200
+                        )
+                ))
+            },
+            // Rainbow, white background
+            {rs, prefsFn ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(255, 255, 255),
+                                "grid" to listOf(
+                                        listOf(listOf(128,0,0, 128,0,0, 96,96,0, 96,96,0)),
+                                        listOf(listOf(96,96,0, 96,96,0, 0,128,0, 0,128,0)),
+                                        listOf(listOf(0,128,0, 0,128,0, 0,96,96, 0,96,96)),
+                                        listOf(listOf(0,96,96, 0,96,96, 0,0,128, 0,0,128)),
+                                        listOf(listOf(0,0,128, 0,0,128, 96,0,96, 96,0,96)),
+                                        listOf(listOf(96,0,96, 96,0,96, 128,0,0, 128,0,0))
+                                ),
+                                "sizeY" to 3.0,
+                                "speedY" to 500
+                        )
+                ))
+            },
 
+            // Row 4.
+            // Solid effects
+            {rs, prefsFn ->
+                SolidColorEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 0, 0),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255)
+                                        )
+                                )
+                        )
+                ))
+            },
+            {rs, prefsFn -> PermuteColorEffect.rgbToBrg(rs) },
+            {rs, prefsFn -> PermuteColorEffect.rgbToGbr(rs) },
+            {rs, prefsFn -> PermuteColorEffect.flipUV(rs) },
+            // Emboss grayscale.
             {rs, prefsFn ->
                 Convolve3x3Effect.fromParameters(rs, mapOf(
                         "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
@@ -98,17 +223,8 @@ object EffectRegistry {
                         )
                 ))
             },
-            {rs, prefsFn ->
-                Convolve3x3Effect.fromParameters(rs, mapOf(
-                        "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
-                        "colors" to mapOf(
-                                "type" to "fixed",
-                                "minColor" to listOf(0, 0, 0),
-                                "maxColor" to listOf(255, 0, 0)
-                        )
-                ))
-            },
 
+            // Row 5.
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -147,52 +263,9 @@ object EffectRegistry {
                         "prefId" to "pixelChars.FULL_COLOR"
                 ))
             },
+            {rs, prefsFn -> PermuteColorEffect.noOp(rs) }
 
-            // 2d gradient colors.
-            {rs, prefsFn ->
-                SolidColorEffect.fromParameters(rs, mapOf(
-                        "colors" to mapOf(
-                                "type" to "grid_gradient",
-                                "minColor" to listOf(0, 0, 0),
-                                "grid" to listOf(
-                                        listOf(
-                                                listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255)
-                                        )
-                                )
-                        )
-                ))
-            },
-            // Yellow background, 2d gradient colors.
-            {rs, prefsFn ->
-                EdgeEffect.fromParameters(rs, mapOf(
-                        "colors" to mapOf(
-                                "type" to "grid_gradient",
-                                "minColor" to listOf(255, 255, 192),
-                                "grid" to listOf(
-                                        listOf(
-                                                listOf(255,0,0, 0,192,0, 0,0,255, 0,0,0)
-                                        )
-                                )
-                        )
-                ))
-            },
-            // Animated colors.
-            {rs, prefsFn ->
-                EdgeEffect.fromParameters(rs, mapOf(
-                        "colors" to mapOf(
-                                "type" to "grid_gradient",
-                                "minColor" to listOf(0, 0, 0),
-                                "grid" to listOf(
-                                        listOf(
-                                                //listOf(255,255,255, 255,255,255, 255,255,255, 255,255,255)
-                                                listOf(255,0,0, 0,255,0, 255,0,0, 0,255,0),
-                                                listOf(0,255,0, 255,0,0, 0,255,0, 255,0,0)
-                                        )
-                                ),
-                                "speedX" to 250
-                        )
-                ))
-            }
+
 
     )
 

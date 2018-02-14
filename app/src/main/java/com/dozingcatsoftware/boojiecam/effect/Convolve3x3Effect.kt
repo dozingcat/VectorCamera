@@ -27,7 +27,7 @@ class Convolve3x3Effect(private val rs: RenderScript,
     override fun effectParameters() = effectParams
 
     override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
-        colorScheme.backgroundFn?.invoke(cameraImage, canvas, rect)
+        colorScheme.backgroundFn.invoke(cameraImage, canvas, rect)
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {

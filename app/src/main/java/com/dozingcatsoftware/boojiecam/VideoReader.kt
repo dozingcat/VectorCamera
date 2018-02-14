@@ -71,7 +71,6 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     fun nextFrameIndexForTimeDelta(baseFrameIndex: Int, targetDeltaMillis: Long): Int {
         var index = baseFrameIndex
         val maxIndex = numberOfFrames() - 1
-        val timestamps = metadata.frameTimestamps
         while (true) {
             if (index >= maxIndex) {
                 return maxIndex

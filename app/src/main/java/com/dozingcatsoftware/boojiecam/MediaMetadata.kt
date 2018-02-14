@@ -13,7 +13,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
 
     fun toJson(): Map<String, Any> {
         val exportedEffectDict =
-                exportedEffectMetadata?.mapValues({entry -> entry.value.toJson()}) ?: mapOf()
+                exportedEffectMetadata.mapValues({entry -> entry.value.toJson()})
         return mapOf(
                 "type" to mediaType.name.toLowerCase(),
                 "width" to width,

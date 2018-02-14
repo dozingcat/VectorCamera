@@ -102,6 +102,8 @@ class MainActivity : Activity() {
     override fun onPause() {
         imageProcessor.pause()
         cameraImageGenerator.stop()
+        Log.i(TAG, "Clearing temp dir")
+        photoLibrary.clearTempDirectories()
         super.onPause()
     }
 
@@ -447,13 +449,12 @@ class MainActivity : Activity() {
             when (status) {
                 VideoRecorder.Status.RUNNING -> {
                     // TODO: Update recording stats for display.
-                    Log.i(TAG, "Wrote video frame, frames: " + recorder.frameTimestamps.size)
+                    Log.i(TAG, "Wrote video frame: " + recorder.frameTimestamps.size)
                 }
                 VideoRecorder.Status.FINISHED -> {
                     Log.i(TAG, "Video recording stopped, writing to library")
                     preferredImageSize = previousImageSize
                     restartCameraImageGenerator()
-                    // TODO: Get audio start timestamp and persist in metadata.
                     photoLibrary.saveVideo(
                             this,
                             recorder.videoId,

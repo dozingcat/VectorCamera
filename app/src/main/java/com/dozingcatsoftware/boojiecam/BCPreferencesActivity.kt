@@ -87,7 +87,7 @@ class BCPreferencesActivity: PreferenceActivity() {
                 android.hardware.Camera::class.java.getField("ACTION_NEW_PICTURE")
             }
             val pm = context.packageManager
-            pm.setComponentEnabledSetting(ComponentName(context, NewPictureReceiver::class.java!!),
+            pm.setComponentEnabledSetting(ComponentName(context, NewPictureReceiver::class.java),
                     if (enabled)
                         PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                     else
