@@ -36,6 +36,7 @@ fun readBytesIntoBuffer(input: InputStream, bytesToRead: Int, buffer: ByteArray,
  * After `block` returns, renames the file to `target`.
  */
 fun writeFileAtomicallyUsingTempDir(target: File, tmpDir: File, block: (FileOutputStream) -> Unit) {
+    tmpDir.mkdirs()
     val tmpFile = createTempFile(directory=tmpDir)
     try {
         FileOutputStream(tmpFile).use(block)
