@@ -139,7 +139,7 @@ class PhotoLibrary(val rootDirectory: File) {
         // Update the exported effect.
         val metadata = metadataForItemId(itemId)
         val updatedMetadata = metadata.withExportedEffectMetadata(pb.effect.effectMetadata(), "png")
-        writeMetadata(updatedMetadata, itemId)
+
         Log.i(TAG, "writePngImage: ${t2-t1}")
     }
 

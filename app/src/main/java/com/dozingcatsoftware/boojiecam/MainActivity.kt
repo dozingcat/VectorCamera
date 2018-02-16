@@ -64,12 +64,6 @@ class MainActivity : Activity() {
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
 
-        moreOptionsButton.setOnClickListener({_ ->
-            moreOptionsLayout.visibility =
-                    if (moreOptionsLayout.visibility == View.VISIBLE) View.INVISIBLE
-                    else View.VISIBLE
-        })
-
         toggleVideoButton.setOnClickListener(this::toggleVideoMode)
         switchCameraButton.setOnClickListener(this::switchToNextCamera)
         switchResolutionButton.setOnClickListener(this::switchResolution)
@@ -90,11 +84,12 @@ class MainActivity : Activity() {
             }
             Log.i(TAG, "Done loading effects")
         }).start()
+        updateControls()
     }
 
     override fun onResume() {
         super.onResume()
-        Log.i(TAG, "onResume")
+        // TODO: Read high quality flag from preferences.
         checkPermissionAndStartCamera()
         overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
     }
@@ -102,8 +97,14 @@ class MainActivity : Activity() {
     override fun onPause() {
         imageProcessor.pause()
         cameraImageGenerator.stop()
-        Log.i(TAG, "Clearing temp dir")
-        photoLibrary.clearTempDirectories()
+        if (videoRecorder != null) {
+            toggleVideoRecording()
+            // HACK: Don't clear the temp directory in this case because it holds the recorded data.
+        }
+        else {
+            Log.i(TAG, "Clearing temp dir")
+            photoLibrary.clearTempDirectories()
+        }
         super.onPause()
     }
 
@@ -147,6 +148,9 @@ class MainActivity : Activity() {
                 if (cameraSelector.isSelectedCameraFrontFacing())
                     R.drawable.ic_camera_front_white_36dp
                 else R.drawable.ic_camera_rear_white_36dp)
+
+        switchResolutionButton.alpha =
+                if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
     }
 
     private fun targetCameraImageSize(): Size {
@@ -293,6 +297,7 @@ class MainActivity : Activity() {
                 else
                     ImageSize.FULL_SCREEN
         restartCameraImageGenerator()
+        updateControls()
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
@@ -310,6 +315,7 @@ class MainActivity : Activity() {
         else {
             currentEffect = previousEffect
             preferredImageSize = previousImageSize
+            controlLayout.visibility = View.VISIBLE
         }
         restartCameraImageGenerator()
         imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
@@ -333,6 +339,7 @@ class MainActivity : Activity() {
                 restartCameraImageGenerator()
                 imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
                 inEffectSelectionMode = false
+                controlLayout.visibility = View.VISIBLE
             }
             else {
                 controlLayout.visibility =
@@ -454,7 +461,9 @@ class MainActivity : Activity() {
                 VideoRecorder.Status.FINISHED -> {
                     Log.i(TAG, "Video recording stopped, writing to library")
                     preferredImageSize = previousImageSize
-                    restartCameraImageGenerator()
+                    if (this.hasWindowFocus()) {
+                        restartCameraImageGenerator()
+                    }
                     photoLibrary.saveVideo(
                             this,
                             recorder.videoId,
