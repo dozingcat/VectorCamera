@@ -20,6 +20,14 @@ class BCPreferences(val context: Context) {
 
     fun effectName() = sharedPrefs().getString(EFFECT_NAME_KEY, "")
 
+    fun useHighQualityPreview() = sharedPrefs().getBoolean(HIGH_QUALITY_PREVIEW_KEY, false)
+
+    fun setUseHighQualityPreview(flag: Boolean) {
+        withPrefsEditor {
+            it.putBoolean(HIGH_QUALITY_PREVIEW_KEY, flag)
+        }
+    }
+
     val lookupFunction = fun(key: String, defaultValue: String): String {
         return sharedPrefs().getString(key, defaultValue)
     }
@@ -63,5 +71,6 @@ class BCPreferences(val context: Context) {
         const val TAG = "BCPreferences"
         const val EFFECT_NAME_KEY = "effectName"
         const val EFFECT_PARAMETERS_KEY = "effectParams"
+        const val HIGH_QUALITY_PREVIEW_KEY = "highQualityPreview"
     }
 }

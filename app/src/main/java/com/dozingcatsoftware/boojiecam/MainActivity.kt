@@ -60,6 +60,9 @@ class MainActivity : Activity() {
         imageProcessor = CameraAllocationProcessor(rs)
 
         currentEffect = effectFromPreferences()
+        preferredImageSize =
+                if (preferences.useHighQualityPreview()) ImageSize.FULL_SCREEN
+                else ImageSize.HALF_SCREEN
 
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
@@ -292,10 +295,9 @@ class MainActivity : Activity() {
             return
         }
         preferredImageSize =
-                if (preferredImageSize == ImageSize.FULL_SCREEN)
-                    ImageSize.HALF_SCREEN
-                else
-                    ImageSize.FULL_SCREEN
+                if (preferredImageSize == ImageSize.FULL_SCREEN) ImageSize.HALF_SCREEN
+                else ImageSize.FULL_SCREEN
+        preferences.setUseHighQualityPreview(preferredImageSize == ImageSize.FULL_SCREEN)
         restartCameraImageGenerator()
         updateControls()
     }

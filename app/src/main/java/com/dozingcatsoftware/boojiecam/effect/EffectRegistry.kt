@@ -215,7 +215,7 @@ object EffectRegistry {
             // Emboss grayscale.
             {rs, prefsFn ->
                 Convolve3x3Effect.fromParameters(rs, mapOf(
-                        "coefficients" to listOf(4, 2, 0, 2, 1, -2, 0, -2, -4),
+                        "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(0, 0, 0),
@@ -271,13 +271,6 @@ object EffectRegistry {
 
     fun defaultEffectFactories(): List<(RenderScript, (String, String) -> String) -> Effect> {
         return baseEffects
-        /* // Inception
-        val f = mutableListOf<(RenderScript) -> Effect>()
-        f.addAll(baseEffects)
-        f.add({rs -> CombinationEffect(rs, baseEffects)})
-        f.add({rs -> CombinationEffect(rs, f.subList(1, 10))})
-        return f
-        */
     }
 
     fun forNameAndParameters(rs: RenderScript, name: String, params: Map<String, Any>): Effect {
