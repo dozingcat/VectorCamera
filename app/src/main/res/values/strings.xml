@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">BoojieCam</string>
+    <string name="app_name">Vector Camera</string>
     <string name="noImagesFound">No pictures found.</string>
 
     <string name="autoConvertPicturesPrefsKey">autoConvertPictures</string>

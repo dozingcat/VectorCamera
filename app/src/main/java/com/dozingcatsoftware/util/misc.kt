@@ -6,11 +6,11 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.InputStream
 
-inline fun toUInt(b: Byte): Int {
+fun toUInt(b: Byte): Int {
     return b.toInt() and 0xff
 }
 
-inline fun addAlpha(color: Int): Int {
+fun addAlpha(color: Int): Int {
     return 0xff000000.toInt() or color
 }
 

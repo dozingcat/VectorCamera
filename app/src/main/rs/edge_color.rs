@@ -1,5 +1,5 @@
 #pragma version(1)
-#pragma rs java_package_name(com.dozingcatsoftware.boojiecam.effect)
+#pragma rs java_package_name(com.dozingcatsoftware.vectorcamera.effect)
 #pragma rs_fp_relaxed
 
 int32_t gMultiplier = 2;

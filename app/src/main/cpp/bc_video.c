@@ -153,7 +153,7 @@ int finish_encode(encoding_context *context) {
 
 // Java API
 
-jint Java_com_dozingcatsoftware_boojiecam_WebMEncoder_nativeStartEncoding(
+jint Java_com_dozingcatsoftware_vectorcamera_WebMEncoder_nativeStartEncoding(
 		JNIEnv* env, jobject thiz, jstring javaPath, jint width, jint height, jfloat fps, jintArray jFrameDurations, jint deadline) {
 	char *path = (char *)(*env)->GetStringUTFChars(env, javaPath, NULL);
 	// copy frame durations to native C array
@@ -175,17 +175,17 @@ jint Java_com_dozingcatsoftware_boojiecam_WebMEncoder_nativeStartEncoding(
 	return result;
 }
 
-jint Java_com_dozingcatsoftware_boojiecam_WebMEncoder_nativeEncodeFrame(JNIEnv* env, jobject thiz, jintArray javaARGB) {
+jint Java_com_dozingcatsoftware_vectorcamera_WebMEncoder_nativeEncodeFrame(JNIEnv* env, jobject thiz, jintArray javaARGB) {
 	int *argb = (int *)(*env)->GetIntArrayElements(env, javaARGB, 0);
 	int result = encode_argb_frame(&gContext, argb);
 	(*env)->ReleaseIntArrayElements(env, javaARGB, argb, 0);
 	return result;
 }
 
-jint Java_com_dozingcatsoftware_boojiecam_WebMEncoder_nativeFinishEncoding(JNIEnv* env, jobject thiz) {
+jint Java_com_dozingcatsoftware_vectorcamera_WebMEncoder_nativeFinishEncoding(JNIEnv* env, jobject thiz) {
 	return finish_encode(&gContext);
 }
 
-jint Java_com_dozingcatsoftware_boojiecam_WebMEncoder_nativeCancelEncoding(JNIEnv* env, jobject thiz) {
+jint Java_com_dozingcatsoftware_vectorcamera_WebMEncoder_nativeCancelEncoding(JNIEnv* env, jobject thiz) {
 	return cleanup(&gContext);
 }

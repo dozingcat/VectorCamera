@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.dozingcatsoftware.boojiecam">
+    package="com.dozingcatsoftware.vectorcamera">
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -19,7 +19,7 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
 
-        <activity android:name=".MainActivity"
+        <activity android:name="com.dozingcatsoftware.vectorcamera.MainActivity"
                   android:screenOrientation="landscape"
                   android:configChanges="keyboard|keyboardHidden">
             <intent-filter>
@@ -30,26 +30,26 @@
         </activity>
 
         <activity
-            android:name=".ImageListActivity">
+            android:name="com.dozingcatsoftware.vectorcamera.ImageListActivity">
         </activity>
 
         <activity
-            android:name=".ViewImageActivity"
+            android:name="com.dozingcatsoftware.vectorcamera.ViewImageActivity"
             android:screenOrientation="landscape">
         </activity>
 
         <activity
-            android:name=".ViewVideoActivity"
+            android:name="com.dozingcatsoftware.vectorcamera.ViewVideoActivity"
             android:screenOrientation="landscape">
         </activity>
 
-        <activity android:name=".AboutActivity">
+        <activity android:name="com.dozingcatsoftware.vectorcamera.AboutActivity">
         </activity>
 
-        <activity android:name=".BCPreferencesActivity">
+        <activity android:name="com.dozingcatsoftware.vectorcamera.VCPreferencesActivity">
         </activity>
 
-        <receiver android:name=".NewPictureReceiver" android:label="NewPictureReceiver"
+        <receiver android:name="com.dozingcatsoftware.vectorcamera.NewPictureReceiver" android:label="NewPictureReceiver"
             android:enabled="false">
             <intent-filter>
                 <action android:name="android.hardware.action.NEW_PICTURE" />
@@ -57,7 +57,7 @@
             </intent-filter>
         </receiver>
 
-        <service android:name=".NewPictureJob"
+        <service android:name="com.dozingcatsoftware.vectorcamera.NewPictureJob"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="true" />
 

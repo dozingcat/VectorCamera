@@ -28,7 +28,7 @@ add_library(
 
 # Main shared library loaded by the app.
 add_library(
-    boojiecam
+    vectorcamera
     SHARED
     src/main/cpp/bc_video.c )
 
@@ -38,7 +38,7 @@ add_library(
 
 target_link_libraries(
     # Specifies the target library.
-    boojiecam
+    vectorcamera
     # Libraries to link.
     vpx
     webmenc)
