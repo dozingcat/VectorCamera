@@ -6,12 +6,8 @@ import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.renderscript.ScriptIntrinsicConvolve3x3
 import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.allocationHas2DSize
-import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
-/**
- * Created by brian on 1/6/18.
- */
 class Convolve3x3Effect(private val rs: RenderScript,
                         private val effectParams: Map<String, Any>,
                         private val coefficients: FloatArray,
@@ -31,14 +27,10 @@ class Convolve3x3Effect(private val rs: RenderScript,
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        if (!allocationHas2DSize(convolveOutputAlloc, cameraImage.width(), cameraImage.height())) {
-            convolveOutputAlloc = create2dAllocation(rs, Element::U8,
-                    cameraImage.width(), cameraImage.height())
-        }
-        if (!allocationHas2DSize(bitmapOutputAlloc, cameraImage.width(), cameraImage.height())) {
-            bitmapOutputAlloc = create2dAllocation(rs, Element::RGBA_8888,
-                    cameraImage.width(), cameraImage.height())
-        }
+        convolveOutputAlloc = reuseOrCreate2dAllocation(convolveOutputAlloc,
+                rs, Element::U8, cameraImage.width(), cameraImage.height())
+        bitmapOutputAlloc = reuseOrCreate2dAllocation(bitmapOutputAlloc,
+                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
 
         convolveScript.setCoefficients(coefficients)
         if (cameraImage.singleYuvAllocation != null) {

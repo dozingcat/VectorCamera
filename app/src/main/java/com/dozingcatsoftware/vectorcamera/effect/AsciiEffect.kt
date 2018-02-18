@@ -101,17 +101,13 @@ class AsciiEffect(private val rs: RenderScript,
             charBitmapCanvas.drawText(pixelChars[i].toString(),
                     (i * charPixelWidth).toFloat(), charPixelHeight - 1f, paint)
         }
-        if (!allocationHas2DSize(characterTemplateAllocation,
-                        pixelChars.length * charPixelWidth, charPixelHeight)) {
-            characterTemplateAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    pixelChars.length * charPixelWidth, charPixelHeight)
-        }
+        characterTemplateAllocation = reuseOrCreate2dAllocation(characterTemplateAllocation,
+                rs, Element::RGBA_8888,pixelChars.length * charPixelWidth, charPixelHeight)
+
         characterTemplateAllocation!!.copyFrom(charBitmap)
 
-        if (!allocationHas2DSize(bitmapOutputAllocation, outputWidth, outputHeight)) {
-            bitmapOutputAllocation = create2dAllocation(
-                    rs, Element::RGBA_8888, outputWidth, outputHeight)
-        }
+        bitmapOutputAllocation = reuseOrCreate2dAllocation(bitmapOutputAllocation,
+                rs, Element::RGBA_8888, outputWidth, outputHeight)
 
         script._characterBitmapInput = characterTemplateAllocation
         script._imageOutput = bitmapOutputAllocation
@@ -148,10 +144,9 @@ class AsciiEffect(private val rs: RenderScript,
             camAllocation: CameraImage, pixelChars: String,
             charPixelWidth: Int, charPixelHeight: Int,
             numCharacterColumns: Int, numCharacterRows: Int): AsciiResult {
-        if (!allocationHas2DSize(asciiBlockAllocation, numCharacterColumns, numCharacterRows)) {
-            asciiBlockAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    numCharacterColumns, numCharacterRows)
-        }
+        asciiBlockAllocation = reuseOrCreate2dAllocation(asciiBlockAllocation,
+                rs, Element::RGBA_8888, numCharacterColumns, numCharacterRows)
+
         script._inputImageWidth = camAllocation.width()
         script._inputImageHeight = camAllocation.height()
         script._characterPixelWidth = charPixelWidth

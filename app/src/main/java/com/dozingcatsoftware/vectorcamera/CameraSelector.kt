@@ -14,9 +14,6 @@ enum class ImageSize {
     EFFECT_GRID,
 }
 
-/**
- * Created by brian on 9/30/17.
- */
 class CameraSelector(val context: Context) {
 
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager

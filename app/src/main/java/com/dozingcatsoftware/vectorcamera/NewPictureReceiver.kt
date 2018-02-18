@@ -8,7 +8,7 @@ import android.util.Log
 
 /**
  * Receiver for the Camera.ACTION_NEW_PICTURE broadcast message sent when the camera app saves
- * a new picture. Calls ProcessImageOperation to create an ASCII version of the picture.
+ * a new picture. Calls ProcessImageOperation to import the picture.
  */
 class NewPictureReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

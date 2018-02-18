@@ -10,9 +10,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.preference.PreferenceActivity
 
-/**
- * Created by brian on 1/28/18.
- */
 class VCPreferencesActivity : PreferenceActivity() {
     val handler = Handler()
 

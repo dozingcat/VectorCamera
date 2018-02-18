@@ -8,9 +8,6 @@ import java.io.OutputStream
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/**
- * Created by brian on 1/10/18.
- */
 class AudioRecorder(val videoId: String, val outputStream: OutputStream,
                     val timeFn: (() -> Long) = System::currentTimeMillis) {
     // MediaRecorder looks like it should work but doesn't. There's no Vorbis encoding support,
@@ -41,7 +38,7 @@ class AudioRecorder(val videoId: String, val outputStream: OutputStream,
         }
     }
 
-    fun shouldStopRecording(): Boolean {
+    private fun shouldStopRecording(): Boolean {
         lock.withLock {
             return recordingThread == null ||
                     timeFn() - recordingStartTimestamp > recordingLimitMillis;

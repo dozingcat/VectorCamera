@@ -1,6 +1,5 @@
 package com.dozingcatsoftware.util
 
-import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream

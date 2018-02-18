@@ -3,9 +3,6 @@ package com.dozingcatsoftware.vectorcamera
 import android.renderscript.Allocation
 import android.util.Size
 
-/**
- * Created by brian on 9/30/17.
- */
 data class CameraImage(val singleYuvAllocation: Allocation?,
                        val planarYuvAllocations: PlanarYuvAllocations?,
                        val orientation: ImageOrientation, val status: CameraStatus,

@@ -3,12 +3,8 @@ package com.dozingcatsoftware.vectorcamera.effect
 import android.graphics.Bitmap
 import android.renderscript.*
 import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.allocationHas2DSize
-import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
-/**
- * Created by brian on 10/16/17.
- */
 class EdgeLuminanceEffect(val rs: RenderScript): Effect {
 
     private var outputAllocation: Allocation? = null
@@ -17,10 +13,8 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
     override fun effectName() = EFFECT_NAME
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
-            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    cameraImage.width(), cameraImage.height())
-        }
+        outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
+                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
         script._gWidth = cameraImage.width()
         script._gHeight = cameraImage.height()
         script._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))

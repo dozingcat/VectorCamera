@@ -12,15 +12,13 @@ class Animated2dGradient(val cellCornerColors: List<List<List<Int>>>,
                          val sizeX: Float = 1f, val sizeY: Float = 1f,
                          val pixelsPerCell: Int = DEFAULT_PIXELS_PER_CELL) {
 
-    val gridBitmap: Bitmap
-    val numRowCells: Int
-    val numColumnCells: Int
-    val sizeXPixels = (sizeX * pixelsPerCell).roundToInt()
-    val sizeYPixels = (sizeY * pixelsPerCell).roundToInt()
+    private val gridBitmap: Bitmap
+    private val numRowCells = cellCornerColors.size
+    private val numColumnCells = cellCornerColors[0].size
+    private val sizeXPixels = (sizeX * pixelsPerCell).roundToInt()
+    private val sizeYPixels = (sizeY * pixelsPerCell).roundToInt()
 
     init {
-        numRowCells = cellCornerColors.size
-        numColumnCells = cellCornerColors[0].size
         gridBitmap = Bitmap.createBitmap(
                 numColumnCells * pixelsPerCell,
                 numRowCells * pixelsPerCell,

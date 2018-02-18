@@ -6,9 +6,6 @@ import android.media.AudioTrack
 import android.util.Log
 import java.io.RandomAccessFile
 
-/**
- * Created by brian on 1/15/18.
- */
 class AudioPlayer(val audioFile: RandomAccessFile) {
     val sampleRate = 44100
     val encoding = AudioFormat.ENCODING_PCM_16BIT

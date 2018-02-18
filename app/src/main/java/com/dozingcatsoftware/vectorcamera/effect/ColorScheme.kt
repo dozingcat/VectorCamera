@@ -9,10 +9,6 @@ import com.dozingcatsoftware.util.intFromArgbList
 import com.dozingcatsoftware.util.makeAllocationColorMap
 import com.dozingcatsoftware.util.makeAlphaAllocation
 
-/**
- * Created by brian on 1/7/18.
- */
-// Not paint function, instead backgroundFn taking Canvas and RectF?
 data class ColorScheme(val colorMap: Allocation,
                        val backgroundFn: (CameraImage, Canvas, RectF) -> Unit) {
 

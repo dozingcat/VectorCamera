@@ -11,9 +11,6 @@ import android.renderscript.Type
 import android.util.Log
 import android.util.Size
 
-/**
- * Created by brian on 9/20/17.
- */
 class CameraImageGenerator(val context: Context, val rs: RenderScript,
                            val cameraManager: CameraManager, val cameraId: String,
                            val timestampFn: () -> Long = System::currentTimeMillis) {

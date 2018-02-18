@@ -5,12 +5,8 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.allocationHas2DSize
-import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
-/**
- * Created by brian on 12/11/17.
- */
 enum class ColorComponentSource(val rsCode: Int) {
     // These names may be stored in picture metadata; don't change without ensuring compatibility.
     RED(1),
@@ -38,10 +34,8 @@ class PermuteColorEffect(
     override fun effectParameters() = effectParams
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
-            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    cameraImage.width(), cameraImage.height())
-        }
+        outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
+                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
         script._gRedSource = redSource.rsCode
         script._gGreenSource = greenSource.rsCode
         script._gBlueSource = blueSource.rsCode

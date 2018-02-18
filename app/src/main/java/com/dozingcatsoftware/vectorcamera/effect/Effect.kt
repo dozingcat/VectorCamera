@@ -5,9 +5,6 @@ import android.graphics.Canvas
 import android.graphics.RectF
 import com.dozingcatsoftware.vectorcamera.CameraImage
 
-/**
- * Created by brian on 12/16/17.
- */
 data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
     fun toJson() = mapOf("name" to name, "params" to parameters)
 

@@ -4,9 +4,6 @@ import android.os.AsyncTask
 import android.util.Log
 import java.io.File
 
-/**
- * Created by brian on 1/25/18.
- */
 class CreateWebmAsyncTask(
         val progressHandler: (ProcessVideoTask.Progress) -> Unit,
         val completionHandler: (ProcessVideoTask.Result) -> Unit) :

@@ -10,9 +10,6 @@ import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.util.mapToJsonString
 
-/**
- * Created by brian on 1/20/18.
- */
 class VCPreferences(val context: Context) {
 
     private fun sharedPrefs() = PreferenceManager.getDefaultSharedPreferences(context)

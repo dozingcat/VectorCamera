@@ -10,9 +10,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.android.synthetic.main.about.*
 
-/**
- * Created by brian on 2/8/18.
- */
 class AboutActivity: Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -8,9 +8,6 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * Created by brian on 1/26/18.
- */
 class CreateVideoZipFileAsyncTask(
         val progressHandler: (ProcessVideoTask.Progress) -> Unit,
         val completionHandler: (ProcessVideoTask.Result) -> Unit) :

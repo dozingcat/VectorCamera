@@ -41,12 +41,23 @@ fun ioReceiveIfInput(alloc: Allocation?) {
     }
 }
 
-fun allocationHas2DSize(alloc: Allocation?, x: Int, y: Int): Boolean {
-    return (alloc != null) && (alloc.type.x) == x && (alloc.type.y == y)
-}
-
 fun create2dAllocation(rs: RenderScript, elementFn: (RenderScript) -> Element, x: Int, y: Int,
                        usage: Int = Allocation.USAGE_SCRIPT): Allocation {
+    val typeBuilder = Type.Builder(rs, elementFn(rs)).setX(x).setY(y)
+    return Allocation.createTyped(rs, typeBuilder.create(), usage)
+}
+
+/**
+ * If `alloc` is non-null and has dimensions `x` and `y`, returns it. Otherwise creates
+ * and returns a new Allocation with dimensions `x` and `y` and type given by `elementFn`.
+ * Specifically does not check if an existing allocation has a compatible element type.
+ */
+fun reuseOrCreate2dAllocation(
+        alloc: Allocation?, rs: RenderScript, elementFn: (RenderScript) -> Element, x: Int, y: Int,
+        usage: Int = Allocation.USAGE_SCRIPT): Allocation {
+    if (alloc != null && (alloc.type.x) == x && alloc.type.y == y) {
+        return alloc
+    }
     val typeBuilder = Type.Builder(rs, elementFn(rs)).setX(x).setY(y)
     return Allocation.createTyped(rs, typeBuilder.create(), usage)
 }

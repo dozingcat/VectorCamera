@@ -8,9 +8,6 @@ import android.renderscript.RenderScript
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.CameraImage
 
-/**
- * Created by brian on 12/17/17.
- */
 class CombinationEffect(
         private val rs: RenderScript,
         private val prefsFn: (String, String) -> String,

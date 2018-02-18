@@ -1,16 +1,13 @@
 package com.dozingcatsoftware.vectorcamera
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.util.scaledBitmapFromURIWithMaximumSize
+import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 
-/**
- * Created by brian on 1/28/18.
- */
 class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis) {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
@@ -26,7 +23,9 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
                     CameraStatus.CAPTURING_PHOTO, timeFn(), Size(bitmap!!.width, bitmap!!.height))
         }
         val prefs = VCPreferences(context)
-        val effect = prefs.effect(rs, {throw IllegalStateException()})
+        val effect = prefs.effect(rs, {
+            EffectRegistry.defaultEffectFactories()[0](rs, prefs.lookupFunction)
+        })
         val t2 = timeFn()
         val outputBitmap = effect.createBitmap(inputImage)
         val processedBitmap = ProcessedBitmap(effect, inputImage, outputBitmap)
@@ -34,7 +33,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         val t3 = timeFn()
         val photoId = photoLibrary.savePhoto(context, processedBitmap)
         val t4 = timeFn()
-        Log.i(TAG, "Image processed in ${t4-t1}ms (${t2-t1} ${t3-t2} ${t4-t3}")
+        Log.i(TAG, "Image processed in ${t4-t1}ms (${t2-t1} ${t3-t2} ${t4-t3})")
         return photoId
     }
 

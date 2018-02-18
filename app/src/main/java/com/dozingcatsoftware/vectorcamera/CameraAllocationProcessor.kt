@@ -10,9 +10,6 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/**
- * Created by brian on 10/15/17.
- */
 class CameraAllocationProcessor(val rs: RenderScript) {
     private var consumerThread: Thread? = null
     private var receivedCameraAllocation: CameraImage? = null

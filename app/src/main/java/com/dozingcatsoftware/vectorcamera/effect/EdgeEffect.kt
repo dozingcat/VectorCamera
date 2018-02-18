@@ -5,8 +5,7 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.allocationHas2DSize
-import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
 class EdgeEffect(private val rs: RenderScript,
                  private val effectParams: Map<String, Any>,
@@ -29,10 +28,8 @@ class EdgeEffect(private val rs: RenderScript,
         script._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
         script._gColorMap = colorScheme.colorMap
 
-        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
-            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    cameraImage.width(), cameraImage.height())
-        }
+        outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
+                rs, Element::RGBA_8888,  cameraImage.width(), cameraImage.height())
 
         if (cameraImage.singleYuvAllocation != null) {
             script._gYuvInput = cameraImage.singleYuvAllocation

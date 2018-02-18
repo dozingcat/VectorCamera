@@ -135,6 +135,7 @@ object EffectRegistry {
                         )
                 ))
             },
+            // Red-green horizontally animated colors.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -142,7 +143,6 @@ object EffectRegistry {
                                 "minColor" to listOf(0, 0, 0),
                                 "grid" to listOf(
                                         listOf(
-                                                //listOf(255,255,255, 255,255,255, 255,255,255, 255,255,255)
                                                 listOf(255,0,0, 0,255,0, 255,0,0, 0,255,0),
                                                 listOf(0,255,0, 255,0,0, 0,255,0, 255,0,0)
                                         )
@@ -174,7 +174,7 @@ object EffectRegistry {
                         )
                 ))
             },
-            // Rainbow, white background
+            // Rainbow, animated vertically on white background.
             {rs, prefsFn ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -224,7 +224,7 @@ object EffectRegistry {
                 ))
             },
 
-            // Row 5.
+            // Row 5. ASCII effects, with unmodified input as last effect.
             {rs, prefsFn ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(

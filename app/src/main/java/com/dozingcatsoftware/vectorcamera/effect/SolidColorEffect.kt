@@ -5,12 +5,8 @@ import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
 import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.allocationHas2DSize
-import com.dozingcatsoftware.util.create2dAllocation
+import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
-/**
- * Created by brian on 10/29/17.
- */
 class SolidColorEffect(val rs: RenderScript,
                        private val effectParams: Map<String, Any>,
                        private val colorScheme: ColorScheme): Effect {
@@ -35,10 +31,8 @@ class SolidColorEffect(val rs: RenderScript,
         }
         script._colorMap = colorScheme.colorMap
 
-        if (!allocationHas2DSize(outputAllocation, cameraImage.width(), cameraImage.height())) {
-            outputAllocation = create2dAllocation(rs, Element::RGBA_8888,
-                    cameraImage.width(), cameraImage.height())
-        }
+        outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
+                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
 
         script.forEach_computeColor(outputAllocation)
 

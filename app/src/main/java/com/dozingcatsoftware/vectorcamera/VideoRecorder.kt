@@ -5,7 +5,6 @@ import java.io.OutputStream
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-
 private data class Frame(val timestamp: Long, val data: ByteArray)
 
 class VideoRecorder(val videoId: String, val videoOutput: OutputStream,

@@ -33,7 +33,7 @@ import java.util.zip.GZIPOutputStream
  *         [video_id].png (if exported)
  *     videos/
  *         [video_id].webm (if exported)
- *     raw_tmp/
+ *     tmp/
  *         [video ID of recording in progress]_video.dat
  *         [video ID of recording in progress]_audio.pcm
  *
