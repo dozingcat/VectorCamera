@@ -67,21 +67,19 @@ class VCPreferencesActivity : PreferenceActivity() {
     }
 
     /**
-     * Sets whether pictures saved by the camera app (or other apps which broadcast the appropriate intent)
-     * should automatically be converted to ascii via the NewPictureReceiver broadcast receiver.
+     * Sets whether pictures saved by the camera app (or other apps which broadcast the appropriate
+     * intent) should automatically be imported and processed.
      */
     private fun setAutoConvertEnabled(context: Context, enabled: Boolean) {
-        // For N and above, schedule or cancel a JobService.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            // For N and above, schedule or cancel a JobService.
             if (enabled) {
                 NewPictureJob.scheduleJob(context)
             } else {
                 NewPictureJob.cancelJob(context)
             }
         } else {
-            if (enabled) {
-                android.hardware.Camera::class.java.getField("ACTION_NEW_PICTURE")
-            }
+            // For M, enable or disable NewPictureReceiver.
             val pm = context.packageManager
             pm.setComponentEnabledSetting(ComponentName(context, NewPictureReceiver::class.java),
                     if (enabled)

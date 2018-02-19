@@ -3,7 +3,8 @@ package com.dozingcatsoftware.vectorcamera
 import java.io.File
 
 /**
- * Created by brian on 1/21/18.
+ * Encodes a series of video frames to a WebM file using a native library.
+ * See vc_video.c
  */
 class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
 

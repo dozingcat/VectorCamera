@@ -8,6 +8,10 @@ import com.dozingcatsoftware.util.create2dAllocation
 import com.dozingcatsoftware.util.readBytesIntoBuffer
 import java.io.InputStream
 
+/**
+ * Wrapper for YUV image data stored in separate allocations. This is used when creating CameraImage
+ * objects from existing images, because there's no API to create single YUV allocations.
+ */
 class PlanarYuvAllocations(val y: Allocation, val u: Allocation, val v: Allocation) {
 
     companion object {
