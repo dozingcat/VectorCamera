@@ -18,9 +18,9 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         // Use a block so the bitmap can be freed as soon as possible.
         val inputImage = run {
             val bitmap = scaledBitmapFromURIWithMaximumSize(context, imageUri, 2560, 1600)
-            val planarYuv = PlanarYuvAllocations.fromBitmap(rs, bitmap!!)
+            val planarYuv = PlanarYuvAllocations.fromBitmap(rs, bitmap)
             CameraImage(rs, null, planarYuv, ImageOrientation.NORMAL,
-                    CameraStatus.CAPTURING_PHOTO, timeFn(), Size(bitmap!!.width, bitmap!!.height))
+                    CameraStatus.CAPTURING_PHOTO, timeFn(), Size(bitmap.width, bitmap.height))
         }
         val prefs = VCPreferences(context)
         val effect = prefs.effect(rs, {

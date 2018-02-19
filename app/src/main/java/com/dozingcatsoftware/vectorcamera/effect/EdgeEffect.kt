@@ -7,6 +7,9 @@ import android.renderscript.RenderScript
 import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
+/**
+ * Effect that maps each pixel to an output color based on its edge strength.
+ */
 class EdgeEffect(private val rs: RenderScript,
                  private val effectParams: Map<String, Any>,
                  private val colorScheme: ColorScheme): Effect {

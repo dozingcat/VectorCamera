@@ -16,8 +16,9 @@ enum class ColorComponentSource(val rsCode: Int) {
     MAX(-1),
 }
 
-// enum for flipUV?
-
+/**
+ * Effect that swaps the red/green/blue and/or U/V components of an image.
+ */
 class PermuteColorEffect(
         private val rs: RenderScript,
         private val effectParams: Map<String, Any>,

@@ -5,6 +5,10 @@ import android.renderscript.*
 import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
+/**
+ * Effect that preserves the "color" of each pixel as given by its U and V values, but replaces its
+ * brightness (Y value) with its edge strength.
+ */
 class EdgeLuminanceEffect(val rs: RenderScript): Effect {
 
     private var outputAllocation: Allocation? = null

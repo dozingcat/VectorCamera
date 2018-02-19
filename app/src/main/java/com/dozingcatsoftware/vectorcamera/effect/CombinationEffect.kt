@@ -8,6 +8,10 @@ import android.renderscript.RenderScript
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.CameraImage
 
+/**
+ * Effect that takes a list of other effects and renders them all in a grid. Used to implement
+ * the UI for selecting an effect.
+ */
 class CombinationEffect(
         private val rs: RenderScript,
         private val prefsFn: (String, String) -> String,

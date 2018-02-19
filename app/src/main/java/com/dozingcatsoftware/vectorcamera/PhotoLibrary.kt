@@ -55,6 +55,10 @@ class PhotoLibrary(val rootDirectory: File) {
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
 
+    /**
+     * Saves picture data as a compressed bytestream of Y/U/V image planes. Also creates a
+     * metadata file and thumbnail image. Does not create a full-size PNG image.
+     */
     fun savePhoto(context: Context, processedBitmap: ProcessedBitmap): String {
         val t1 = System.currentTimeMillis()
         if (processedBitmap.yuvBytes == null &&
@@ -141,6 +145,9 @@ class PhotoLibrary(val rootDirectory: File) {
         Log.i(TAG, "writePngImage: ${t2-t1}")
     }
 
+    /**
+     * Creates or replaces the thumbnail image for a picture or video.
+     */
     fun writeThumbnail(processedBitmap: ProcessedBitmap, itemId: String) {
         thumbnailDirectory.mkdirs()
         val noMediaFile = File(thumbnailDirectory, ".nomedia")
@@ -220,6 +227,10 @@ class PhotoLibrary(val rootDirectory: File) {
         return GZIPInputStream(FileInputStream(rawImageFileForItemId(itemId)))
     }
 
+    /**
+     * Creates metadata and thumbnail files for a video, and moves the temporary audio and video
+     * files to the video directory.
+     */
     fun saveVideo(context: Context, itemId: String, imageInfo: MediaMetadata,
                   frameTimestamps: List<Long>, audioStartTimestamp: Long) {
         // Move video/audio files from tmp_raw/ to raw/, write metadata.json.
@@ -228,6 +239,7 @@ class PhotoLibrary(val rootDirectory: File) {
         if (!videoFile.exists()) {
             throw IllegalStateException("Video file does not exist")
         }
+        rawDirectory.mkdirs()
         videoFile.renameTo(rawVideoFileForItemId(itemId))
         if (audioFile.exists()) {
             audioFile.renameTo(rawAudioFileForItemId(itemId))
@@ -316,5 +328,3 @@ class PhotoLibrary(val rootDirectory: File) {
         }
     }
 }
-
-enum class LibraryItemType {IMAGE, VIDEO}

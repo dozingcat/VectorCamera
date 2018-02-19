@@ -25,12 +25,17 @@ data class ColorScheme(val colorMap: Allocation,
             }
 
             when (params["type"]) {
+                // For fixed colors, the input maps directly to an output color.
                 "fixed" -> {
                     val minColor = colorAsInt("minColor", "minEdgeColor")
                     val maxColor = colorAsInt("maxColor", "maxEdgeColor")
                     val colorMap = makeAllocationColorMap(rs, minColor, maxColor)
                     return ColorScheme(colorMap, { _, _, _ -> Unit })
                 }
+                // For gradients, we draw the entire canvas with the gradient first, and then mask
+                // out each pixel based on the input value. The color of each "foreground" pixel is
+                // given by a map where 0 is entirely opaque to show the "background" color, and 255
+                // is entirely transparent to let the gradient through.
                 "linear_gradient" -> {
                     val minColor = colorAsInt("minColor", "minEdgeColor")
                     val gradientStartColor = colorAsInt("gradientStartColor")

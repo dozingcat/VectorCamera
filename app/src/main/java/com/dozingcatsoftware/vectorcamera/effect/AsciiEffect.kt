@@ -31,8 +31,8 @@ class AsciiEffect(private val rs: RenderScript,
                   private val backgroundColor: Int,
                   private val pixelChars: String,
                   private val colorMode: AsciiColorMode): Effect {
-    var minCharWidth = 10
-    var charHeightOverWidth = 1.8
+    private var minCharWidth = 10
+    private var charHeightOverWidth = 1.8
 
     private var asciiBlockAllocation: Allocation? = null
     private var characterTemplateAllocation: Allocation? = null

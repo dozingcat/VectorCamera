@@ -8,6 +8,10 @@ import android.renderscript.ScriptIntrinsicConvolve3x3
 import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
+/**
+ * Effect that performs a 3x3 convolve operation on the brightness of the input image.
+ * The coefficients of the convolve are given as parameters.
+ */
 class Convolve3x3Effect(private val rs: RenderScript,
                         private val effectParams: Map<String, Any>,
                         private val coefficients: FloatArray,
