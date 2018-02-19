@@ -48,7 +48,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
             val exportedEffectMetadata = exportedEffectDict?.mapValues(
                     {entry -> EffectMetadata.fromJson(entry.value as Map<String, Any>)}) ?: mapOf()
             val frameTimestamps = json.getOrElse("frameTimestamps", {listOf<Long>()})
-            val audioStartTimestamp = json.getOrDefault("audioStartTimestamp", 0) as Number
+            val audioStartTimestamp = json.getOrElse("audioStartTimestamp", {0}) as Number
             return MediaMetadata(
                     MediaType.valueOf((json["type"] as String).toUpperCase()),
                     EffectMetadata.fromJson(effectDict),

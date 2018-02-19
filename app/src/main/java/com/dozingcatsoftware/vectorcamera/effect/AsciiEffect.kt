@@ -276,16 +276,16 @@ class AsciiEffect(private val rs: RenderScript,
                     colors.getOrElse("text", {listOf(255, 255, 255)}) as List<Int>)
             val backgroundColor = intFromArgbList(
                     colors.getOrElse("background", {listOf(0, 0, 0)}) as List<Int>)
-            val numCharColumns = params.getOrDefault("numColumns", DEFAULT_CHARACTER_COLUMNS) as Int
+            val numCharColumns = params.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
 
-            var pixelChars = params.getOrDefault("pixelChars", "") as String
+            var pixelChars = params.getOrElse("pixelChars", {""}) as String
             if (pixelChars.isEmpty()) {
                 // Shouldn't happen, set a reasonable default.
                 pixelChars = " .o8"
             }
 
             val colorType = try {
-                AsciiColorMode.fromString(params.getOrDefault("colorMode", "fixed") as String)
+                AsciiColorMode.fromString(params.getOrElse("colorMode", {"fixed"}) as String)
             } catch (ex: IllegalArgumentException) {AsciiColorMode.FIXED}
 
             return AsciiEffect(

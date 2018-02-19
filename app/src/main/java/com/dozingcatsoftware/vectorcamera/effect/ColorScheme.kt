@@ -62,12 +62,12 @@ data class ColorScheme(val colorMap: Allocation,
                 "grid_gradient" -> {
                     val minColor = colorAsInt("minColor")
                     val gridColors = params["grid"] as List<List<List<Int>>>
-                    val speedX = params.getOrDefault("speedX", 0) as Number
-                    val speedY = params.getOrDefault("speedY", 0) as Number
-                    val sizeX = params.getOrDefault("sizeX", 1) as Number
-                    val sizeY = params.getOrDefault("sizeY", 1) as Number
-                    val pixPerCell = params.getOrDefault(
-                            "pixelsPerCell", Animated2dGradient.DEFAULT_PIXELS_PER_CELL) as Number
+                    val speedX = params.getOrElse("speedX", {0}) as Number
+                    val speedY = params.getOrElse("speedY", {0}) as Number
+                    val sizeX = params.getOrElse("sizeX", {1}) as Number
+                    val sizeY = params.getOrElse("sizeY", {1}) as Number
+                    val pixPerCell = params.getOrElse(
+                            "pixelsPerCell", {Animated2dGradient.DEFAULT_PIXELS_PER_CELL}) as Number
                     val gradient = Animated2dGradient(gridColors, speedX.toInt(), speedY.toInt(),
                             sizeX.toFloat(), sizeY.toFloat(), pixPerCell.toInt())
                     val backgroundFn = fun(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {

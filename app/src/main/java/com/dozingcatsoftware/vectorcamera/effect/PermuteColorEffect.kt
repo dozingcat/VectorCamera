@@ -66,7 +66,7 @@ class PermuteColorEffect(
             val redSource = ColorComponentSource.valueOf(params["red"] as String)
             val greenSource = ColorComponentSource.valueOf(params["green"] as String)
             val blueSource = ColorComponentSource.valueOf(params["blue"] as String)
-            val flipUV = params.getOrDefault("flipUV", false) as Boolean
+            val flipUV = params.getOrElse("flipUV", {false}) as Boolean
             return PermuteColorEffect(rs, params, redSource, greenSource, blueSource, flipUV)
         }
 

@@ -26,7 +26,7 @@ bool flipVertical;
 int32_t colorMode;
 // In primary color mode, if a color component is at least this fraction of the maximum color
 // component, it will be enabled.
-static float PRIMARY_COLOR_RATIO = 0.75f;
+static float PRIMARY_COLOR_RATIO = 0.875f;
 
 
 // Returns (red, green, blue, brightness) averages for the input pixel block.

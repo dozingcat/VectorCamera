@@ -40,10 +40,10 @@ fun scanSavedMediaFile(context: Context, path: String,
     scannerConnection.connect()
 }
 
-/** Returns a BitmapFactory.Options object containing the size of the image at the given URI,
+/**
+ * Returns a BitmapFactory.Options object containing the size of the image at the given URI,
  * without actually loading the image.
  */
-@Throws(FileNotFoundException::class)
 private fun computeBitmapSizeFromURI(context: Context, imageURI: Uri): BitmapFactory.Options {
     val options = BitmapFactory.Options()
     options.inJustDecodeBounds = true
@@ -51,10 +51,10 @@ private fun computeBitmapSizeFromURI(context: Context, imageURI: Uri): BitmapFac
     return options
 }
 
-/** Returns a Bitmap from the given URI that may be scaled by an integer factor to reduce its size,
+/**
+ * Returns a Bitmap from the given URI that may be scaled by an integer factor to reduce its size,
  * while staying as least as large as the width and height parameters.
  */
-@Throws(FileNotFoundException::class)
 fun scaledBitmapFromURIWithMinimumSize(
         context: Context, imageURI: Uri, width: Int, height: Int): Bitmap {
     val options = computeBitmapSizeFromURI(context, imageURI)
@@ -68,11 +68,11 @@ fun scaledBitmapFromURIWithMinimumSize(
             context.contentResolver.openInputStream(imageURI), null, options)
 }
 
-/** Returns a Bitmap from the given URI that may be scaled by an integer factor to reduce its size,
+/**
+ * Returns a Bitmap from the given URI that may be scaled by an integer factor to reduce its size,
  * so that its width and height are no greater than the corresponding parameters. The scale factor
  * will be a power of 2.
  */
-@Throws(FileNotFoundException::class)
 fun scaledBitmapFromURIWithMaximumSize(
         context: Context, imageURI: Uri, width: Int, height: Int): Bitmap {
     val options = computeBitmapSizeFromURI(context, imageURI)

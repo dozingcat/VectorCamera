@@ -14,7 +14,7 @@ data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
                 return EffectMetadata("", mapOf())
             }
             val params = json.getOrElse("params", {mapOf<String, Any>()}) as Map<String, Any>
-            return EffectMetadata(json.getOrDefault("name", "") as String, params)
+            return EffectMetadata(json.getOrElse("name", {""}) as String, params)
         }
     }
 }
@@ -23,10 +23,6 @@ interface Effect {
     fun createBitmap(cameraImage: CameraImage): Bitmap
 
     fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {}
-
-//    fun createPaintFn(cameraImage: CameraImage): (RectF) -> Paint? {
-//        return {null}
-//    }
 
     fun effectName(): String
 

@@ -41,7 +41,7 @@ class AudioRecorder(val videoId: String, val outputStream: OutputStream,
     private fun shouldStopRecording(): Boolean {
         lock.withLock {
             return recordingThread == null ||
-                    timeFn() - recordingStartTimestamp > recordingLimitMillis;
+                    timeFn() - recordingStartTimestamp > recordingLimitMillis
         }
     }
 
@@ -54,6 +54,10 @@ class AudioRecorder(val videoId: String, val outputStream: OutputStream,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
                 bufferSize)
+        if (audioRecorder.state != AudioRecord.STATE_INITIALIZED) {
+            Log.i(TAG, "AudioRecord is not initialized, aborting")
+            return
+        }
         val readBuffer = ByteArray(bufferSize / 2)
         Log.i(TAG, "Starting recording with bufferSize=${bufferSize}")
         recordingStartTimestamp = timeFn()
