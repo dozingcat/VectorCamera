@@ -12,6 +12,7 @@ import com.dozingcatsoftware.ebml.EBMLReader;
 import com.dozingcatsoftware.ebml.EBMLUtilities;
 import com.dozingcatsoftware.ebml.MatroskaID;
 
+// This class was copied from WireGoggles; there was no need to modify it or convert it to Kotlin.
 public class CombineAudioVideo {
 
     public static interface EncoderDelegate {

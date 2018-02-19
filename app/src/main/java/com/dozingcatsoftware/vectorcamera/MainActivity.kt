@@ -28,7 +28,7 @@ class MainActivity : Activity() {
     private lateinit var cameraImageGenerator: CameraImageGenerator
     private val preferences = VCPreferences(this)
 
-    private lateinit var imageProcessor: CameraAllocationProcessor
+    private lateinit var imageProcessor: CameraImageProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
     private val photoLibrary = PhotoLibrary.defaultLibrary()
@@ -57,7 +57,7 @@ class MainActivity : Activity() {
         displaySize = getDisplaySize(this)
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
-        imageProcessor = CameraAllocationProcessor(rs)
+        imageProcessor = CameraImageProcessor(rs)
 
         currentEffect = effectFromPreferences()
         preferredImageSize =
@@ -253,7 +253,7 @@ class MainActivity : Activity() {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()
             }
-            this.imageProcessor.queueAllocation(cameraImage)
+            this.imageProcessor.queueCameraImage(cameraImage)
         })
     }
 
@@ -361,6 +361,10 @@ class MainActivity : Activity() {
     }
 
     private fun handleShutterClick() {
+        if (!PermissionsChecker.hasStoragePermission(this)) {
+            PermissionsChecker.requestStoragePermissionsToTakePhoto(this)
+            return
+        }
         when (shutterMode) {
             ShutterMode.IMAGE -> takePicture()
             ShutterMode.VIDEO -> toggleVideoRecording()
@@ -400,6 +404,10 @@ class MainActivity : Activity() {
     }
 
     private fun gotoLibrary(view: View) {
+        if (!PermissionsChecker.hasStoragePermission(this)) {
+            PermissionsChecker.requestStoragePermissionsToGoToLibrary(this)
+            return
+        }
         ImageListActivity.startIntent(this)
     }
 

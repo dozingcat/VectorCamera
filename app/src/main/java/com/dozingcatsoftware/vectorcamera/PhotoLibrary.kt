@@ -28,10 +28,9 @@ import java.util.zip.GZIPOutputStream
  *         [image_id].gz
  *         [video_id]_video.dat
  *         [video_id]_audio.pcm
- *     images/
+ *     VectorCamera_images/
  *         [image_id].png
- *         [video_id].png (if exported)
- *     videos/
+ *     VectorCamera_videos/
  *         [video_id].webm (if exported)
  *     tmp/
  *         [video ID of recording in progress]_video.dat
@@ -41,14 +40,17 @@ import java.util.zip.GZIPOutputStream
  *  Images are stored as flattened YUV data; first (width*height) bytes of Y, then
  *  (width*height/4) bytes of U, then (width*height/4) bytes of V. Video files store individual
  *  frames concatenated together. Audio is mono 16-bit (little-endian) 44kHz PCM.
+ *
+ *  The images and videos directory have "VectorCamera" prefixes so that they're easier to identify
+ *  when using Android's photo picker, which shows only the parent directory name.
  */
 class PhotoLibrary(val rootDirectory: File) {
 
     private val thumbnailDirectory = File(rootDirectory, "thumbnails")
     private val metadataDirectory = File(rootDirectory, "metadata")
     private val rawDirectory = File(rootDirectory, "raw")
-    private val imageDirectory = File(rootDirectory, "images")
-    private val videoDirectory = File(rootDirectory, "videos")
+    private val imageDirectory = File(rootDirectory, "VectorCamera_images")
+    private val videoDirectory = File(rootDirectory, "VectorCamera_videos")
     private val tempDirectory = File(rootDirectory, "tmp")
 
     fun itemIdForTimestamp(timestamp: Long): String = PHOTO_ID_FORMAT.format(Date(timestamp))
@@ -146,6 +148,16 @@ class PhotoLibrary(val rootDirectory: File) {
             noMediaFile.createNewFile()
         }
         val thumbSize = scaleToTargetSize(processedBitmap.sourceImage.size(), THUMBNAIL_MAX_SIZE)
+        // Thumbnails look better if we shrink the input image and then apply the effect, rather
+        // than scaling down the image with the effect already applied. Unfortunately this causes
+        // intermittent crashes (in native code, no stack trace), possibly due to thread non-safety.
+        /*
+        Log.i(TAG, "Resizing for thumbnail: ${processedBitmap.sourceImage.size()} -> ${thumbSize}")
+        val resizedPB = processedBitmap.resizedTo(thumbSize)
+        Log.i(TAG, "Rendering thumbnail")
+        val thumbnailBitmap = resizedPB.renderBitmap(thumbSize.width, thumbSize.height)
+        Log.i(TAG, "Done")
+        */
         val thumbnailBitmap = processedBitmap.renderBitmap(thumbSize.width, thumbSize.height)
         writeFileAtomicallyUsingTempDir(thumbnailFileForItemId(itemId), getTempDirectory(), {
             thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)

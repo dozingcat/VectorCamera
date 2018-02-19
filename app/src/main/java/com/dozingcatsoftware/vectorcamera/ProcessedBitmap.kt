@@ -1,14 +1,24 @@
 package com.dozingcatsoftware.vectorcamera
 
 import android.graphics.*
+import android.renderscript.RenderScript
+import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 
+/**
+ * The result of applying an Effect to a CameraImage. Contains references to the effect and
+ * input image, and the bitmap created by applying the effect.
+ */
 data class ProcessedBitmap(
         val effect: Effect,
         val sourceImage: CameraImage,
         val bitmap: Bitmap,
         val yuvBytes: ByteArray? = null) {
 
+    /**
+     * Outputs the processed image to a canvas. Accepts optional Paint, RectF, and Matrix arguments
+     * to avoid recreating temporary objects.
+     */
     fun renderToCanvas(canvas: Canvas, width: Int, height: Int, outsidePaint: Paint? = null,
                        tmpRect: RectF? = null, tmpMatrix: Matrix? = null) {
         val dstRect = tmpRect ?: RectF()
@@ -47,5 +57,11 @@ data class ProcessedBitmap(
         val canvas = Canvas(bitmap)
         renderToCanvas(canvas, width, height)
         return bitmap
+    }
+
+    fun resizedTo(size: Size): ProcessedBitmap {
+        val resizedSource = this.sourceImage.resizedTo(size)
+        val bitmap = effect.createBitmap(resizedSource)
+        return ProcessedBitmap(effect, resizedSource, bitmap)
     }
 }

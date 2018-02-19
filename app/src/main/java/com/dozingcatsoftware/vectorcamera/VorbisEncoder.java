@@ -14,6 +14,7 @@ import org.xiph.libvorbis.vorbis_dsp_state;
 import org.xiph.libvorbis.vorbis_info;
 import org.xiph.libvorbis.vorbisenc;
 
+// This class was copied from WireGoggles; there was no need to modify it or convert it to Kotlin.
 public class VorbisEncoder implements Iterator<ogg_page> {
 
     public static interface Delegate {

@@ -36,7 +36,7 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
         val allocation = PlanarYuvAllocations.fromInputStream(
                 rs, ByteArrayInputStream(frameBuffer), metadata.width, metadata.height)
         val cameraImage = CameraImage.withAllocationSet(
-                allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
+                rs, allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
         return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
     }

@@ -136,10 +136,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                 if (captureSession != null) {
                     if (this.imageAllocationCallback != null) {
                         this.imageAllocationCallback!!(CameraImage.withAllocation(
-                                allocation!!,
-                                imageOrientation,
-                                this.status,
-                                this.timestampFn()))
+                                rs, allocation!!, imageOrientation, status, timestampFn()))
                     }
                 }
                 else {
@@ -217,7 +214,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     }
 
     companion object {
-        val TAG = "CameraImageGenerator"
+        const val TAG = "CameraImageGenerator"
 
         fun pickBestSize(sizes: Array<Size>, target: Size): Size {
             fun differenceFromRequested(s: Size) =

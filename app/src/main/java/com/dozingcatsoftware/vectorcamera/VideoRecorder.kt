@@ -103,7 +103,7 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
     }
 
     companion object {
-        val TAG = "VideoRecorder"
-        val MAX_QUEUED_FRAMES = 3
+        const val TAG = "VideoRecorder"
+        const val MAX_QUEUED_FRAMES = 3
     }
 }

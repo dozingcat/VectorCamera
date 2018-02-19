@@ -10,9 +10,9 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CameraAllocationProcessor(val rs: RenderScript) {
+class CameraImageProcessor(val rs: RenderScript) {
     private var consumerThread: Thread? = null
-    private var receivedCameraAllocation: CameraImage? = null
+    private var receivedCameraImage: CameraImage? = null
     private var lastAllocationRef: WeakReference<Allocation>? = null
     private var allocationUpdateCount = 0
     private val threadLock = ReentrantLock()
@@ -47,16 +47,16 @@ class CameraAllocationProcessor(val rs: RenderScript) {
         })
     }
 
-    fun queueAllocation(cameraAllocation: CameraImage) {
+    fun queueCameraImage(cameraImage: CameraImage) {
         threadLock.withLock({
             if (consumerThread == null) {
-                ioReceiveIfInput(cameraAllocation.singleYuvAllocation)
+                ioReceiveIfInput(cameraImage.singleYuvAllocation)
                 return
             }
         })
 
         allocationLock.withLock({
-            val allocation = cameraAllocation.singleYuvAllocation!!
+            val allocation = cameraImage.singleYuvAllocation!!
             if (lastAllocationRef != null) {
                 val prevAllocation = lastAllocationRef!!.get()
                 if (prevAllocation == allocation) {
@@ -74,9 +74,9 @@ class CameraAllocationProcessor(val rs: RenderScript) {
                 lastAllocationRef = WeakReference(allocation)
                 allocationUpdateCount = 1
             }
-            this.receivedCameraAllocation = cameraAllocation
+            this.receivedCameraImage = cameraImage
             allocationAvailable.signal()
-            debugLog("queueAllocation, count=${allocationUpdateCount}")
+            debugLog("queueCameraImage, count=${allocationUpdateCount}")
         })
     }
 
@@ -94,7 +94,7 @@ class CameraAllocationProcessor(val rs: RenderScript) {
                     return
                 }
                 allocationLock.withLock({
-                    currentCamAllocation = receivedCameraAllocation
+                    currentCamAllocation = receivedCameraImage
                     if (currentCamAllocation == null) {
                         allocationAvailable.awaitNanos(250000000)
                     }
@@ -104,7 +104,7 @@ class CameraAllocationProcessor(val rs: RenderScript) {
                             ioReceiveIfInput(currentCamAllocation!!.singleYuvAllocation)
                         }
                         allocationUpdateCount = 0
-                        receivedCameraAllocation = null
+                        receivedCameraImage = null
                     }
                 })
             }
