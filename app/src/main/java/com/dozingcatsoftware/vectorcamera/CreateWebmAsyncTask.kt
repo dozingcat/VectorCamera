@@ -4,6 +4,9 @@ import android.os.AsyncTask
 import android.util.Log
 import java.io.File
 
+/**
+ * AsyncTask to create a WebM file for a video.
+ */
 class CreateWebmAsyncTask(
         val progressHandler: (ProcessVideoTask.Progress) -> Unit,
         val completionHandler: (ProcessVideoTask.Result) -> Unit) :
@@ -32,7 +35,7 @@ class CreateWebmAsyncTask(
             val encoder = WebMEncoder(videoReader, tempVideoOnlyFile.path)
             encoder.startEncoding()
             for (frameIndex in 0 until videoReader.numberOfFrames()) {
-                if (this.isCancelled()) {
+                if (this.isCancelled) {
                     throw InterruptedException()
                 }
                 encoder.encodeFrame(frameIndex)

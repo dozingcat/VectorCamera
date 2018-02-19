@@ -72,6 +72,8 @@ class ImageListActivity : Activity() {
         noImagesView.visibility = if (cellMaps.isNotEmpty()) View.GONE else View.VISIBLE
     }
 
+    // Images and metadata info are loaded asynchronously using Anko coroutines:
+    // https://github.com/Kotlin/anko/wiki/Anko-Coroutines
     private fun loadGridCellImage(view: ImageView, itemId: String) {
         val self = this
         async(UI) {
@@ -111,8 +113,8 @@ class ImageListActivity : Activity() {
 
     companion object {
         // These should match the dimensions in imagegrid.xml and imagegrid_cell.xml.
-        val CELL_WIDTH = 160
-        val CELL_HEIGHT = 120
+        const val CELL_WIDTH = 160
+        const val CELL_HEIGHT = 120
         val GRID_DATE_FORMAT = DateFormat.getDateInstance(DateFormat.MEDIUM)
         val GRID_SIZE_FORMAT_LARGE = NumberFormat.getIntegerInstance()
         val GRID_SIZE_FORMAT_SMALL = DecimalFormat("0.0")

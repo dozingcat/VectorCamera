@@ -8,6 +8,9 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/**
+ * AsyncTask to create a zip archive containing all frames from a video as PNG files.
+ */
 class CreateVideoZipFileAsyncTask(
         val progressHandler: (ProcessVideoTask.Progress) -> Unit,
         val completionHandler: (ProcessVideoTask.Result) -> Unit) :
@@ -70,6 +73,6 @@ class CreateVideoZipFileAsyncTask(
     }
 
     companion object {
-        val TAG = "CreateVideoZipFile"
+        const val TAG = "CreateVideoZipFile"
     }
 }
