@@ -12,7 +12,7 @@
     <string name="whiteOnBlackPixelCharsPrefId">pixelChars.WHITE_ON_BLACK</string>
     <string name="whiteOnBlackPixelCharsPrefTitle">White on black characters</string>
     <string name="whiteOnBlackPixelCharsPrefSummary">Characters for white on black mode.</string>
-    <string name="whiteOnBlackPixelCharsPrefMessage">Enter characters to use for white on black images from darkest to brightest, or leave blank for the default of .:oO8@</string>
+    <string name="whiteOnBlackPixelCharsPrefMessage">Enter characters to use for white on black images from darkest to brightest, or leave blank for the default of .:oO8#</string>
 
     <string name="blackOnWhitePixelCharsPrefId">pixelChars.BLACK_ON_WHITE</string>
     <string name="blackOnWhitePixelCharsPrefTitle">Black on white characters</string>
@@ -22,7 +22,7 @@
     <string name="ansiColorPixelCharsPrefId">pixelChars.ANSI_COLOR</string>
     <string name="ansiColorPixelCharsPrefTitle">Primary color characters</string>
     <string name="ansiColorPixelCharsPrefSummary">Characters for primary color mode.</string>
-    <string name="ansiColorPixelCharsPrefMessage">Enter characters to use in images from darkest to brightest, or leave blank for the default of .:oO8@</string>
+    <string name="ansiColorPixelCharsPrefMessage">Enter characters to use in images from darkest to brightest, or leave blank for the default of .:oO8#</string>
 
     <string name="fullColorPixelCharsPrefId">pixelChars.FULL_COLOR</string>
     <string name="fullColorPixelCharsPrefTitle">Full color characters</string>
