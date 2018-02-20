@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.dozingcatsoftware.vectorcamera">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="true" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+
+        <activity android:name="com.dozingcatsoftware.vectorcamera.MainActivity"
+                  android:screenOrientation="landscape"
+                  android:configChanges="keyboard|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.dozingcatsoftware.vectorcamera.ImageListActivity">
+        </activity>
+
+        <activity
+            android:name="com.dozingcatsoftware.vectorcamera.ViewImageActivity"
+            android:screenOrientation="landscape">
+        </activity>
+
+        <activity
+            android:name="com.dozingcatsoftware.vectorcamera.ViewVideoActivity"
+            android:screenOrientation="landscape">
+        </activity>
+
+        <activity android:name="com.dozingcatsoftware.vectorcamera.AboutActivity">
+        </activity>
+
+        <activity android:name="com.dozingcatsoftware.vectorcamera.VCPreferencesActivity">
+        </activity>
+
+        <receiver android:name="com.dozingcatsoftware.vectorcamera.NewPictureReceiver" android:label="NewPictureReceiver"
+            android:enabled="false">
+            <intent-filter>
+                <action android:name="android.hardware.action.NEW_PICTURE" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name="com.dozingcatsoftware.vectorcamera.NewPictureJob"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="true" />
+
+        <provider
+            android:authorities="${applicationId}.fileprovider"
+            android:name="android.support.v4.content.FileProvider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
+    </application>
+
+</manifest>

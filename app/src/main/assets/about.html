@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            html, body {
+                background: black;
+                color: #ddd;
+            }
+
+            body {
+                line-height: 1.4;
+                padding: 12px;
+            }
+
+            h2 {
+                margin-top: 0;
+            }
+
+            a {
+                color: #ddd;
+            }
+
+            .icon-desc {
+                display: flex;
+                align-items: center;
+                margin: 16px 0;
+            }
+
+            .icon-desc .desc {
+              margin-left: 16px;
+            }
+
+            .icon-small {
+                height: 24px;
+                vertical-align: bottom;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>
+            Vector Camera
+        </h2>
+        <div>
+            Version 1.0, Feb 19 2018<br/>
+            Copyright &copy; 2018 Brian Nenninger<br/>
+            Comments or suggestions: <a href="mailto:bnenning@gmail.com">bnenning@gmail.com</a>
+        </div>
+
+        <h3>
+            Controls
+        </h3>
+
+        <div>
+            The shutter button at the top right will take a picture or start or stop a video
+            recording. After taking a photo or video, it will be displayed in a view where you can
+            share it with the
+            <img src="img/ic_share_white_36px.svg" class="icon-small"> icon,
+            change the effect with the
+            <img src="img/ic_color_lens_white_36px.svg" class="icon-small"> icon,
+            or delete it with the <img src="img/ic_delete_white_36px.svg" class="icon-small"> icon.
+            <p/>
+            Other controls in the main view:
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_photo_camera_white_36px.svg">
+            <div class="desc">
+                Switch between taking photo and video mode. In video mode the icon will change to
+                <img src="img/ic_videocam_white_36px.svg" class="icon-small"> and the shutter button
+                will be red.
+            </div>
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_camera_rear_white_36px.svg">
+            <div class="desc">
+                Switch between the rear-facing and front-facing cameras.
+            </div>
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_color_lens_white_36px.svg">
+            <div class="desc">
+                Choose the effect to apply. This icon will show a view displaying all available
+                effects. Touch the effect you want to activate, or use the back button to return
+                without changing the effect.
+            </div>
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_photo_library_white_36px.svg">
+            <div class="desc">
+                Show all photos and videos you have taken.
+            </div>
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_settings_white_36px.svg">
+            <div class="desc">
+                Open the settings screen where you can set options of text effects, and enable
+                automatically creating images that you take with the standard camera app.
+            </div>
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_high_quality_white_36px.svg">
+            <div class="desc">
+                Toggle high quality mode, which shows camera images in the main view at a higher
+                resolution but may be slower. This does not affect the resolution of pictures that
+                you take.
+            </div>
+        </div>
+
+        <div class="icon-desc">
+            <img src="img/ic_library_add_white_36px.svg">
+            <div class="desc">
+                Select an existing picture to import.
+            </div>
+        </div>
+
+        <div>
+            NOTE: Video recordings can be very large. Every frame is stored uncompressed
+            (so that you can go back and apply different effects), and depending on how quickly
+            your device can process and store frames this can use 5 megabytes or more per second.
+        </div>
+
+        <h3>
+            Privacy
+        </h3>
+        <div>
+            Vector Camera does not collect any personal information. See the
+            <a href="https://www.dozingcatsoftware.com/VectorCamera/privacy.html">privacy policy</a>
+            for details.
+        </div>
+
+        <h3>
+            Licenses
+        </h3>
+        <div>
+            Vector Camera is free and open source software. It is released under
+            <a href="gpl_v3.html">version 3 of the GNU GPL</a>. Source code is available at
+            <a href="https://github.com/dozingcat/vectorcamera">
+                https://github.com/dozingcat/vectorcamera
+            </a>
+            <p/>
+            Vector Camera includes code and assets from other parties, used in accordance with their
+            licenses. <a href="thirdparty.html">See details</a>.
+            <p/>
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+            INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+            PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+            LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+            TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+            OTHER DEALINGS IN THE SOFTWARE.
+        </div>
+    </body>
+
+</html>
