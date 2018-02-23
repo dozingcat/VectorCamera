@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.preference.PreferenceManager
@@ -109,6 +110,11 @@ class MainActivity : Activity() {
             photoLibrary.clearTempDirectories()
         }
         super.onPause()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        Log.i(TAG, "configurationChanged: ${newConfig.orientation}")
+        super.onConfigurationChanged(newConfig)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
