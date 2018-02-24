@@ -34,12 +34,11 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         val facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING)
         val isFrontFacing = (facing == CameraMetadata.LENS_FACING_FRONT)
         val orientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)
-        if (isFrontFacing && orientation == 90 || !isFrontFacing && orientation == 270) {
-            ImageOrientation.ROTATED_180
-        }
-        else {
-            ImageOrientation.NORMAL
-        }
+        val upsideDown =
+                (isFrontFacing && orientation == 90) || (!isFrontFacing && orientation == 270)
+        // X flipped if the camera front facing or the orientation is backwards, but not both.
+        Log.i(TAG, "isFrontFacing: ${isFrontFacing} upsideDown: ${upsideDown}")
+        ImageOrientation(xFlipped = (isFrontFacing != upsideDown), yFlipped = upsideDown)
     }()
 
     fun start(targetStatus: CameraStatus, targetSize: Size,

@@ -35,7 +35,6 @@ class MainActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
-    private lateinit var displaySize: Size
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var currentEffect: Effect? = null
     private var previousEffect: Effect? = null
@@ -55,7 +54,6 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
-        displaySize = getDisplaySize(this)
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
         imageProcessor = CameraImageProcessor(rs)
@@ -140,6 +138,11 @@ class MainActivity : Activity() {
         }
     }
 
+    fun landscapeDisplaySize(): Size {
+        val ds = getDisplaySize(this)
+        return if (ds.width >= ds.height) ds else Size(ds.height, ds.width)
+    }
+
     fun updateControls() {
         var shutterResId = R.drawable.btn_camera_shutter_holo
         if (shutterMode == ShutterMode.VIDEO) {
@@ -163,11 +166,12 @@ class MainActivity : Activity() {
     }
 
     private fun targetCameraImageSize(): Size {
+        val ds = landscapeDisplaySize()
         return when (preferredImageSize) {
-            ImageSize.FULL_SCREEN -> displaySize
-            ImageSize.HALF_SCREEN -> Size(displaySize.width / 2, displaySize.height / 2)
+            ImageSize.FULL_SCREEN -> ds
+            ImageSize.HALF_SCREEN -> Size(ds.width / 2, ds.height / 2)
             ImageSize.VIDEO_RECORDING -> Size(640, 360)
-            ImageSize.EFFECT_GRID -> Size(displaySize.width / 4, displaySize.height / 4)
+            ImageSize.EFFECT_GRID -> Size(ds.width / 4, ds.height / 4)
         }
     }
 
@@ -253,8 +257,12 @@ class MainActivity : Activity() {
 
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
         handler.post(fun() {
-            // Slightly ugly but some effects need the display size.
-            val cameraImage = imageFromCamera.withDisplaySize(displaySize)
+            // Add fields that the image generator doesn't have. Might be better to have a separate
+            // class that holds a CameraImage, display size, and portrait flag.
+            val ds = landscapeDisplaySize()
+            val isPortrait = overlayView.height > overlayView.width
+            val orientation = imageFromCamera.orientation.withPortrait(isPortrait)
+            val cameraImage = imageFromCamera.withDisplaySizeAndOrientation(ds, orientation)
             if (cameraImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()

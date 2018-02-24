@@ -20,8 +20,11 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
         frameBuffer = ByteArray(bytesPerFrame())
     }
 
-    fun videoWidth() = metadata.width
-    fun videoHeight() = metadata.height
+    fun isPortrait() = metadata.orientation.portrait
+    fun landscapeVideoWidth() = metadata.width
+    fun landscapeVideoHeight() = metadata.height
+    fun outputVideoWidth() = if (isPortrait()) metadata.height else metadata.width
+    fun outputVideoHeight() = if (isPortrait()) metadata.width else metadata.height
     fun numberOfFrames() = metadata.frameTimestamps.size
 
     private fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2

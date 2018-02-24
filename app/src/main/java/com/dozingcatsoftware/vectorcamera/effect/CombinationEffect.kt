@@ -48,10 +48,10 @@ class CombinationEffect(
 
             var gridX = i % gridSize
             var gridY = i / gridSize
-            if (cameraImage.orientation.isXFlipped()) {
+            if (cameraImage.orientation.xFlipped) {
                 gridX = gridSize - 1 - gridX
             }
-            if (cameraImage.orientation.isYFlipped()) {
+            if (cameraImage.orientation.yFlipped) {
                 gridY = gridSize - 1 - gridY
             }
             val dstRect = Rect(gridX * tileWidth, gridY * tileHeight,

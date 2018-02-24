@@ -18,8 +18,9 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                 "type" to mediaType.name.toLowerCase(),
                 "width" to width,
                 "height" to height,
-                "xFlipped" to orientation.isXFlipped(),
-                "yFlipped" to orientation.isYFlipped(),
+                "xFlipped" to orientation.xFlipped,
+                "yFlipped" to orientation.yFlipped,
+                "portrait" to orientation.portrait,
                 "timestamp" to timestamp,
                 "frameTimestamps" to frameTimestamps,
                 "audioStartTimestamp" to audioStartTimestamp,
@@ -54,8 +55,9 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                     EffectMetadata.fromJson(effectDict),
                     (json["width"] as Number).toInt(),
                     (json["height"] as Number).toInt(),
-                    ImageOrientation.withXYFlipped(
-                            json["xFlipped"] as Boolean, json["yFlipped"] as Boolean),
+                    ImageOrientation(
+                            json["xFlipped"] as Boolean, json["yFlipped"] as Boolean,
+                            json.getOrDefault("portrait", false) as Boolean),
                     json["timestamp"] as Long,
                     frameTimestamps as List<Long>,
                     audioStartTimestamp.toLong(),

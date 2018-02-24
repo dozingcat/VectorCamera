@@ -8,10 +8,10 @@ import java.io.File
  */
 class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
 
-    private val frameArgb = IntArray(videoReader.videoWidth() * videoReader.videoHeight())
+    private val frameArgb = IntArray(videoReader.outputVideoWidth() * videoReader.outputVideoHeight())
     private val numFrames = videoReader.numberOfFrames()
-    private val videoWidth = videoReader.videoWidth()
-    private val videoHeight = videoReader.videoHeight()
+    private val outputWidth = videoReader.outputVideoWidth()
+    private val outputHeight = videoReader.outputVideoHeight()
 
     fun startEncoding() {
         val framesPerSecond = (numFrames / videoReader.totalDurationMillis()).toFloat() / 1000f
@@ -23,7 +23,7 @@ class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
         }
         val deadlineMicros = 1_000_000
         this.nativeStartEncoding(
-                outputPath, videoWidth, videoHeight,
+                outputPath, outputWidth, outputHeight,
                 framesPerSecond, frameRelativeEndTimes, deadlineMicros)
     }
 
@@ -31,8 +31,9 @@ class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
         if (frameIndex < 0 || frameIndex >= numFrames) {
             throw IllegalArgumentException("Invalid frame index: ${frameIndex}")
         }
-        val bitmap = videoReader.bitmapForFrame(frameIndex).renderBitmap(videoWidth, videoHeight)
-        bitmap.getPixels(frameArgb, 0, videoWidth, 0, 0, videoWidth, videoHeight)
+        val bitmap = videoReader.bitmapForFrame(frameIndex).renderBitmap(
+                videoReader.landscapeVideoWidth(), videoReader.landscapeVideoHeight())
+        bitmap.getPixels(frameArgb, 0, outputWidth, 0, 0, outputWidth, outputHeight)
         nativeEncodeFrame(frameArgb)
     }
 
