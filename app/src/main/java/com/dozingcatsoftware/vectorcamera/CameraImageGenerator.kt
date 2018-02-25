@@ -22,6 +22,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     var status = CameraStatus.CLOSED
     private var targetStatus = CameraStatus.CLOSED
     private var imageAllocationCallback: ((CameraImage) -> Unit)? = null
+    private var cameraClosedCallback: (() -> Unit)? = null
     private var handler = Handler()
 
     private val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
@@ -34,12 +35,11 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         val facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING)
         val isFrontFacing = (facing == CameraMetadata.LENS_FACING_FRONT)
         val orientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)
-        if (isFrontFacing && orientation == 90 || !isFrontFacing && orientation == 270) {
-            ImageOrientation.ROTATED_180
-        }
-        else {
-            ImageOrientation.NORMAL
-        }
+        val upsideDown =
+                (isFrontFacing && orientation == 90) || (!isFrontFacing && orientation == 270)
+        // X flipped if the camera front facing or the orientation is backwards, but not both.
+        Log.i(TAG, "isFrontFacing: ${isFrontFacing} upsideDown: ${upsideDown}")
+        ImageOrientation(xFlipped = (isFrontFacing != upsideDown), yFlipped = upsideDown)
     }()
 
     fun start(targetStatus: CameraStatus, targetSize: Size,
@@ -61,19 +61,24 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         }
     }
 
-    fun stop() {
+    /**
+     * Stops the camera and invokes the callback after the camera is completely closed. This avoids
+     * errors that can occur when trying to open the camera while it's in the process of closing.
+     */
+    fun stop(closedCallback: (() -> Unit)? = null) {
         this.targetStatus = CameraStatus.CLOSED
+        this.cameraClosedCallback = closedCallback
         updateStatus(this.status)
     }
 
     private fun updateStatus(status: CameraStatus) {
-        Log.i(TAG, "CameraStatus change: " + status)
+        Log.i(TAG, "CameraStatus change: ${status}, target=${targetStatus}")
         this.status = status
 
         if (this.targetStatus == CameraStatus.CLOSED) {
             if (this.status.isCapturing()) {
                 this.status = CameraStatus.CLOSING
-                stopCaptureSession()
+                stopCamera()
             }
         }
         else if (this.targetStatus.isCapturing()) {
@@ -100,7 +105,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         }
     }
 
-    fun openCamera() {
+    private fun openCamera() {
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         stopCamera()
         try {
@@ -111,8 +116,15 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                     updateStatus(CameraStatus.OPENED)
                 }
 
-                override fun onDisconnected(cam: CameraDevice) {
+                override fun onClosed(cam: CameraDevice) {
+                    Log.i(TAG, "camera onClosed")
                     updateStatus(CameraStatus.CLOSED)
+                    cameraClosedCallback?.invoke()
+                }
+
+                override fun onDisconnected(cam: CameraDevice) {
+                    Log.i(TAG, "onDisconnected")
+                    cam.close()
                 }
 
                 override fun onError(camera: CameraDevice, error: Int) {
@@ -157,6 +169,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                         }
 
                         override fun onClosed(session: CameraCaptureSession?) {
+                            Log.i(TAG, "capture session onClosed, status=${status}")
                             super.onClosed(session)
                             updateStatus(CameraStatus.OPENED)
                         }

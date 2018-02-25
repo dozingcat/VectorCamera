@@ -19,6 +19,8 @@ data class CameraImage(val rs: RenderScript,
                        val orientation: ImageOrientation, val status: CameraStatus,
                        val timestamp: Long, val displaySize: Size = zeroSize) {
 
+    // width() and height() return the dimensions of the actual camera input, which is always
+    // landscape. In portrait orientation the rendered image will have the dimensioned swapped.
     fun width(): Int {
         return singleYuvAllocation?.type?.x ?: planarYuvAllocations!!.y.type.x
     }
@@ -32,6 +34,11 @@ data class CameraImage(val rs: RenderScript,
     fun withDisplaySize(ds: Size): CameraImage {
         return CameraImage(
                 rs, singleYuvAllocation, planarYuvAllocations, orientation, status, timestamp, ds)
+    }
+
+    fun withDisplaySizeAndOrientation(ds: Size, o: ImageOrientation): CameraImage {
+        return CameraImage(
+                rs, singleYuvAllocation, planarYuvAllocations, o, status, timestamp, ds)
     }
 
     fun resizedTo(size: Size): CameraImage {

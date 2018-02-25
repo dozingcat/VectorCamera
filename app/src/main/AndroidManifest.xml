@@ -20,8 +20,7 @@
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
 
         <activity android:name="com.dozingcatsoftware.vectorcamera.MainActivity"
-                  android:screenOrientation="landscape"
-                  android:configChanges="keyboard|keyboardHidden">
+                  android:configChanges="orientation|screenSize|keyboard|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -35,12 +34,12 @@
 
         <activity
             android:name="com.dozingcatsoftware.vectorcamera.ViewImageActivity"
-            android:screenOrientation="landscape">
+            android:configChanges="orientation|screenSize">
         </activity>
 
         <activity
             android:name="com.dozingcatsoftware.vectorcamera.ViewVideoActivity"
-            android:screenOrientation="landscape">
+            android:configChanges="orientation|screenSize">
         </activity>
 
         <activity android:name="com.dozingcatsoftware.vectorcamera.AboutActivity">

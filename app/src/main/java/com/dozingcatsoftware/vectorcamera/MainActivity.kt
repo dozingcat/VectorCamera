@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.preference.PreferenceManager
@@ -9,15 +10,17 @@ import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
-import android.view.MotionEvent
-import android.view.View
-import android.view.Window
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
-import com.dozingcatsoftware.util.getDisplaySize
+import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
+import android.view.*
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+
+
 
 enum class ShutterMode {IMAGE, VIDEO}
 
@@ -34,7 +37,6 @@ class MainActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
-    private lateinit var displaySize: Size
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private var currentEffect: Effect? = null
     private var previousEffect: Effect? = null
@@ -48,13 +50,14 @@ class MainActivity : Activity() {
     private lateinit var previousImageSize: ImageSize
     private var shutterMode = ShutterMode.IMAGE
 
+    private var layoutIsPortrait = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_main)
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
-        displaySize = getDisplaySize(this)
         // Use PROFILE type only on first run?
         rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
         imageProcessor = CameraImageProcessor(rs)
@@ -92,9 +95,16 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        // TODO: Read high quality flag from preferences.
         checkPermissionAndStartCamera()
         overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
+
+        // View size is zero in onResume, have to wait for layout notification.
+        var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
+        listener = ViewTreeObserver.OnGlobalLayoutListener {
+            updateLayout(isPortraitOrientation())
+            overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+        }
+        overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
     override fun onPause() {
@@ -109,6 +119,15 @@ class MainActivity : Activity() {
             photoLibrary.clearTempDirectories()
         }
         super.onPause()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        Log.i(TAG, "configurationChanged: ${newConfig.orientation}")
+        super.onConfigurationChanged(newConfig)
+        val isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
+        if (isPortrait != layoutIsPortrait) {
+            updateLayout(isPortrait)
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
@@ -156,12 +175,47 @@ class MainActivity : Activity() {
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
     }
 
+    fun updateLayout(isPortrait: Boolean) {
+        Log.i(TAG, "updateLayout: ${isPortrait}")
+        layoutIsPortrait = isPortrait
+        val layoutWidth =
+                if (isPortrait) FrameLayout.LayoutParams.MATCH_PARENT
+                else FrameLayout.LayoutParams.WRAP_CONTENT
+        val layoutHeight =
+                if (isPortrait) FrameLayout.LayoutParams.WRAP_CONTENT
+                else FrameLayout.LayoutParams.MATCH_PARENT
+        val orientation = if (isPortrait) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        val direction =
+                if (isPortrait) LinearLayout.LAYOUT_DIRECTION_RTL
+                else LinearLayout.LAYOUT_DIRECTION_LTR
+
+        run {
+            val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
+            params.gravity = if (isPortrait) Gravity.TOP else Gravity.LEFT
+            leftTopControlBar.layoutParams = params
+            leftTopControlBar.orientation = orientation
+            leftTopControlBar.layoutDirection = direction
+        }
+        run {
+            val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
+            params.gravity = if (isPortrait) Gravity.BOTTOM else Gravity.RIGHT
+            rightBottomControlBar.layoutParams = params
+            rightBottomControlBar.orientation = orientation
+            rightBottomControlBar.layoutDirection = direction
+        }
+    }
+
+    private fun isPortraitOrientation(): Boolean {
+        return overlayView.height > overlayView.width
+    }
+
     private fun targetCameraImageSize(): Size {
+        val ds = getLandscapeDisplaySize(this)
         return when (preferredImageSize) {
-            ImageSize.FULL_SCREEN -> displaySize
-            ImageSize.HALF_SCREEN -> Size(displaySize.width / 2, displaySize.height / 2)
+            ImageSize.FULL_SCREEN -> ds
+            ImageSize.HALF_SCREEN -> Size(ds.width / 2, ds.height / 2)
             ImageSize.VIDEO_RECORDING -> Size(640, 360)
-            ImageSize.EFFECT_GRID -> Size(displaySize.width / 4, displaySize.height / 4)
+            ImageSize.EFFECT_GRID -> Size(ds.width / 4, ds.height / 4)
         }
     }
 
@@ -247,8 +301,11 @@ class MainActivity : Activity() {
 
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
         handler.post(fun() {
-            // Slightly ugly but some effects need the display size.
-            val cameraImage = imageFromCamera.withDisplaySize(displaySize)
+            // Add fields that the image generator doesn't have. Might be better to have a separate
+            // class that holds a CameraImage, display size, and portrait flag.
+            val ds = getLandscapeDisplaySize(this)
+            val orientation = imageFromCamera.orientation.withPortrait(isPortraitOrientation())
+            val cameraImage = imageFromCamera.withDisplaySizeAndOrientation(ds, orientation)
             if (cameraImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()
@@ -281,10 +338,13 @@ class MainActivity : Activity() {
         }
         imageProcessor.pause()
         cameraSelector.selectNextCamera()
-        cameraImageGenerator.stop()
-        cameraImageGenerator = cameraSelector.createImageGenerator(rs)
-        restartCameraImageGenerator()
-        updateControls()
+        cameraImageGenerator.stop({
+            handler.post({
+                cameraImageGenerator = cameraSelector.createImageGenerator(rs)
+                restartCameraImageGenerator()
+                updateControls()
+            })
+        })
     }
 
     private fun switchResolution(view: View) {

@@ -1,7 +1,6 @@
 package com.dozingcatsoftware.vectorcamera
 
 import android.graphics.*
-import android.renderscript.RenderScript
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 
@@ -23,19 +22,35 @@ data class ProcessedBitmap(
                        tmpRect: RectF? = null, tmpMatrix: Matrix? = null) {
         val dstRect = tmpRect ?: RectF()
         val flipMatrix = tmpMatrix ?: Matrix()
+        flipMatrix.reset()
 
-        val scaleFactor = Math.min(width.toFloat() / bitmap.width, height.toFloat() / bitmap.height)
-        val scaledWidth = bitmap.width * scaleFactor
-        val scaledHeight = bitmap.height * scaleFactor
+        val o = sourceImage.orientation
+        val shouldRotate = o.portrait
+        val flipHorizontal = if (shouldRotate) o.yFlipped else o.xFlipped
+        val flipVertical = if (shouldRotate) o.xFlipped else o.yFlipped
 
-        val flipHorizontal = sourceImage.orientation.isXFlipped()
-        val flipVertical = sourceImage.orientation.isYFlipped()
+        val bitmapWidth = if (shouldRotate) bitmap.height else bitmap.width
+        val bitmapHeight = if (shouldRotate) bitmap.width else bitmap.height
+
+        val scaleFactor = Math.min(width.toFloat() / bitmapWidth, height.toFloat() / bitmapHeight)
+        val scaledWidth = bitmapWidth * scaleFactor
+        val scaledHeight = bitmapHeight * scaleFactor
+
         var xOffset = (width - scaledWidth) / 2
         var yOffset = (height - scaledHeight) / 2
 
-        flipMatrix.setScale(if (flipHorizontal) -scaleFactor else scaleFactor,
+        if (shouldRotate) {
+            // Rotating clockwise changes the rect from (0, 0, w, h) to (-h, 0, 0, w).
+            // Add h to the x coordinate to get to (0, 0, h, w).
+            flipMatrix.postRotate(90f)
+            flipMatrix.postTranslate(bitmap.height.toFloat(), 0f)
+        }
+
+        flipMatrix.postScale(
+                if (flipHorizontal) -scaleFactor else scaleFactor,
                 if (flipVertical) -scaleFactor else scaleFactor)
-        flipMatrix.postTranslate(if (flipHorizontal) xOffset + scaledWidth else xOffset,
+        flipMatrix.postTranslate(
+                if (flipHorizontal) xOffset + scaledWidth else xOffset,
                 if (flipVertical) yOffset + scaledHeight else yOffset)
 
         if (xOffset > 0 && outsidePaint != null) {
@@ -52,10 +67,14 @@ data class ProcessedBitmap(
         canvas.drawBitmap(bitmap, flipMatrix, null)
     }
 
-    fun renderBitmap(width: Int, height: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    fun renderBitmap(landscapeWidth: Int, landscapeHeight: Int): Bitmap {
+        val shouldRotate = sourceImage.orientation.portrait
+        val bitmap = Bitmap.createBitmap(
+                if (shouldRotate) landscapeHeight else landscapeWidth,
+                if (shouldRotate) landscapeWidth else landscapeHeight,
+                Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        renderToCanvas(canvas, width, height)
+        renderToCanvas(canvas, bitmap.width, bitmap.height)
         return bitmap
     }
 
