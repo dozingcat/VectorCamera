@@ -194,14 +194,14 @@ class MainActivity : Activity() {
         run {
             val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
             params.gravity = if (isPortrait) Gravity.TOP else Gravity.LEFT
-            leftTopControlBar.setLayoutParams(params)
+            leftTopControlBar.layoutParams = params
             leftTopControlBar.orientation = orientation
             leftTopControlBar.layoutDirection = direction
         }
         run {
             val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
             params.gravity = if (isPortrait) Gravity.BOTTOM else Gravity.RIGHT
-            rightBottomControlBar.setLayoutParams(params)
+            rightBottomControlBar.layoutParams = params
             rightBottomControlBar.orientation = orientation
             rightBottomControlBar.layoutDirection = direction
         }
@@ -340,10 +340,13 @@ class MainActivity : Activity() {
         }
         imageProcessor.pause()
         cameraSelector.selectNextCamera()
-        cameraImageGenerator.stop()
-        cameraImageGenerator = cameraSelector.createImageGenerator(rs)
-        restartCameraImageGenerator()
-        updateControls()
+        cameraImageGenerator.stop({
+            handler.post({
+                cameraImageGenerator = cameraSelector.createImageGenerator(rs)
+                restartCameraImageGenerator()
+                updateControls()
+            })
+        })
     }
 
     private fun switchResolution(view: View) {
