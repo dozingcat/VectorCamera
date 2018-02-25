@@ -171,7 +171,9 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                         override fun onClosed(session: CameraCaptureSession?) {
                             Log.i(TAG, "capture session onClosed, status=${status}")
                             super.onClosed(session)
-                            updateStatus(CameraStatus.OPENED)
+                            if (status != CameraStatus.CLOSING && status != CameraStatus.CLOSED) {
+                                updateStatus(CameraStatus.OPENED)
+                            }
                         }
                     },
                     null)
