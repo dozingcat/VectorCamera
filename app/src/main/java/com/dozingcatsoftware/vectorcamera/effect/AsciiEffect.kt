@@ -53,11 +53,10 @@ class AsciiEffect(private val rs: RenderScript,
         canvas.drawRect(rect, backgroundPaint)
     }
 
-    // HERE: Update to hold colors and add HTML/text output.
     class AsciiResult(val numRows: Int, val numCols: Int) {
-        val characters = CharArray(numRows * numCols)
+        private val characters = CharArray(numRows * numCols)
         // Colors are stored as 24-bit packed rgb values. The upper 8 bits are not used.
-        val colors = IntArray(numRows * numCols)
+        private val colors = IntArray(numRows * numCols)
 
         private fun getIndex(row: Int, col: Int) = row * numCols + col
 
@@ -76,53 +75,76 @@ class AsciiEffect(private val rs: RenderScript,
         }
     }
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val outputSize = scaleToTargetSize(cameraImage.size(), cameraImage.displaySize)
-        val numCharacterColumns = Math.min(numPreferredCharColumns, outputSize.width / minCharWidth)
-        val charPixelWidth = outputSize.width / numCharacterColumns
+    class AsciiMetrics(val isPortrait: Boolean, val outputSize: Size, val charPixelSize: Size,
+                       val numCharacterRows: Int, val numCharacterColumns: Int)
+
+    private fun getAsciiMetrics(cameraImage: CameraImage, maxOutputSize: Size): AsciiMetrics {
+        val isPortrait = cameraImage.orientation.portrait
+        // In portrait mode the output size is still wide, because it will get rotated for display,
+        // but the number of character rows and columns changes. The characters are inserted
+        // sideways into the output image so that they will appear correctly after rotation.
+        // Using numPreferredCharColumns results in different text sizes for portrait vs landscape.
+        // Maybe scale it by the aspect ratio?
+        val targetOutputSize = scaleToTargetSize(cameraImage.size(), maxOutputSize)
+        val numPixelsForColumns =
+                if (isPortrait) targetOutputSize.height else targetOutputSize.width
+        val numCharColumns = Math.min(numPreferredCharColumns, numPixelsForColumns / minCharWidth)
+        val charPixelWidth = numPixelsForColumns / numCharColumns
         val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
-        val numCharacterRows = outputSize.height / charPixelHeight
+        val numPixelsForRows = if (isPortrait) targetOutputSize.width else targetOutputSize.height
+        val numCharRows = numPixelsForRows / charPixelHeight
+        // Actual output size may be smaller due to not being an exact multiple of the char size.
+        val actualOutputSize =
+                if (isPortrait) Size(numCharRows * charPixelHeight, numCharColumns * charPixelWidth)
+                else Size(numCharColumns * charPixelWidth, numCharRows * charPixelHeight)
+        return AsciiMetrics(isPortrait, actualOutputSize, Size(charPixelWidth, charPixelHeight),
+                numCharRows, numCharColumns)
+    }
 
-        val outputWidth = numCharacterColumns * charPixelWidth
-        val outputHeight = numCharacterRows * charPixelHeight
+    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+        val metrics = getAsciiMetrics(cameraImage, cameraImage.displaySize)
         // TODO: Reuse resultBitmap and charBitmap if possible.
-        val resultBitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+        val resultBitmap = Bitmap.createBitmap(
+                metrics.outputSize.width, metrics.outputSize.height, Bitmap.Config.ARGB_8888)
 
+        val cps = metrics.charPixelSize
         // Create Bitmap and draw each character into it.
         val paint = Paint()
-        paint.textSize = charPixelHeight * 5f / 6
+        paint.textSize = cps.height * 5f / 6
         paint.color = textColor
 
         val charBitmap = Bitmap.createBitmap(
-                charPixelWidth * pixelChars.length, charPixelHeight, Bitmap.Config.ARGB_8888)
+                cps.width * pixelChars.length, cps.height, Bitmap.Config.ARGB_8888)
         val charBitmapCanvas = Canvas(charBitmap)
         charBitmapCanvas.drawColor(backgroundColor)
         for (i in 0 until pixelChars.length) {
             charBitmapCanvas.drawText(pixelChars[i].toString(),
-                    (i * charPixelWidth).toFloat(), charPixelHeight - 1f, paint)
+                    (i * cps.width).toFloat(), cps.height - 1f, paint)
         }
         characterTemplateAllocation = reuseOrCreate2dAllocation(characterTemplateAllocation,
-                rs, Element::RGBA_8888,pixelChars.length * charPixelWidth, charPixelHeight)
+                rs, Element::RGBA_8888,charBitmap.width, charBitmap.height)
 
         characterTemplateAllocation!!.copyFrom(charBitmap)
 
         bitmapOutputAllocation = reuseOrCreate2dAllocation(bitmapOutputAllocation,
-                rs, Element::RGBA_8888, outputWidth, outputHeight)
+                rs, Element::RGBA_8888, resultBitmap.width, resultBitmap.height)
 
         script._characterBitmapInput = characterTemplateAllocation
         script._imageOutput = bitmapOutputAllocation
         script._inputImageWidth = cameraImage.width()
         script._inputImageHeight = cameraImage.height()
-        script._characterPixelWidth = charPixelWidth
-        script._characterPixelHeight = charPixelHeight
-        script._numCharColumns = numCharacterColumns
-        script._numCharRows = numCharacterRows
+        script._characterPixelWidth = cps.width
+        script._characterPixelHeight = cps.height
+        script._numCharColumns = metrics.numCharacterColumns
+        script._numCharRows = metrics.numCharacterRows
         script._numCharacters = pixelChars.length
         script._flipHorizontal = cameraImage.orientation.xFlipped
         script._flipVertical = cameraImage.orientation.yFlipped
+        script._portrait = metrics.isPortrait
         script._colorMode = colorMode.id
         // There's no input allocation passed directly to the kernel so we manually set x/y ranges.
-        val options = Script.LaunchOptions().setX(0, numCharacterColumns).setY(0, numCharacterRows)
+        val options = Script.LaunchOptions()
+                .setX(0, metrics.numCharacterColumns).setY(0, metrics.numCharacterRows)
         if (cameraImage.planarYuvAllocations != null) {
             script._hasSingleYuvAllocation = false
             script._yInput = cameraImage.planarYuvAllocations.y
@@ -141,43 +163,42 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     private fun getCharacterInfo(
-            camAllocation: CameraImage, pixelChars: String,
-            charPixelWidth: Int, charPixelHeight: Int,
-            numCharacterColumns: Int, numCharacterRows: Int): AsciiResult {
+            cameraImage: CameraImage, pixelChars: String, metrics: AsciiMetrics): AsciiResult {
         asciiBlockAllocation = reuseOrCreate2dAllocation(asciiBlockAllocation,
-                rs, Element::RGBA_8888, numCharacterColumns, numCharacterRows)
+                rs, Element::RGBA_8888, metrics.numCharacterColumns, metrics.numCharacterRows)
 
-        script._inputImageWidth = camAllocation.width()
-        script._inputImageHeight = camAllocation.height()
-        script._characterPixelWidth = charPixelWidth
-        script._characterPixelHeight = charPixelHeight
-        script._numCharColumns = numCharacterColumns
-        script._numCharRows = numCharacterRows
+        script._inputImageWidth = cameraImage.width()
+        script._inputImageHeight = cameraImage.height()
+        script._characterPixelWidth = metrics.charPixelSize.width
+        script._characterPixelHeight = metrics.charPixelSize.height
+        script._numCharColumns = metrics.numCharacterColumns
+        script._numCharRows = metrics.numCharacterRows
         script._numCharacters = pixelChars.length
-        script._flipHorizontal = camAllocation.orientation.xFlipped
-        script._flipVertical = camAllocation.orientation.yFlipped
+        script._flipHorizontal = cameraImage.orientation.xFlipped
+        script._flipVertical = cameraImage.orientation.yFlipped
+        script._portrait = cameraImage.orientation.portrait
         script._colorMode = colorMode.id
-        if (camAllocation.planarYuvAllocations != null) {
+        if (cameraImage.planarYuvAllocations != null) {
             script._hasSingleYuvAllocation = false
-            script._yInput = camAllocation.planarYuvAllocations.y
-            script._uInput = camAllocation.planarYuvAllocations.u
-            script._vInput = camAllocation.planarYuvAllocations.v
+            script._yInput = cameraImage.planarYuvAllocations.y
+            script._uInput = cameraImage.planarYuvAllocations.u
+            script._vInput = cameraImage.planarYuvAllocations.v
             script.forEach_computeCharacterInfoForBlock(asciiBlockAllocation)
         }
         else {
             script._hasSingleYuvAllocation = true
-            script._yuvInput = camAllocation.singleYuvAllocation
+            script._yuvInput = cameraImage.singleYuvAllocation
             script.forEach_computeCharacterInfoForBlock(asciiBlockAllocation)
         }
 
-        val allocBytes = ByteArray(4 * numCharacterColumns * numCharacterRows)
+        val allocBytes = ByteArray(4 * metrics.numCharacterColumns * metrics.numCharacterRows)
         asciiBlockAllocation!!.copyTo(allocBytes)
 
-        val result = AsciiResult(numCharacterRows, numCharacterColumns)
+        val result = AsciiResult(metrics.numCharacterRows, metrics.numCharacterColumns)
         // Average brightness is stored in the alpha component, and allocations are RGBA.
         var allocIndex = 0
-        for (r in 0 until numCharacterRows) {
-            for (c in 0 until numCharacterColumns) {
+        for (r in 0 until metrics.numCharacterRows) {
+            for (c in 0 until metrics.numCharacterColumns) {
                 val red = toUInt(allocBytes[allocIndex])
                 val green = toUInt(allocBytes[allocIndex + 1])
                 val blue = toUInt(allocBytes[allocIndex + 2])
@@ -191,18 +212,12 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     fun writeText(cameraImage: CameraImage, out: OutputStream) {
-        val outputSize = scaleToTargetSize(cameraImage.size(), EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
-        val numCharacterColumns = numPreferredCharColumns
-        val charPixelWidth = outputSize.width / numCharacterColumns
-        val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
-        val numCharacterRows = outputSize.height / charPixelHeight
-
+        val metrics = getAsciiMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
         val asciiResult = getCharacterInfo(
-                cameraImage, pixelChars, charPixelWidth, charPixelHeight,
-                numCharacterColumns, numCharacterRows)
+                cameraImage, pixelChars, metrics)
         val writer = OutputStreamWriter(out, Charsets.UTF_8)
-        for (r in 0 until numCharacterRows) {
-            for (c in 0 until numCharacterColumns) {
+        for (r in 0 until metrics.numCharacterRows) {
+            for (c in 0 until metrics.numCharacterColumns) {
                 writer.write(asciiResult.charAtRowAndColumn(r, c).toString())
             }
             writer.write("\n")
@@ -211,15 +226,9 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     fun writeHtml(cameraImage: CameraImage, out: OutputStream) {
-        val outputSize = scaleToTargetSize(cameraImage.size(), EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
-        val numCharacterColumns = numPreferredCharColumns
-        val charPixelWidth = outputSize.width / numCharacterColumns
-        val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
-        val numCharacterRows = outputSize.height / charPixelHeight
-
+        val metrics = getAsciiMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
         val asciiResult = getCharacterInfo(
-                cameraImage, pixelChars, charPixelWidth, charPixelHeight,
-                numCharacterColumns, numCharacterRows)
+                cameraImage, pixelChars, metrics)
 
         val isFixedColor = (colorMode == AsciiColorMode.FIXED)
         val writer = OutputStreamWriter(out, Charsets.UTF_8)
@@ -238,10 +247,10 @@ class AsciiEffect(private val rs: RenderScript,
         writer.write("</style>\n")
         writer.write("</head>\n<body>\n<div class='ascii'>\n")
 
-        for (r in 0 until numCharacterRows) {
+        for (r in 0 until metrics.numCharacterRows) {
             var lastColor = 0
             writer.write("<pre>")
-            for (c in 0 until numCharacterColumns) {
+            for (c in 0 until metrics.numCharacterColumns) {
                 if (!isFixedColor) {
                     val charColor = asciiResult.colorAtRowAndColumn(r, c)
                     if (c == 0 || charColor != lastColor) {

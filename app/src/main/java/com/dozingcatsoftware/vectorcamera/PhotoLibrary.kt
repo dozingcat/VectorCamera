@@ -98,7 +98,7 @@ class PhotoLibrary(val rootDirectory: File) {
         val uncompressedSize = width * height + 2 * (width / 2) * (height / 2)
         val compressedSize = rawImageFile.length()
         val compressedPercent = Math.round(100.0 * compressedSize / uncompressedSize)
-        Log.i(TAG, "Wrote $compressedSize bytes, compressed by ${compressedPercent}%")
+        Log.i(TAG, "Wrote $compressedSize bytes, compressed to ${compressedPercent}%")
 
         val effectMetadata = EffectMetadata(
                 processedBitmap.effect.effectName(), processedBitmap.effect.effectParameters())

@@ -21,6 +21,7 @@ int32_t characterPixelHeight;
 int32_t numCharacters;
 bool flipHorizontal;
 bool flipVertical;
+bool portrait;
 
 // 0=monochrome, 1=primary, 2=full
 int32_t colorMode;
@@ -28,16 +29,35 @@ int32_t colorMode;
 // component, it will be enabled.
 static float PRIMARY_COLOR_RATIO = 0.875f;
 
+// In portrait mode, the image input and output is still landscape, but it will be rotated for
+// display so we need to write the text sideways. (x, y) coords in portrait mode:
+// ===================
+// |(2,0)|(2,1)|(2,2)|
+// |(1,0)|(1,1)|(1,2)|
+// |(0,0)|(0,1)|(0,2)|
+// ===================
+
 
 // Returns (red, green, blue, brightness) averages for the input pixel block.
 static uchar4 computeBlockAverageColor(uint32_t x, uint32_t y) {
-    int inputPixelsPerCol = inputImageWidth / numCharColumns;
-    int inputPixelsPerRow = inputImageHeight / numCharRows;
-
-    uint32_t xmin = x * inputPixelsPerCol;
-    uint32_t xmax = (x + 1) * inputPixelsPerCol;
-    uint32_t ymin = y * inputPixelsPerRow;
-    uint32_t ymax = (y + 1) * inputPixelsPerRow;
+    uint32_t inputPixelsPerCol, inputPixelsPerRow;
+    uint32_t xmin, xmax, ymin, ymax;
+    if (portrait) {
+        inputPixelsPerCol = inputImageHeight / numCharColumns;
+        inputPixelsPerRow = inputImageWidth / numCharRows;
+        xmin = y * inputPixelsPerRow;
+        xmax = xmin + inputPixelsPerRow;
+        ymin = (numCharColumns - 1 - x) * inputPixelsPerCol;
+        ymax = ymin + inputPixelsPerCol;
+    }
+    else {
+        inputPixelsPerCol = inputImageWidth / numCharColumns;
+        inputPixelsPerRow = inputImageHeight / numCharRows;
+        xmin = x * inputPixelsPerCol;
+        xmax = xmin + inputPixelsPerCol;
+        ymin = y * inputPixelsPerRow;
+        ymax = ymin + inputPixelsPerRow;
+    }
 
     uint32_t redTotal = 0;
     uint32_t greenTotal = 0;
@@ -102,19 +122,48 @@ void RS_KERNEL writeCharacterToBitmap(uint32_t x, uint32_t y) {
     uchar4 averageColor = computeBlockAverageColor(x, y);
     uchar4 textColor = textColorForBlockAverage(averageColor);
 
-    uint32_t xOutMin = x * characterPixelWidth;
-    uint32_t yOutMin = y * characterPixelHeight;
+    uint32_t xOutMin, yOutMin, xOutCount, yOutCount;
+    if (portrait) {
+        xOutMin = y * characterPixelHeight;
+        yOutMin = (numCharColumns - 1 - x) * characterPixelWidth;
+        xOutCount = characterPixelHeight;
+        yOutCount = characterPixelWidth;
+    }
+    else {
+        xOutMin = x * characterPixelWidth;
+        yOutMin = y * characterPixelHeight;
+        xOutCount = characterPixelWidth;
+        yOutCount = characterPixelHeight;
+    }
+
     uint32_t pixelIndex = (uint32_t) (averageColor.a / 256.0 * numCharacters);
     uint32_t xoff = pixelIndex * characterPixelWidth;
-    for (uint32_t dy = 0; dy < characterPixelHeight; dy++) {
-        uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
-        for (uint32_t dx = 0; dx < characterPixelWidth; dx++) {
-            uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
-            uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
-            if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
-                pixel = textColor;
+
+    // In portrait mode, "rotate" the character bitmap pixels into the output image.
+    if (portrait) {
+        for (uint32_t dy = 0; dy < yOutCount; dy++) {
+            uint32_t xsrc = xoff + (flipVertical ? dy:  characterPixelWidth - 1 - dy);
+            for (uint32_t dx = 0; dx < xOutCount; dx++) {
+                uint32_t ysrc = (flipHorizontal ? characterPixelHeight - 1 - dx : dx);
+                uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+                if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
+                    pixel = textColor;
+                }
+                rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
             }
-            rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
+        }
+    }
+    else {
+        for (uint32_t dy = 0; dy < yOutCount; dy++) {
+            uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
+            for (uint32_t dx = 0; dx < xOutCount; dx++) {
+                uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
+                uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+                if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
+                    pixel = textColor;
+                }
+                rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
+            }
         }
     }
 }
