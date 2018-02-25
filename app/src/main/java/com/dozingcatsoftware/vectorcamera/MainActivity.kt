@@ -16,8 +16,6 @@ import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
-import android.R.attr.button
-import android.R.attr.gravity
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout

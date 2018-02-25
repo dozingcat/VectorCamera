@@ -45,7 +45,6 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
                 rs, allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
         val fp = forcePortrait
-        android.util.Log.i("VR", "forcePortrait: ${forcePortrait}")
         if (fp != null) {
             cameraImage = cameraImage.withDisplaySizeAndOrientation(
                     displaySize, cameraImage.orientation.withPortrait(fp))
