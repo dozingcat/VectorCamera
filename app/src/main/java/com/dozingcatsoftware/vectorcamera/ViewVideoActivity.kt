@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
@@ -17,7 +18,7 @@ import android.widget.Toast
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
-import com.dozingcatsoftware.util.getDisplaySize
+import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.scanSavedMediaFile
 import kotlinx.android.synthetic.main.view_video.*
 import java.io.File
@@ -54,6 +55,7 @@ class ViewVideoActivity: Activity() {
     private lateinit var rs : RenderScript
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
+    private var effectSelectionIsPortrait = false
     private var originalEffect: Effect? = null
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private lateinit var videoReader: VideoReader
@@ -81,7 +83,7 @@ class ViewVideoActivity: Activity() {
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")
-        videoReader = VideoReader(rs, photoLibrary, videoId, getDisplaySize(this))
+        videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
 
         frameSeekBar.max = videoReader.numberOfFrames() - 1
         frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
@@ -116,11 +118,25 @@ class ViewVideoActivity: Activity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (inEffectSelectionMode) {
+            videoReader.forcePortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
+            if (!isPlaying) {
+                loadFrame(frameIndex)
+            }
+        }
+    }
+
     private fun updateControls() {
         frameSeekBar.progress = frameIndex
         playPauseButton.setImageResource(
                 if (isPlaying) R.drawable.ic_pause_white_36dp
                 else R.drawable.ic_play_arrow_white_36dp)
+    }
+
+    private fun isPortraitOrientation(): Boolean {
+        return overlayView.height > overlayView.width
     }
 
     private fun loadFrame(index: Int) {
@@ -136,10 +152,12 @@ class ViewVideoActivity: Activity() {
             originalEffect = videoReader.effect
             videoReader.effect =
                     CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
+            videoReader.forcePortrait = isPortraitOrientation()
             controlBar.visibility = View.GONE
         }
         else {
             videoReader.effect = originalEffect!!
+            videoReader.forcePortrait = null
             controlBar.visibility = View.VISIBLE
         }
         if (!isPlaying) {
@@ -222,6 +240,7 @@ class ViewVideoActivity: Activity() {
                 val effect = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
                 originalEffect = effect
                 videoReader.effect = effect
+                videoReader.forcePortrait = null
 
                 // Update thumbnail and metadata with effect.
                 val newMetadata = photoLibrary.metadataForItemId(videoId)

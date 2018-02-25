@@ -19,6 +19,11 @@ fun getDisplaySize(context: Context): Size {
     return Size(metrics.widthPixels, metrics.heightPixels)
 }
 
+fun getLandscapeDisplaySize(context: Context): Size {
+    val ds = getDisplaySize(context)
+    return if (ds.width >= ds.height) ds else Size(ds.height, ds.width)
+}
+
 /**
  * Notifies the OS to index an image so it appears in apps that show media files. Allows optional
  * callback to notify client when the scan is completed, e.g. so it can access the "content" URI

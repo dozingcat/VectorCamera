@@ -13,7 +13,10 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray
     // effect and displaySize can be changed after creation.
+    // forcePortrait is for when we're showing the effect selection grid and always want to fill
+    // the screen, so we enable portrait when the device is vertical regardless of the metadata.
     var effect: Effect
+    var forcePortrait: Boolean? = null
 
     init {
         effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
@@ -38,9 +41,15 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
         videoFile.readFully(frameBuffer)
         val allocation = PlanarYuvAllocations.fromInputStream(
                 rs, ByteArrayInputStream(frameBuffer), metadata.width, metadata.height)
-        val cameraImage = CameraImage.withAllocationSet(
+        var cameraImage = CameraImage.withAllocationSet(
                 rs, allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
+        val fp = forcePortrait
+        android.util.Log.i("VR", "forcePortrait: ${forcePortrait}")
+        if (fp != null) {
+            cameraImage = cameraImage.withDisplaySizeAndOrientation(
+                    displaySize, cameraImage.orientation.withPortrait(fp))
+        }
         return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
     }
 

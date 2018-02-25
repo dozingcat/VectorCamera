@@ -38,6 +38,7 @@ class CombinationEffect(
         val resultBitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
         val resultCanvas = Canvas(resultBitmap)
 
+        val shouldRotate = cameraImage.orientation.portrait
         val srcRect = RectF(0f, 0f, tileBuffer.width.toFloat(), tileBuffer.height.toFloat())
         for (i in 0 until effectFactories.size) {
             val effect = effectFactories[i](rs, prefsFn)
@@ -46,8 +47,8 @@ class CombinationEffect(
             effect.drawBackground(cameraImage, tileCanvas, srcRect)
             tileCanvas.drawBitmap(tileBitmap, tileBitmapRect, srcRect, null)
 
-            var gridX = i % gridSize
-            var gridY = i / gridSize
+            var gridX = if (shouldRotate) (i / gridSize) else (i % gridSize)
+            var gridY = if (shouldRotate) (gridSize - 1 - i % gridSize) else (i / gridSize)
             if (cameraImage.orientation.xFlipped) {
                 gridX = gridSize - 1 - gridX
             }

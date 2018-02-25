@@ -57,7 +57,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                     (json["height"] as Number).toInt(),
                     ImageOrientation(
                             json["xFlipped"] as Boolean, json["yFlipped"] as Boolean,
-                            json.getOrDefault("portrait", false) as Boolean),
+                            json.getOrElse("portrait", {false}) as Boolean),
                     json["timestamp"] as Long,
                     frameTimestamps as List<Long>,
                     audioStartTimestamp.toLong(),

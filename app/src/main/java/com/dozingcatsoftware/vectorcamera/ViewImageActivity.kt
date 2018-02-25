@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
@@ -17,7 +18,7 @@ import com.dozingcatsoftware.vectorcamera.effect.AsciiEffect
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
-import com.dozingcatsoftware.util.getDisplaySize
+import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.view_image.*
 import java.io.File
 
@@ -27,6 +28,7 @@ class ViewImageActivity : Activity() {
     private lateinit var rs : RenderScript
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
+    private var effectSelectionIsPortrait = false
     private val allEffectFactories = EffectRegistry.defaultEffectFactories()
     private val preferences = VCPreferences(this)
     private val handler = Handler()
@@ -54,19 +56,39 @@ class ViewImageActivity : Activity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (inEffectSelectionMode) {
+            val isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
+            if (isPortrait != effectSelectionIsPortrait) {
+                Log.i(TAG, "Switching portrait: " + isPortraitOrientation())
+                showModeSelectionGrid(isPortrait)
+            }
+        }
+    }
+
+    private fun isPortraitOrientation(): Boolean {
+        return overlayView.height > overlayView.width
+    }
+
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
         val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         showImage(effect, metadata)
     }
 
+    private fun showModeSelectionGrid(isPortrait: Boolean) {
+        val comboEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
+        // FIXME: This is slow because the saved image is high resolution.
+        showImage(comboEffect, photoLibrary.metadataForItemId(imageId), isPortrait)
+        controlBar.visibility = View.GONE
+        effectSelectionIsPortrait = isPortrait
+    }
+
     private fun toggleEffectSelectionMode(view: View?) {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
-            val comboEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
-            // FIXME: This is slow because the saved image is high resolution.
-            showImage(comboEffect, photoLibrary.metadataForItemId(imageId))
-            controlBar.visibility = View.GONE
+            showModeSelectionGrid(isPortraitOrientation())
         }
         else {
             loadImage()
@@ -79,17 +101,22 @@ class ViewImageActivity : Activity() {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
         return CameraImage(rs, null, planarYuv, metadata.orientation,
-                CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getDisplaySize(this))
+                CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getLandscapeDisplaySize(this))
     }
 
-    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
-        val inputImage = createCameraImage(metadata)
+    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata,
+                                      forcePortrait: Boolean? = null): ProcessedBitmap {
+        var inputImage = createCameraImage(metadata)
+        if (forcePortrait != null) {
+            inputImage = inputImage.withDisplaySizeAndOrientation(
+                    inputImage.displaySize, inputImage.orientation.withPortrait(forcePortrait))
+        }
         val bitmap = effect.createBitmap(inputImage)
         return ProcessedBitmap(effect, inputImage, bitmap)
     }
 
-    private fun showImage(effect: Effect, metadata: MediaMetadata) {
-        overlayView.processedBitmap = createProcessedBitmap(effect, metadata)
+    private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null) {
+        overlayView.processedBitmap = createProcessedBitmap(effect, metadata, forcePortrait)
         overlayView.invalidate()
     }
 

@@ -16,7 +16,7 @@ import android.view.Window
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
-import com.dozingcatsoftware.util.getDisplaySize
+import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
 
@@ -138,11 +138,6 @@ class MainActivity : Activity() {
         }
     }
 
-    fun landscapeDisplaySize(): Size {
-        val ds = getDisplaySize(this)
-        return if (ds.width >= ds.height) ds else Size(ds.height, ds.width)
-    }
-
     fun updateControls() {
         var shutterResId = R.drawable.btn_camera_shutter_holo
         if (shutterMode == ShutterMode.VIDEO) {
@@ -165,8 +160,12 @@ class MainActivity : Activity() {
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
     }
 
+    private fun isPortraitOrientation(): Boolean {
+        return overlayView.height > overlayView.width
+    }
+
     private fun targetCameraImageSize(): Size {
-        val ds = landscapeDisplaySize()
+        val ds = getLandscapeDisplaySize(this)
         return when (preferredImageSize) {
             ImageSize.FULL_SCREEN -> ds
             ImageSize.HALF_SCREEN -> Size(ds.width / 2, ds.height / 2)
@@ -259,9 +258,8 @@ class MainActivity : Activity() {
         handler.post(fun() {
             // Add fields that the image generator doesn't have. Might be better to have a separate
             // class that holds a CameraImage, display size, and portrait flag.
-            val ds = landscapeDisplaySize()
-            val isPortrait = overlayView.height > overlayView.width
-            val orientation = imageFromCamera.orientation.withPortrait(isPortrait)
+            val ds = getLandscapeDisplaySize(this)
+            val orientation = imageFromCamera.orientation.withPortrait(isPortraitOrientation())
             val cameraImage = imageFromCamera.withDisplaySizeAndOrientation(ds, orientation)
             if (cameraImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
