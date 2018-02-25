@@ -10,15 +10,19 @@ import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
-import android.view.MotionEvent
-import android.view.View
-import android.view.Window
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
+import android.R.attr.button
+import android.R.attr.gravity
+import android.view.*
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+
+
 
 enum class ShutterMode {IMAGE, VIDEO}
 
@@ -47,6 +51,8 @@ class MainActivity : Activity() {
     private var audioStartTimestamp = 0L
     private lateinit var previousImageSize: ImageSize
     private var shutterMode = ShutterMode.IMAGE
+
+    private var layoutIsPortrait = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,9 +97,16 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        // TODO: Read high quality flag from preferences.
         checkPermissionAndStartCamera()
         overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
+
+        // View size is zero in onResume, have to wait for layout notification.
+        var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
+        listener = ViewTreeObserver.OnGlobalLayoutListener {
+            updateLayout(isPortraitOrientation())
+            overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+        }
+        overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
     override fun onPause() {
@@ -113,6 +126,10 @@ class MainActivity : Activity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         Log.i(TAG, "configurationChanged: ${newConfig.orientation}")
         super.onConfigurationChanged(newConfig)
+        val isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
+        if (isPortrait != layoutIsPortrait) {
+            updateLayout(isPortrait)
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
@@ -158,6 +175,36 @@ class MainActivity : Activity() {
 
         switchResolutionButton.alpha =
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
+    }
+
+    fun updateLayout(isPortrait: Boolean) {
+        Log.i(TAG, "updateLayout: ${isPortrait}")
+        layoutIsPortrait = isPortrait
+        val layoutWidth =
+                if (isPortrait) FrameLayout.LayoutParams.MATCH_PARENT
+                else FrameLayout.LayoutParams.WRAP_CONTENT
+        val layoutHeight =
+                if (isPortrait) FrameLayout.LayoutParams.WRAP_CONTENT
+                else FrameLayout.LayoutParams.MATCH_PARENT
+        val orientation = if (isPortrait) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        val direction =
+                if (isPortrait) LinearLayout.LAYOUT_DIRECTION_RTL
+                else LinearLayout.LAYOUT_DIRECTION_LTR
+
+        run {
+            val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
+            params.gravity = if (isPortrait) Gravity.TOP else Gravity.LEFT
+            leftTopControlBar.setLayoutParams(params)
+            leftTopControlBar.orientation = orientation
+            leftTopControlBar.layoutDirection = direction
+        }
+        run {
+            val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
+            params.gravity = if (isPortrait) Gravity.BOTTOM else Gravity.RIGHT
+            rightBottomControlBar.setLayoutParams(params)
+            rightBottomControlBar.orientation = orientation
+            rightBottomControlBar.layoutDirection = direction
+        }
     }
 
     private fun isPortraitOrientation(): Boolean {
