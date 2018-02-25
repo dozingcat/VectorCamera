@@ -1,24 +1,11 @@
 package com.dozingcatsoftware.vectorcamera
 
-enum class ImageOrientation {
-    NORMAL,
-    ROTATED_180,
-    ;
+class ImageOrientation(
+        val xFlipped: Boolean, val yFlipped: Boolean, val portrait: Boolean = false) {
 
-    fun isXFlipped(): Boolean {
-        return this == ROTATED_180
-    }
-
-    fun isYFlipped(): Boolean {
-        return this == ROTATED_180
-    }
+    fun withPortrait(newPortrait: Boolean) = ImageOrientation(xFlipped, yFlipped, newPortrait)
 
     companion object {
-        fun withXYFlipped(xFlipped: Boolean, yFlipped: Boolean): ImageOrientation {
-            if (xFlipped != yFlipped) {
-                throw IllegalArgumentException("Only 0 and 180 degree rotations supported")
-            }
-            return if (xFlipped) ImageOrientation.ROTATED_180 else ImageOrientation.NORMAL
-        }
+        val NORMAL = ImageOrientation(false, false)
     }
 }

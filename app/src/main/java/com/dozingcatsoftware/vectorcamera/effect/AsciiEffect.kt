@@ -118,8 +118,8 @@ class AsciiEffect(private val rs: RenderScript,
         script._numCharColumns = numCharacterColumns
         script._numCharRows = numCharacterRows
         script._numCharacters = pixelChars.length
-        script._flipHorizontal = cameraImage.orientation.isXFlipped()
-        script._flipVertical = cameraImage.orientation.isYFlipped()
+        script._flipHorizontal = cameraImage.orientation.xFlipped
+        script._flipVertical = cameraImage.orientation.yFlipped
         script._colorMode = colorMode.id
         // There's no input allocation passed directly to the kernel so we manually set x/y ranges.
         val options = Script.LaunchOptions().setX(0, numCharacterColumns).setY(0, numCharacterRows)
@@ -154,8 +154,8 @@ class AsciiEffect(private val rs: RenderScript,
         script._numCharColumns = numCharacterColumns
         script._numCharRows = numCharacterRows
         script._numCharacters = pixelChars.length
-        script._flipHorizontal = camAllocation.orientation.isXFlipped()
-        script._flipVertical = camAllocation.orientation.isYFlipped()
+        script._flipHorizontal = camAllocation.orientation.xFlipped
+        script._flipVertical = camAllocation.orientation.yFlipped
         script._colorMode = colorMode.id
         if (camAllocation.planarYuvAllocations != null) {
             script._hasSingleYuvAllocation = false

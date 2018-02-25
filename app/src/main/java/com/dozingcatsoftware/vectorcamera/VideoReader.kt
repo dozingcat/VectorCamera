@@ -13,15 +13,21 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray
     // effect and displaySize can be changed after creation.
+    // forcePortrait is for when we're showing the effect selection grid and always want to fill
+    // the screen, so we enable portrait when the device is vertical regardless of the metadata.
     var effect: Effect
+    var forcePortrait: Boolean? = null
 
     init {
         effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
         frameBuffer = ByteArray(bytesPerFrame())
     }
 
-    fun videoWidth() = metadata.width
-    fun videoHeight() = metadata.height
+    fun isPortrait() = metadata.orientation.portrait
+    fun landscapeVideoWidth() = metadata.width
+    fun landscapeVideoHeight() = metadata.height
+    fun outputVideoWidth() = if (isPortrait()) metadata.height else metadata.width
+    fun outputVideoHeight() = if (isPortrait()) metadata.width else metadata.height
     fun numberOfFrames() = metadata.frameTimestamps.size
 
     private fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
@@ -35,9 +41,14 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
         videoFile.readFully(frameBuffer)
         val allocation = PlanarYuvAllocations.fromInputStream(
                 rs, ByteArrayInputStream(frameBuffer), metadata.width, metadata.height)
-        val cameraImage = CameraImage.withAllocationSet(
+        var cameraImage = CameraImage.withAllocationSet(
                 rs, allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
+        val fp = forcePortrait
+        if (fp != null) {
+            cameraImage = cameraImage.withDisplaySizeAndOrientation(
+                    displaySize, cameraImage.orientation.withPortrait(fp))
+        }
         return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
     }
 

@@ -31,8 +31,8 @@ class CreateVideoZipFileAsyncTask(
             val videoReader = params[0]!!.videoReader
             val mediaLibrary = params[0]!!.mediaLibrary
             val videoId = params[0]!!.videoId
-            val videoWidth = videoReader.videoWidth()
-            val videoHeight = videoReader.videoHeight()
+            val videoWidth = videoReader.landscapeVideoWidth()
+            val videoHeight = videoReader.landscapeVideoHeight()
 
             // Frames are JPEGs because PNG encoding is very slow.
             zipFile = mediaLibrary.videoFramesArchiveForItemId(videoId)
