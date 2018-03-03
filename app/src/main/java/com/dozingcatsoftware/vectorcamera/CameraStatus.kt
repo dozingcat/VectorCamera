@@ -9,6 +9,7 @@ enum class CameraStatus {
     CAPTURING_PHOTO,
     CAPTURING_VIDEO,
     STOPPING_CAPTURE,
+    RESTARTING_CAPTURE,
     CLOSING,
     ERROR,
     ;
