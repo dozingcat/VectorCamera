@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private var previousEffect: Effect? = null
     private var inEffectSelectionMode = false
     private var lastBitmapTimestamp = 0L
+    private var previousFingerSpacing = 0.0
 
     private var videoRecorder: VideoRecorder? = null
     private var videoFrameMetadata: MediaMetadata? = null
@@ -384,30 +385,52 @@ class MainActivity : Activity() {
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
-        if (event.action == MotionEvent.ACTION_DOWN) {
-            if (inEffectSelectionMode) {
-                val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
-                val tileWidth = view.width / gridSize
-                val tileHeight = view.height / gridSize
-                val tileX = (event.x / tileWidth).toInt()
-                val tileY = (event.y / tileHeight).toInt()
-                val index = gridSize * tileY + tileX
+        if (event.pointerCount > 1 && !inEffectSelectionMode) {
+            // Zoom in or out if we've gotten repeated multitouch events.
+            val dx = event.getX(0) - event.getX(1)
+            val dy = event.getY(1) - event.getY(1)
+            val dist = Math.hypot(dx.toDouble(), dy.toDouble())
+            if (previousFingerSpacing <= 0) {
+                previousFingerSpacing = dist
+            }
+            else if (dist > previousFingerSpacing + 2) {
+                cameraImageGenerator.zoomIn(0.025)
+                previousFingerSpacing = dist
+            }
+            else if (dist < previousFingerSpacing - 2) {
+                cameraImageGenerator.zoomIn(-0.025)
+                previousFingerSpacing = dist
+            }
+        }
+        else {
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                if (inEffectSelectionMode) {
+                    val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                    val tileWidth = view.width / gridSize
+                    val tileHeight = view.height / gridSize
+                    val tileX = (event.x / tileWidth).toInt()
+                    val tileY = (event.y / tileHeight).toInt()
+                    val index = gridSize * tileY + tileX
 
-                val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                val eff = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
-                currentEffect = eff
-                preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
-                preferredImageSize = previousImageSize
-                restartCameraImageGenerator()
-                imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-                inEffectSelectionMode = false
-                controlLayout.visibility = View.VISIBLE
+                    val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
+                    val eff = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
+                    currentEffect = eff
+                    preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
+                    preferredImageSize = previousImageSize
+                    restartCameraImageGenerator()
+                    imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+                    inEffectSelectionMode = false
+                    controlLayout.visibility = View.VISIBLE
+                }
+                else {
+                    controlLayout.visibility =
+                            if (controlLayout.visibility == View.VISIBLE) View.GONE
+                            else View.VISIBLE
+                }
             }
-            else {
-                controlLayout.visibility =
-                        if (controlLayout.visibility == View.VISIBLE) View.GONE
-                        else View.VISIBLE
-            }
+        }
+        if (event.action == MotionEvent.ACTION_UP) {
+            previousFingerSpacing = 0.0
         }
     }
 
