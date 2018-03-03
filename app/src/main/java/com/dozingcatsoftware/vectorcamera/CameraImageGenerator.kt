@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera
 
 import android.content.Context
 import android.graphics.ImageFormat
+import android.graphics.Rect
 import android.hardware.camera2.*
 import android.os.Handler
 import android.renderscript.Allocation
@@ -19,6 +20,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     private var camera: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
     private var captureSize: Size? = null
+    private var zoomRatio = 0.0
     var status = CameraStatus.CLOSED
     private var targetStatus = CameraStatus.CLOSED
     private var imageAllocationCallback: ((CameraImage) -> Unit)? = null
@@ -55,6 +57,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             Log.i(TAG, "Restarting capture")
             captureSession!!.abortCaptures()
             captureSession!!.close()
+            this.status = CameraStatus.RESTARTING_CAPTURE
         }
         else {
             updateStatus(this.status)
@@ -196,6 +199,18 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             }
         }
         request.addTarget(allocation!!.surface)
+        if (this.zoomRatio > 0) {
+            val cc = cameraCharacteristics
+            val baseRect = cc.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+            val maxZoom = cc.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)
+            val zoom = Math.pow(maxZoom.toDouble(), this.zoomRatio)
+            val width = (baseRect.width() / zoom).toInt()
+            val height = (baseRect.height() / zoom).toInt()
+            val cx = baseRect.centerX()
+            val cy = baseRect.centerY()
+            val zoomedRect = Rect(cx - width / 2, cy - height / 2, cx + width / 2, cy + height / 2)
+            request.set(CaptureRequest.SCALER_CROP_REGION, zoomedRect)
+        }
         if (this.targetStatus == CameraStatus.CAPTURING_PHOTO) {
             captureSession!!.capture(request.build(), null, null)
         }
@@ -203,6 +218,21 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             captureSession!!.setRepeatingRequest(request.build(), null, null)
         }
         this.status = this.targetStatus
+    }
+
+    fun setZoom(zoomRatio: Double) {
+        if (zoomRatio < 0 || zoomRatio > 1) {
+            throw IllegalArgumentException("Invalid zoom ratio: ${zoomRatio}")
+        }
+        this.zoomRatio = zoomRatio
+        if (this.status.isCapturing()) {
+            startCapture()
+        }
+    }
+
+    fun zoomIn(zoomAmount: Double) {
+        val newZoom = this.zoomRatio + zoomAmount
+        setZoom(minOf(1.0, maxOf(0.0, newZoom)))
     }
 
     private fun stopCaptureSession() {
