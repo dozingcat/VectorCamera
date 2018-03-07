@@ -163,8 +163,13 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                     listOf(allocation!!.surface),
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) {
-                            captureSession = session
-                            updateStatus(CameraStatus.CAPTURE_READY)
+                            if (camera != null) {
+                                captureSession = session
+                                updateStatus(CameraStatus.CAPTURE_READY)
+                            }
+                            else {
+                                Log.i(TAG, "onConfigured: camera is null, not starting")
+                            }
                         }
 
                         override fun onConfigureFailed(session: CameraCaptureSession) {
