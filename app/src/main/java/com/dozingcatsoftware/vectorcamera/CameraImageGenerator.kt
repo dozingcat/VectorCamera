@@ -46,6 +46,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
     fun start(targetStatus: CameraStatus, targetSize: Size,
               imageAllocationCallback: ((CameraImage) -> Unit)? = null) {
+        Log.i(TAG, "start(), status=${status}")
         this.captureSize = pickBestSize(
                 cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                         .getOutputSizes(ImageFormat.YUV_420_888),
@@ -115,6 +116,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             updateStatus(CameraStatus.OPENING)
             manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(cam: CameraDevice) {
+                    Log.i(TAG, "camera onOpened")
                     camera = cam
                     updateStatus(CameraStatus.OPENED)
                 }
@@ -143,7 +145,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     private fun setupCameraPreview() {
         try {
             val size = this.captureSize!!
-            Log.i(TAG, "Using camera size: " + size)
+            Log.i(TAG, "Using camera size: ${size}")
 
             allocation = createRenderscriptAllocation(size)
             allocation!!.setOnBufferAvailableListener({
@@ -158,11 +160,12 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                     Log.i(TAG, "captureSession is null, closing image")
                 }
             })
-
+            this.status = CameraStatus.CAPTURE_STARTING
             camera!!.createCaptureSession(
                     listOf(allocation!!.surface),
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) {
+                            Log.i(TAG, "capture session onConfigured, status=${status}")
                             if (camera != null) {
                                 captureSession = session
                                 updateStatus(CameraStatus.CAPTURE_READY)
@@ -176,7 +179,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                             updateStatus(CameraStatus.ERROR)
                         }
 
-                        override fun onClosed(session: CameraCaptureSession?) {
+                        override fun onClosed(session: CameraCaptureSession) {
                             Log.i(TAG, "capture session onClosed, status=${status}")
                             super.onClosed(session)
                             if (status != CameraStatus.CLOSING && status != CameraStatus.CLOSED) {
@@ -223,6 +226,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             captureSession!!.setRepeatingRequest(request.build(), null, null)
         }
         this.status = this.targetStatus
+        Log.i(TAG, "Capture started, status=${status}")
     }
 
     fun setZoom(zoomRatio: Double) {

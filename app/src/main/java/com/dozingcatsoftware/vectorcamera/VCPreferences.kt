@@ -12,6 +12,8 @@ import com.dozingcatsoftware.util.mapToJsonString
 
 class VCPreferences(val context: Context) {
 
+    val effectRegistry = EffectRegistry()
+
     private fun sharedPrefs() = PreferenceManager.getDefaultSharedPreferences(context)
 
     fun effectName() = sharedPrefs().getString(EFFECT_NAME_KEY, "")
@@ -48,7 +50,7 @@ class VCPreferences(val context: Context) {
         val params = effectParameters()
         if (name.isNotEmpty()) {
             try {
-                return EffectRegistry.forNameAndParameters(rs, name, params)
+                return effectRegistry.effectForNameAndParameters(rs, name, params)
             }
             catch (ex: Exception) {
                 Log.w(TAG, "Error reading effect from preferences", ex)
