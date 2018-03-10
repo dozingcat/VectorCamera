@@ -57,7 +57,7 @@ class ViewVideoActivity: Activity() {
     private var inEffectSelectionMode = false
     private var effectSelectionIsPortrait = false
     private var originalEffect: Effect? = null
-    private val allEffectFactories = EffectRegistry.defaultEffectFactories()
+    private val effectRegistry = EffectRegistry()
     private lateinit var videoReader: VideoReader
     private val preferences = VCPreferences(this)
     private val handler = Handler()
@@ -150,8 +150,8 @@ class ViewVideoActivity: Activity() {
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect
-            videoReader.effect =
-                    CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
+            videoReader.effect = CombinationEffect(
+                    effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
             videoReader.forcePortrait = isPortraitOrientation()
             controlBar.visibility = View.GONE
         }
@@ -229,15 +229,17 @@ class ViewVideoActivity: Activity() {
         // Mostly duplicated from MainActivity.
         if (event.action == MotionEvent.ACTION_DOWN) {
             if (inEffectSelectionMode) {
-                val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                val numEffects = effectRegistry.defaultEffectCount()
+                val gridSize = Math.ceil(Math.sqrt(numEffects.toDouble())).toInt()
                 val tileWidth = view.width / gridSize
                 val tileHeight = view.height / gridSize
                 val tileX = (event.x / tileWidth).toInt()
                 val tileY = (event.y / tileHeight).toInt()
                 val index = gridSize * tileY + tileX
 
-                val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                val effect = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
+                val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
+                val effect = effectRegistry.defaultEffectAtIndex(
+                        effectIndex, rs, preferences.lookupFunction)
                 originalEffect = effect
                 videoReader.effect = effect
                 videoReader.forcePortrait = null

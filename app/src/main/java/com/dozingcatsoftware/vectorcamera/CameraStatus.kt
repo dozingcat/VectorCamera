@@ -4,6 +4,7 @@ enum class CameraStatus {
     CLOSED,
     OPENING,
     OPENED,
+    CAPTURE_STARTING,
     CAPTURE_READY,
     CAPTURING_PREVIEW,
     CAPTURING_PHOTO,

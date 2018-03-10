@@ -19,7 +19,8 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     var forcePortrait: Boolean? = null
 
     init {
-        effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
+        // It would be better to pass in the EffectRegistry.
+        effect = EffectRegistry().effectForMetadata(rs, metadata.effectMetadata)
         frameBuffer = ByteArray(bytesPerFrame())
     }
 

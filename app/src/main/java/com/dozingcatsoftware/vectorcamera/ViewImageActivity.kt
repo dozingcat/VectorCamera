@@ -29,7 +29,7 @@ class ViewImageActivity : Activity() {
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
     private var effectSelectionIsPortrait = false
-    private val allEffectFactories = EffectRegistry.defaultEffectFactories()
+    private val effectRegistry = EffectRegistry()
     private val preferences = VCPreferences(this)
     private val handler = Handler()
 
@@ -73,12 +73,13 @@ class ViewImageActivity : Activity() {
 
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
+        val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
         showImage(effect, metadata)
     }
 
     private fun showModeSelectionGrid(isPortrait: Boolean) {
-        val comboEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
+        val comboEffect = CombinationEffect(
+                effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
         // FIXME: This is slow because the saved image is high resolution.
         showImage(comboEffect, photoLibrary.metadataForItemId(imageId), isPortrait)
         controlBar.visibility = View.GONE
@@ -124,15 +125,17 @@ class ViewImageActivity : Activity() {
         // Mostly duplicated from MainActivity.
         if (event.action == MotionEvent.ACTION_DOWN) {
             if (inEffectSelectionMode) {
-                val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                val numEffects = effectRegistry.defaultEffectCount()
+                val gridSize = Math.ceil(Math.sqrt(numEffects.toDouble())).toInt()
                 val tileWidth = view.width / gridSize
                 val tileHeight = view.height / gridSize
                 val tileX = (event.x / tileWidth).toInt()
                 val tileY = (event.y / tileHeight).toInt()
                 val index = gridSize * tileY + tileX
 
-                val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                val effect = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
+                val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
+                val effect = effectRegistry.defaultEffectAtIndex(
+                        effectIndex, rs, preferences.lookupFunction)
                 // Update metadata and thumbnail, *not* the full size image because that's slow.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
                         .withEffectMetadata(effect.effectMetadata())
@@ -150,7 +153,7 @@ class ViewImageActivity : Activity() {
     private fun shareImage(view: View) {
         // Stop reading metadata so often?
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val effect = EffectRegistry.forMetadata(rs, metadata.effectMetadata)
+        val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
         if (effect is AsciiEffect) {
             showAsciiTypeShareDialog(metadata, effect)
         }
