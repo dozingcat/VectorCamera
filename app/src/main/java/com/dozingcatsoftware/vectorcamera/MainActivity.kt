@@ -19,7 +19,7 @@ import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-
+import com.dozingcatsoftware.vectorcamera.effect.EffectContext
 
 
 enum class ShutterMode {IMAGE, VIDEO}
@@ -37,7 +37,7 @@ class MainActivity : Activity() {
     private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     private lateinit var rs: RenderScript
-    private val allEffectFactories = EffectRegistry.defaultEffectFactories()
+    private val effectRegistry = EffectRegistry()
     private var currentEffect: Effect? = null
     private var previousEffect: Effect? = null
     private var inEffectSelectionMode = false
@@ -86,8 +86,9 @@ class MainActivity : Activity() {
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
             Log.i(TAG, "Starting effect loading thread")
-            for (ef in allEffectFactories) {
-                ef(rs, preferences.lookupFunction)
+            for (i in 0 until effectRegistry.defaultEffectCount()) {
+                effectRegistry.defaultEffectAtIndex(
+                    i, rs, preferences.lookupFunction, EffectContext.PRELOAD)
             }
             Log.i(TAG, "Done loading effects")
         }).start()
@@ -297,7 +298,8 @@ class MainActivity : Activity() {
     }
 
     private fun effectFromPreferences(): Effect {
-        return preferences.effect(rs, {allEffectFactories[0](rs, preferences.lookupFunction)})
+        return preferences.effect(rs,
+                {effectRegistry.defaultEffectAtIndex(0, rs, preferences.lookupFunction)})
     }
 
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
@@ -350,6 +352,7 @@ class MainActivity : Activity() {
 
     private fun switchResolution(view: View) {
         if (cameraImageGenerator.status != CameraStatus.CAPTURING_PREVIEW) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not switching resolution")
             return
         }
         if (inEffectSelectionMode) {
@@ -364,21 +367,24 @@ class MainActivity : Activity() {
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
+        if (!cameraImageGenerator.status.isCapturing()) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
+        }
         inEffectSelectionMode = !inEffectSelectionMode
         if (inEffectSelectionMode) {
             previousEffect = currentEffect
-            val t1 = System.currentTimeMillis()
-            currentEffect = CombinationEffect(rs, preferences.lookupFunction, allEffectFactories)
-            val t2 = System.currentTimeMillis()
+            currentEffect = CombinationEffect(effectRegistry.defaultEffectFunctions(
+                    rs, preferences.lookupFunction, EffectContext.COMBO_GRID))
             previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.EFFECT_GRID
             controlLayout.visibility = View.GONE
-            Log.i(TAG, "CombinationEffect time: ${t2-t1}")
+            Log.i(TAG, "Showing combo grid")
         }
         else {
             currentEffect = previousEffect
             preferredImageSize = previousImageSize
             controlLayout.visibility = View.VISIBLE
+            Log.i(TAG, "Exiting combo grid")
         }
         restartCameraImageGenerator()
         imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
@@ -405,15 +411,23 @@ class MainActivity : Activity() {
         else {
             if (event.action == MotionEvent.ACTION_DOWN) {
                 if (inEffectSelectionMode) {
-                    val gridSize = Math.ceil(Math.sqrt(allEffectFactories.size.toDouble())).toInt()
+                    if (!cameraImageGenerator.status.isCapturing()) {
+                        Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
+                        return
+                    }
+                    val gridSize = Math.ceil(
+                            Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
                     val tileWidth = view.width / gridSize
                     val tileHeight = view.height / gridSize
                     val tileX = (event.x / tileWidth).toInt()
                     val tileY = (event.y / tileHeight).toInt()
                     val index = gridSize * tileY + tileX
 
-                    val effectIndex = Math.min(Math.max(0, index), allEffectFactories.size - 1)
-                    val eff = allEffectFactories[effectIndex](rs, preferences.lookupFunction)
+                    val effectIndex =
+                            Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
+                    Log.i(TAG, "Selected effect ${effectIndex}")
+                    val eff = effectRegistry.defaultEffectAtIndex(
+                            effectIndex, rs, preferences.lookupFunction)
                     currentEffect = eff
                     preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
                     preferredImageSize = previousImageSize

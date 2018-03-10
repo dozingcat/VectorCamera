@@ -2,16 +2,27 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.renderscript.RenderScript
 
-object EffectRegistry {
+enum class EffectContext {
+    NORMAL,
+    COMBO_GRID,
+    PRELOAD,
+}
+
+class EffectRegistry {
+
+    private fun gradientPixelsPerCell(context: EffectContext): Int {
+        return if (context == EffectContext.COMBO_GRID || context == EffectContext.PRELOAD) 20
+               else Animated2dGradient.DEFAULT_PIXELS_PER_CELL
+    }
 
     // 25 effects, shown in 5x5 grid.
-    val baseEffects = listOf<(RenderScript, (String, String) -> String) -> Effect>(
+    val baseEffects = listOf<(RenderScript, (String, String) -> String, EffectContext) -> Effect>(
 
             // Row 1, edges on black.
             // Edge strength->brightness, preserve colors.
-            {rs, prefsFn -> EdgeLuminanceEffect(rs) },
+            {rs, prefsFn, context -> EdgeLuminanceEffect(rs) },
             // White
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -21,7 +32,7 @@ object EffectRegistry {
                 ))
             },
             // Green
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -31,7 +42,7 @@ object EffectRegistry {
                 ))
             },
             // Red
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -41,7 +52,7 @@ object EffectRegistry {
                 ))
             },
             // Cyan
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -53,7 +64,7 @@ object EffectRegistry {
 
             // Row 2, edges on non-black.
             // Black on white.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -63,7 +74,7 @@ object EffectRegistry {
                 ))
             },
             // Blue on white.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -73,7 +84,7 @@ object EffectRegistry {
                 ))
             },
             // Red on white.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -83,7 +94,7 @@ object EffectRegistry {
                 ))
             },
             // Yellow background, 2d gradient colors.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -92,12 +103,13 @@ object EffectRegistry {
                                         listOf(
                                                 listOf(255,0,0, 0,192,0, 0,0,255, 0,0,0)
                                         )
-                                )
+                                ),
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
             // Pink background, 2d gradient colors.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -106,7 +118,8 @@ object EffectRegistry {
                                         listOf(
                                                 listOf(0,128,0, 128,0,0, 0,128,128, 128,0,128)
                                         )
-                                )
+                                ),
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
@@ -114,7 +127,7 @@ object EffectRegistry {
             // Row 3, animations.
             // Animated colors.
             // Blue-green edges on black.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "linear_gradient",
@@ -125,7 +138,7 @@ object EffectRegistry {
                 ))
             },
             // Radial gradient background.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "radial_gradient",
@@ -136,7 +149,7 @@ object EffectRegistry {
                 ))
             },
             // Red-green horizontally animated colors.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -147,12 +160,13 @@ object EffectRegistry {
                                                 listOf(0,255,0, 255,0,0, 0,255,0, 255,0,0)
                                         )
                                 ),
-                                "speedX" to 250
+                                "speedX" to 250,
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
             // Animated colors with 2d sliding window.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -170,12 +184,13 @@ object EffectRegistry {
                                 "sizeX" to 0.5,
                                 "sizeY" to 0.5,
                                 "speedX" to 300,
-                                "speedY" to 200
+                                "speedY" to 200,
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
             // Rainbow, animated vertically on white background.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -189,14 +204,15 @@ object EffectRegistry {
                                         listOf(listOf(96,0,96, 96,0,96, 128,0,0, 128,0,0))
                                 ),
                                 "sizeY" to 3.0,
-                                "speedY" to 500
+                                "speedY" to 500,
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
 
             // Row 4.
             // Solid effects
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 SolidColorEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -205,15 +221,16 @@ object EffectRegistry {
                                         listOf(
                                                 listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255)
                                         )
-                                )
+                                ),
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
-            {rs, prefsFn -> PermuteColorEffect.rgbToBrg(rs) },
-            {rs, prefsFn -> PermuteColorEffect.rgbToGbr(rs) },
-            {rs, prefsFn -> PermuteColorEffect.flipUV(rs) },
+            {rs, prefsFn, context -> PermuteColorEffect.rgbToBrg(rs) },
+            {rs, prefsFn, context -> PermuteColorEffect.rgbToGbr(rs) },
+            {rs, prefsFn, context -> PermuteColorEffect.flipUV(rs) },
             // Emboss grayscale.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 Convolve3x3Effect.fromParameters(rs, mapOf(
                         "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
                         "colors" to mapOf(
@@ -225,7 +242,7 @@ object EffectRegistry {
             },
 
             // Row 5. ASCII effects, with unmodified input as last effect.
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "text" to listOf(255, 255, 255),
@@ -236,7 +253,7 @@ object EffectRegistry {
                         "prefId" to "pixelChars.WHITE_ON_BLACK"
                 ))
             },
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "text" to listOf(0, 0, 0),
@@ -247,7 +264,7 @@ object EffectRegistry {
                         "prefId" to "pixelChars.BLACK_ON_WHITE"
                 ))
             },
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "primary",
                         "pixelChars" to asciiChars(prefsFn, "pixelChars.ANSI_COLOR", " .:oO8#"),
@@ -255,7 +272,7 @@ object EffectRegistry {
                         "prefId" to "pixelChars.ANSI_COLOR"
                 ))
             },
-            {rs, prefsFn ->
+            {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "full",
                         "pixelChars" to asciiChars(prefsFn, "pixelChars.FULL_COLOR", "O8#"),
@@ -263,17 +280,27 @@ object EffectRegistry {
                         "prefId" to "pixelChars.FULL_COLOR"
                 ))
             },
-            {rs, prefsFn -> PermuteColorEffect.noOp(rs) }
-
-
-
+            {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) }
     )
 
-    fun defaultEffectFactories(): List<(RenderScript, (String, String) -> String) -> Effect> {
-        return baseEffects
+    fun defaultEffectCount() = baseEffects.size
+
+    fun defaultEffectAtIndex(index: Int, rs: RenderScript, prefsFn: (String, String) -> String,
+                             context: EffectContext = EffectContext.NORMAL): Effect {
+        return baseEffects[index](rs, prefsFn, context)
     }
 
-    fun forNameAndParameters(rs: RenderScript, name: String, params: Map<String, Any>): Effect {
+    fun defaultEffectFunctions(rs: RenderScript, prefsFn: (String, String) -> String,
+                               context: EffectContext = EffectContext.NORMAL): List<() -> Effect> {
+        val fns = mutableListOf<() -> Effect>()
+        for (i in 0 until defaultEffectCount()) {
+            fns.add({defaultEffectAtIndex(i, rs, prefsFn, context)})
+        }
+        return fns
+    }
+
+    fun effectForNameAndParameters(
+            rs: RenderScript, name: String, params: Map<String, Any>): Effect {
         return when (name) {
             AsciiEffect.EFFECT_NAME -> AsciiEffect.fromParameters(rs, params)
             EdgeEffect.EFFECT_NAME -> EdgeEffect.fromParameters(rs, params)
@@ -285,8 +312,8 @@ object EffectRegistry {
         }
     }
 
-    fun forMetadata(rs: RenderScript, metadata: EffectMetadata) =
-            forNameAndParameters(rs, metadata.name, metadata.parameters)
+    fun effectForMetadata(rs: RenderScript, metadata: EffectMetadata) =
+            effectForNameAndParameters(rs, metadata.name, metadata.parameters)
 }
 
 private fun numAsciiColumns(prefsFn: (String, String) -> String): Int {

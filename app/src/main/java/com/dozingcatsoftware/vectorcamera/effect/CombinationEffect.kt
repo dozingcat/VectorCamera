@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.RectF
 import android.renderscript.RenderScript
+import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.CameraImage
 
@@ -13,10 +14,7 @@ import com.dozingcatsoftware.vectorcamera.CameraImage
  * the UI for selecting an effect.
  */
 class CombinationEffect(
-        private val rs: RenderScript,
-        private val prefsFn: (String, String) -> String,
-        private val effectFactories:
-                List<(RenderScript, (String, String) -> String) -> Effect>): Effect {
+        private val effectFactories: List<() -> Effect>): Effect {
 
     override fun effectName() = "combination"
 
@@ -40,9 +38,14 @@ class CombinationEffect(
 
         val shouldRotate = cameraImage.orientation.portrait
         val srcRect = RectF(0f, 0f, tileBuffer.width.toFloat(), tileBuffer.height.toFloat())
+
+        val t0 = System.currentTimeMillis()
         for (i in 0 until effectFactories.size) {
-            val effect = effectFactories[i](rs, prefsFn)
+            val t1 = System.currentTimeMillis()
+            val effect = effectFactories[i]()
+            val t2 = System.currentTimeMillis()
             val tileBitmap = effect.createBitmap(cameraImage)
+            val t3 = System.currentTimeMillis()
             val tileBitmapRect = Rect(0, 0, tileBitmap.width, tileBitmap.height)
             effect.drawBackground(cameraImage, tileCanvas, srcRect)
             tileCanvas.drawBitmap(tileBitmap, tileBitmapRect, srcRect, null)
@@ -58,8 +61,14 @@ class CombinationEffect(
             val dstRect = Rect(gridX * tileWidth, gridY * tileHeight,
                     (gridX + 1) * tileWidth, (gridY + 1) * tileHeight)
             resultCanvas.drawBitmap(tileBuffer, null, dstRect, null)
+            val t4 = System.currentTimeMillis()
+            // Log.i(TAG, "Combo grid timing: ${i} ${t2-t1} ${t3-t2} ${t4-t3}")
         }
-
+        Log.i(TAG, "Combo total time: ${System.currentTimeMillis() - t0}")
         return resultBitmap
+    }
+
+    companion object {
+        const val TAG = "CombinationEffect"
     }
 }
