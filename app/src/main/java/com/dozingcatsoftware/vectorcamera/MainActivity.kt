@@ -48,7 +48,6 @@ class MainActivity : Activity() {
     private var videoFrameMetadata: MediaMetadata? = null
     private var audioRecorder: AudioRecorder? = null
     private var audioStartTimestamp = 0L
-    private lateinit var previousImageSize: ImageSize
     private var shutterMode = ShutterMode.IMAGE
 
     private var layoutIsPortrait = false
@@ -80,6 +79,7 @@ class MainActivity : Activity() {
         settingsButton.setOnClickListener(this::gotoPreferences)
         convertPictureButton.setOnClickListener(this::convertExistingPicture)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
+        staticGrid.setOnTouchListener(this::handleEffectGridTouch)
         cameraActionButton.onShutterButtonClick = this::handleShutterClick
         cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
 
@@ -222,6 +222,10 @@ class MainActivity : Activity() {
     }
 
     private fun cameraImageSizeForSavedPicture() = Size(1920, 1080)
+
+    private fun previewImageSizeFromPrefs() =
+            if (preferences.useHighQualityPreview()) ImageSize.FULL_SCREEN
+            else ImageSize.HALF_SCREEN
 
     override fun onRequestPermissionsResult(
             requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -367,27 +371,36 @@ class MainActivity : Activity() {
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
-        if (!cameraImageGenerator.status.isCapturing()) {
-            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
+        if (videoRecorder != null) {
+            Log.i(TAG, "Video recording in progress, not toggling effect grid")
+            return
         }
         inEffectSelectionMode = !inEffectSelectionMode
-        if (inEffectSelectionMode) {
-            previousEffect = currentEffect
-            currentEffect = CombinationEffect(effectRegistry.defaultEffectFunctions(
-                    rs, preferences.lookupFunction, EffectContext.COMBO_GRID))
-            previousImageSize = preferredImageSize
-            preferredImageSize = ImageSize.EFFECT_GRID
-            controlLayout.visibility = View.GONE
-            Log.i(TAG, "Showing combo grid")
+        if (preferences.useLiveGridPreview()) {
+            if (!cameraImageGenerator.status.isCapturing()) {
+                Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
+                return
+            }
+            if (inEffectSelectionMode) {
+                previousEffect = currentEffect
+                currentEffect = CombinationEffect(effectRegistry.defaultEffectFunctions(
+                        rs, preferences.lookupFunction, EffectContext.COMBO_GRID))
+                preferredImageSize = ImageSize.EFFECT_GRID
+                controlLayout.visibility = View.GONE
+                Log.i(TAG, "Showing combo grid")
+            }
+            else {
+                currentEffect = previousEffect
+                preferredImageSize = previewImageSizeFromPrefs()
+                Log.i(TAG, "Exiting combo grid")
+            }
+            restartCameraImageGenerator()
+            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
         }
         else {
-            currentEffect = previousEffect
-            preferredImageSize = previousImageSize
-            controlLayout.visibility = View.VISIBLE
-            Log.i(TAG, "Exiting combo grid")
+            staticGrid.visibility = if (inEffectSelectionMode) View.VISIBLE else View.GONE
         }
-        restartCameraImageGenerator()
-        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+        controlLayout.visibility = if (inEffectSelectionMode) View.GONE  else View.VISIBLE
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
@@ -411,30 +424,7 @@ class MainActivity : Activity() {
         else {
             if (event.action == MotionEvent.ACTION_DOWN) {
                 if (inEffectSelectionMode) {
-                    if (!cameraImageGenerator.status.isCapturing()) {
-                        Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
-                        return
-                    }
-                    val gridSize = Math.ceil(
-                            Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
-                    val tileWidth = view.width / gridSize
-                    val tileHeight = view.height / gridSize
-                    val tileX = (event.x / tileWidth).toInt()
-                    val tileY = (event.y / tileHeight).toInt()
-                    val index = gridSize * tileY + tileX
-
-                    val effectIndex =
-                            Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
-                    Log.i(TAG, "Selected effect ${effectIndex}")
-                    val eff = effectRegistry.defaultEffectAtIndex(
-                            effectIndex, rs, preferences.lookupFunction)
-                    currentEffect = eff
-                    preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
-                    preferredImageSize = previousImageSize
-                    restartCameraImageGenerator()
-                    imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-                    inEffectSelectionMode = false
-                    controlLayout.visibility = View.VISIBLE
+                    handleEffectGridTouch(view, event)
                 }
                 else {
                     controlLayout.visibility =
@@ -446,6 +436,41 @@ class MainActivity : Activity() {
         if (event.action == MotionEvent.ACTION_UP) {
             previousFingerSpacing = 0.0
         }
+    }
+
+    private fun handleEffectGridTouch(view: View, event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            if (preferences.useLiveGridPreview() && !cameraImageGenerator.status.isCapturing()) {
+                Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
+                return true
+            }
+            val gridSize = Math.ceil(
+                    Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
+            val tileWidth = view.width / gridSize
+            val tileHeight = view.height / gridSize
+            val tileX = (event.x / tileWidth).toInt()
+            val tileY = (event.y / tileHeight).toInt()
+            val index = gridSize * tileY + tileX
+
+            val effectIndex =
+                    Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
+            Log.i(TAG, "Selected effect ${effectIndex}")
+            val eff = effectRegistry.defaultEffectAtIndex(
+                    effectIndex, rs, preferences.lookupFunction)
+            currentEffect = eff
+            preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
+            inEffectSelectionMode = false
+            overlayView.visibility = View.VISIBLE
+            controlLayout.visibility = View.VISIBLE
+            staticGrid.visibility = View.GONE
+            if (preferences.useLiveGridPreview()) {
+                preferredImageSize = previewImageSizeFromPrefs()
+                restartCameraImageGenerator()
+            }
+            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+            return true
+        }
+        return false
     }
 
     override fun onBackPressed() {
@@ -526,7 +551,6 @@ class MainActivity : Activity() {
             Log.i(TAG, "Starting video recording")
             val videoId = photoLibrary.itemIdForTimestamp(System.currentTimeMillis())
             val videoStream = photoLibrary.createTempRawVideoFileOutputStreamForItemId(videoId)
-            previousImageSize = preferredImageSize
             preferredImageSize = ImageSize.VIDEO_RECORDING
             // This might be cleaner with a MediaRecorder class that encapsulates audio and video.
             videoFrameMetadata = null
@@ -567,7 +591,7 @@ class MainActivity : Activity() {
                 }
                 VideoRecorder.Status.FINISHED -> {
                     Log.i(TAG, "Video recording stopped, writing to library")
-                    preferredImageSize = previousImageSize
+                    preferredImageSize = previewImageSizeFromPrefs()
                     if (this.hasWindowFocus()) {
                         restartCameraImageGenerator()
                     }

@@ -120,13 +120,14 @@
                 android:src="@drawable/ic_photo_library_white_36dp" />
         </LinearLayout>
 
-        <ImageView
-            android:id="@+id/staticGrid"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone"
-            android:src="@drawable/static_grid" />
-
     </FrameLayout>
+
+    <ImageView
+        android:id="@+id/staticGrid"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:visibility="gone"
+        android:src="@drawable/static_grid" />
 
 </FrameLayout>
