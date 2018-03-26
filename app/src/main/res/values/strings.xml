@@ -5,6 +5,9 @@
     <string name="autoConvertPicturesPrefsKey">autoConvertPictures</string>
     <string name="autoConvertPicturesPrefsTitle">Automatically convert camera pictures</string>
 
+    <string name="liveGridPreviewPrefsKey">liveGridPreview</string>
+    <string name="liveGridPreviewPrefsTitle">Live preview when choosing effect</string>
+
     <string name="numAsciiColumnsPrefId">numAsciiColumns</string>
     <string name="numAsciiColumnsPrefTitle">Number of text columns</string>
     <string name="numAsciiColumnsPrefMessage">Choose the number of columns of text to create when using text effects.</string>

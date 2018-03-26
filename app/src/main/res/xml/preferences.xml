@@ -5,6 +5,9 @@
         <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
             android:enabled="true"
             android:title="@string/autoConvertPicturesPrefsTitle" />
+        <CheckBoxPreference android:key="@string/liveGridPreviewPrefsKey"
+            android:enabled="true"
+            android:title="@string/liveGridPreviewPrefsTitle" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Text characters">
