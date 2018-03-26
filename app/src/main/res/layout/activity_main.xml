@@ -122,118 +122,12 @@
 
     </FrameLayout>
 
-<!--
-    <LinearLayout
-
+    <ImageView
+        android:id="@+id/staticGrid"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_gravity="bottom"
-        android:orientation="horizontal">
-
-        <LinearLayout
-            android:id="@+id/moreOptionsLayout"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_gravity="bottom"
-            android:layout_weight="1"
-            android:gravity="bottom|center"
-            android:visibility="visible">
-
-            <ImageButton
-                android:id="@+id/helpButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:src="@drawable/ic_help_outline_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/settingsButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:src="@drawable/ic_settings_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/switchResolutionButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:src="@drawable/ic_high_quality_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/convertPictureButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:src="@drawable/ic_library_add_white_36dp" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/verticalButtonBar"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="right"
-            android:background="#20000000"
-            android:gravity="right"
-            android:orientation="vertical"
-            android:paddingLeft="3dp"
-            android:paddingRight="3dp"
-            android:paddingTop="3dp"
-            android:visibility="visible">
-
-            <com.dozingcatsoftware.util.ShutterButton
-                android:id="@+id/cameraActionButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:clickable="true"
-                android:src="@drawable/btn_camera_shutter_holo" />
-
-            <ImageButton
-                android:id="@+id/toggleVideoButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:src="@drawable/ic_photo_camera_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/switchCameraButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:src="@drawable/ic_camera_rear_white_36dp"
-                android:visibility="visible" />
-
-            <ImageButton
-                android:id="@+id/switchEffectButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:src="@drawable/ic_color_lens_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/libraryButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:src="@drawable/ic_photo_library_white_36dp" />
-
-            <View
-                android:layout_width="fill_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-        </LinearLayout>
-
-    </LinearLayout>
--->
+        android:scaleType="fitXY"
+        android:visibility="gone"
+        android:src="@drawable/static_grid" />
 
 </FrameLayout>
