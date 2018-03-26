@@ -398,9 +398,12 @@ class MainActivity : Activity() {
             imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
         }
         else {
+            // If we're showing the static effect selection grid image, keep the camera running.
+            // It wastes some CPU because the processed images won't be visible, but it avoids bugs
+            // when stopping and starting the camera.
             staticGrid.visibility = if (inEffectSelectionMode) View.VISIBLE else View.GONE
         }
-        controlLayout.visibility = if (inEffectSelectionMode) View.GONE  else View.VISIBLE
+        controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
