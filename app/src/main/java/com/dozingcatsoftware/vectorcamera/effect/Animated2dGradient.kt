@@ -26,14 +26,34 @@ class Animated2dGradient(val cellCornerColors: List<List<List<Int>>>,
 
         val pixels = IntArray(gridBitmap.width * gridBitmap.height)
         var pixelIndex = 0
-        for (y in 0 until gridBitmap.height) {
-            val cellY = y / pixelsPerCell
-            val offsetY = y % pixelsPerCell
-            for (x in 0 until gridBitmap.width) {
-                val cellX = x / pixelsPerCell
-                val offsetX = x % pixelsPerCell
-                val cell = cellCornerColors[cellY][cellX]
-                pixels[pixelIndex++] = colorForCellOffset(cell, pixelsPerCell, offsetX, offsetY)
+        for (cellY in 0 until numRowCells) {
+            for (offsetY in 0 until pixelsPerCell) {
+                val yFraction = offsetY.toDouble() / (pixelsPerCell - 1)
+                for (cellX in 0 until numColumnCells) {
+                    val cellColors = cellCornerColors[cellY][cellX]
+                    val rLeft = cellColors[0] + yFraction * (cellColors[6] - cellColors[0])
+                    var rRight = cellColors[3] + yFraction * (cellColors[9] - cellColors[3])
+                    val rIncr = (rRight - rLeft) / (pixelsPerCell - 1)
+                    val gLeft = cellColors[1] + yFraction * (cellColors[7] - cellColors[1])
+                    var gRight = cellColors[4] + yFraction * (cellColors[10] - cellColors[4])
+                    val gIncr = (gRight - gLeft) / (pixelsPerCell - 1)
+                    val bLeft = cellColors[2] + yFraction * (cellColors[8] - cellColors[2])
+                    var bRight = cellColors[5] + yFraction * (cellColors[11] - cellColors[5])
+                    val bIncr = (bRight - bLeft) / (pixelsPerCell - 1)
+
+                    var red = rLeft
+                    var green = gLeft
+                    var blue = bLeft
+                    for (offsetX in 0 until pixelsPerCell) {
+                        pixels[pixelIndex++] = Color.argb(255,
+                                Math.round(red).toInt(),
+                                Math.round(green).toInt(),
+                                Math.round(blue).toInt())
+                        red += rIncr
+                        green += gIncr
+                        blue += bIncr
+                    }
+                }
             }
         }
         gridBitmap.setPixels(pixels, 0, gridBitmap.width, 0, 0, gridBitmap.width, gridBitmap.height)
@@ -112,24 +132,7 @@ class Animated2dGradient(val cellCornerColors: List<List<List<Int>>>,
 
     companion object {
         const val TAG = "Animated2dGradient"
+
         const val DEFAULT_PIXELS_PER_CELL = 80
-
-        fun colorForCellOffset(
-                colors: List<Int>, pixelsPerCell: Int, offsetX: Int, offsetY: Int): Int {
-
-            fun colorComponentValue(
-                    topLeft: Int, topRight: Int, bottomLeft: Int, bottomRight: Int): Int {
-                val xFraction = offsetX.toDouble() / pixelsPerCell
-                val yFraction = offsetY.toDouble() / pixelsPerCell
-                val top = topLeft + (topRight - topLeft) * xFraction
-                val bottom = bottomLeft + (bottomRight - bottomLeft) * xFraction
-                return (top + (bottom - top) * yFraction).roundToInt()
-            }
-
-            val red = colorComponentValue(colors[0], colors[3], colors[6], colors[9])
-            val green = colorComponentValue(colors[1], colors[4], colors[7], colors[10])
-            val blue = colorComponentValue(colors[2], colors[5], colors[8], colors[11])
-            return Color.argb(255, red, green, blue)
-        }
     }
 }
