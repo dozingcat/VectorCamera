@@ -598,13 +598,16 @@ class MainActivity : Activity() {
                     if (this.hasWindowFocus()) {
                         restartCameraImageGenerator()
                     }
-                    photoLibrary.saveVideo(
-                            this,
-                            recorder.videoId,
-                            videoFrameMetadata!!,
-                            recorder.frameTimestamps,
-                            audioStartTimestamp)
-                    ViewVideoActivity.startActivityWithVideoId(this, recorder.videoId)
+                    val metadata = this.videoFrameMetadata
+                    if (metadata != null) {
+                        photoLibrary.saveVideo(
+                                this,
+                                recorder.videoId,
+                                metadata,
+                                recorder.frameTimestamps,
+                                audioStartTimestamp)
+                        ViewVideoActivity.startActivityWithVideoId(this, recorder.videoId)
+                    }
                 }
             }
         }
