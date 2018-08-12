@@ -44,7 +44,7 @@ dependencies {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    compile "org.jetbrains.anko:anko-coroutines:$anko_version"
+    implementation "org.jetbrains.anko:anko-coroutines:$anko_version"
 
-    compile files('libs/vorbis-java-1.0.0-beta.jar')
+    implementation files('libs/vorbis-java-1.0.0-beta.jar')
 }

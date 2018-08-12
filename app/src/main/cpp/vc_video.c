@@ -105,6 +105,8 @@ int write_webm_frame_data(encoding_context *context, vpx_image_t *image) {
 			case VPX_CODEC_CX_FRAME_PKT:
 				write_webm_block(&context->ebml, &context->cfg, pkt);
 				break;
+			default:
+				break;
 		}
 	}
 	return 0;
