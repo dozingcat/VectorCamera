@@ -280,7 +280,9 @@ class EffectRegistry {
                         "prefId" to "pixelChars.FULL_COLOR"
                 ))
             },
-            {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) }
+            {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
+
+            {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) }
     )
 
     fun defaultEffectCount() = baseEffects.size

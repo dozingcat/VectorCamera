@@ -116,56 +116,53 @@ static uchar4 textColorForBlockAverage(uchar4 averageColor) {
     return textColor;
 }
 
+// Writes pixels for a character to the output image allocation.
+static void writeCharacterPixels(
+        uint32_t x, uint32_t y, uint32_t pixelIndex, bool useTextColor, uchar4 textColor) {
+    uint32_t xoff = pixelIndex * characterPixelWidth;
+
+    if (portrait) {
+        uint32_t xOutMin = y * characterPixelHeight;
+        uint32_t yOutMin = (numCharColumns - 1 - x) * characterPixelWidth;
+        uint32_t xOutCount = characterPixelHeight;
+        uint32_t yOutCount = characterPixelWidth;
+
+        for (uint32_t dy = 0; dy < yOutCount; dy++) {
+            uint32_t xsrc = xoff + (flipVertical ? dy:  characterPixelWidth - 1 - dy);
+            for (uint32_t dx = 0; dx < xOutCount; dx++) {
+                uint32_t ysrc = (flipHorizontal ? characterPixelHeight - 1 - dx : dx);
+                // If `useTextColor` is true, replace any non-black source color with `textColor`.
+                uchar4 s = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+                uchar4 pixel = useTextColor && (s.r > 0 || s.g > 0 || s.b > 0) ? textColor: s;
+                rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
+            }
+        }
+    }
+    else {
+        uint32_t xOutMin = x * characterPixelWidth;
+        uint32_t yOutMin = y * characterPixelHeight;
+        uint32_t xOutCount = characterPixelWidth;
+        uint32_t yOutCount = characterPixelHeight;
+
+        for (uint32_t dy = 0; dy < yOutCount; dy++) {
+            uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
+            for (uint32_t dx = 0; dx < xOutCount; dx++) {
+                uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
+                uchar4 s = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
+                uchar4 pixel = useTextColor && (s.r > 0 || s.g > 0 || s.b > 0) ? textColor: s;
+                rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
+            }
+        }
+    }
+}
+
 // This kernel is called for each rectangle of the input image that will have a character drawn into
 // it, not once for each pixel. The output allocation contains the average color for the rectangle.
 void RS_KERNEL writeCharacterToBitmap(uint32_t x, uint32_t y) {
     uchar4 averageColor = computeBlockAverageColor(x, y);
     uchar4 textColor = textColorForBlockAverage(averageColor);
-
-    uint32_t xOutMin, yOutMin, xOutCount, yOutCount;
-    if (portrait) {
-        xOutMin = y * characterPixelHeight;
-        yOutMin = (numCharColumns - 1 - x) * characterPixelWidth;
-        xOutCount = characterPixelHeight;
-        yOutCount = characterPixelWidth;
-    }
-    else {
-        xOutMin = x * characterPixelWidth;
-        yOutMin = y * characterPixelHeight;
-        xOutCount = characterPixelWidth;
-        yOutCount = characterPixelHeight;
-    }
-
     uint32_t pixelIndex = (uint32_t) (averageColor.a / 256.0 * numCharacters);
-    uint32_t xoff = pixelIndex * characterPixelWidth;
-
-    // In portrait mode, "rotate" the character bitmap pixels into the output image.
-    if (portrait) {
-        for (uint32_t dy = 0; dy < yOutCount; dy++) {
-            uint32_t xsrc = xoff + (flipVertical ? dy:  characterPixelWidth - 1 - dy);
-            for (uint32_t dx = 0; dx < xOutCount; dx++) {
-                uint32_t ysrc = (flipHorizontal ? characterPixelHeight - 1 - dx : dx);
-                uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
-                if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
-                    pixel = textColor;
-                }
-                rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
-            }
-        }
-    }
-    else {
-        for (uint32_t dy = 0; dy < yOutCount; dy++) {
-            uint32_t ysrc = flipVertical ? characterPixelHeight - 1 - dy : dy;
-            for (uint32_t dx = 0; dx < xOutCount; dx++) {
-                uint32_t xsrc = xoff + (flipHorizontal ? characterPixelWidth - 1 - dx : dx);
-                uchar4 pixel = rsGetElementAt_uchar4(characterBitmapInput, xsrc, ysrc);
-                if (colorMode != 0 && (pixel.r > 0 || pixel.g > 0 || pixel.b > 0)) {
-                    pixel = textColor;
-                }
-                rsSetElementAt_uchar4(imageOutput, pixel, xOutMin + dx, yOutMin + dy);
-            }
-        }
-    }
+    writeCharacterPixels(x, y, pixelIndex, colorMode != 0, textColor);
 }
 
 // Returns the text color to use in the RGB components, and the average brightness in alpha.
