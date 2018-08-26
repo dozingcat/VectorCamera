@@ -20,6 +20,8 @@ class VCPreferences(val context: Context) {
 
     fun useHighQualityPreview() = sharedPrefs().getBoolean(HIGH_QUALITY_PREVIEW_KEY, false)
 
+    fun useLiveGridPreview() = sharedPrefs().getBoolean(LIVE_GRID_PREVIEW_KEY, false)
+
     fun setUseHighQualityPreview(flag: Boolean) {
         withPrefsEditor {
             it.putBoolean(HIGH_QUALITY_PREVIEW_KEY, flag)
@@ -70,5 +72,6 @@ class VCPreferences(val context: Context) {
         const val EFFECT_NAME_KEY = "effectName"
         const val EFFECT_PARAMETERS_KEY = "effectParams"
         const val HIGH_QUALITY_PREVIEW_KEY = "highQualityPreview"
+        const val LIVE_GRID_PREVIEW_KEY="liveGridPreview"
     }
 }
