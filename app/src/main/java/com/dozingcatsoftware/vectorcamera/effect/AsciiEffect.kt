@@ -25,7 +25,7 @@ enum class AsciiColorMode(val id: Int) {
 
 class AsciiEffect(private val rs: RenderScript,
                   private val effectParams: Map<String, Any>,
-                  private val numPreferredCharColumns: Int,
+                  numPreferredCharColumns: Int,
                   private val textColor: Int,
                   private val backgroundColor: Int,
                   private val pixelChars: String,
@@ -277,7 +277,7 @@ class AsciiEffect(private val rs: RenderScript,
         private fun cssHexColor(color: Int): String {
             fun toHex2(x: Int): String {
                 val s = Integer.toHexString(x)
-                return (if (s.length > 1) s else "0" + s)
+                return (if (s.length > 1) s else "0$s")
             }
             val red = toHex2((color shr 16) and 0xff)
             val green = toHex2((color shr 8) and 0xff)

@@ -282,7 +282,12 @@ class EffectRegistry {
             },
             {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
 
-            {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) }
+            {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) },
+            {rs, prefsFn, context ->
+                MatrixEffect.fromParameters(rs, mapOf(
+                        "numColumns" to numAsciiColumns(prefsFn)
+                ))
+            }
     )
 
     fun defaultEffectCount() = baseEffects.size
@@ -311,6 +316,7 @@ class EffectRegistry {
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
+            MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)
             else -> throw IllegalArgumentException("Unknown effect: " + name)
         }
     }
