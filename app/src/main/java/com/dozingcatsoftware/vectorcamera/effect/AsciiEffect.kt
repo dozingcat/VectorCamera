@@ -10,7 +10,6 @@ import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.*
 import java.io.OutputStream
 import java.io.OutputStreamWriter
-import kotlin.math.roundToInt
 
 enum class AsciiColorMode(val id: Int) {
     FIXED(0),
@@ -31,8 +30,8 @@ class AsciiEffect(private val rs: RenderScript,
                   private val backgroundColor: Int,
                   private val pixelChars: String,
                   private val colorMode: AsciiColorMode): Effect {
-    private var minCharWidth = 10
-    private var charHeightOverWidth = 1.8
+
+    private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
 
     private var asciiBlockAllocation: Allocation? = null
     private var characterTemplateAllocation: Allocation? = null
@@ -75,34 +74,8 @@ class AsciiEffect(private val rs: RenderScript,
         }
     }
 
-    class AsciiMetrics(val isPortrait: Boolean, val outputSize: Size, val charPixelSize: Size,
-                       val numCharacterRows: Int, val numCharacterColumns: Int)
-
-    private fun getAsciiMetrics(cameraImage: CameraImage, maxOutputSize: Size): AsciiMetrics {
-        val isPortrait = cameraImage.orientation.portrait
-        // In portrait mode the output size is still wide, because it will get rotated for display,
-        // but the number of character rows and columns changes. The characters are inserted
-        // sideways into the output image so that they will appear correctly after rotation.
-        // Using numPreferredCharColumns results in different text sizes for portrait vs landscape.
-        // Maybe scale it by the aspect ratio?
-        val targetOutputSize = scaleToTargetSize(cameraImage.size(), maxOutputSize)
-        val numPixelsForColumns =
-                if (isPortrait) targetOutputSize.height else targetOutputSize.width
-        val numCharColumns = Math.min(numPreferredCharColumns, numPixelsForColumns / minCharWidth)
-        val charPixelWidth = numPixelsForColumns / numCharColumns
-        val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
-        val numPixelsForRows = if (isPortrait) targetOutputSize.width else targetOutputSize.height
-        val numCharRows = numPixelsForRows / charPixelHeight
-        // Actual output size may be smaller due to not being an exact multiple of the char size.
-        val actualOutputSize =
-                if (isPortrait) Size(numCharRows * charPixelHeight, numCharColumns * charPixelWidth)
-                else Size(numCharColumns * charPixelWidth, numCharRows * charPixelHeight)
-        return AsciiMetrics(isPortrait, actualOutputSize, Size(charPixelWidth, charPixelHeight),
-                numCharRows, numCharColumns)
-    }
-
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val metrics = getAsciiMetrics(cameraImage, cameraImage.displaySize)
+        val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
         // TODO: Reuse resultBitmap and charBitmap if possible.
         val resultBitmap = Bitmap.createBitmap(
                 metrics.outputSize.width, metrics.outputSize.height, Bitmap.Config.ARGB_8888)
@@ -163,7 +136,7 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     private fun getCharacterInfo(
-            cameraImage: CameraImage, pixelChars: String, metrics: AsciiMetrics): AsciiResult {
+            cameraImage: CameraImage, pixelChars: String, metrics: TextMetrics): AsciiResult {
         asciiBlockAllocation = reuseOrCreate2dAllocation(asciiBlockAllocation,
                 rs, Element::RGBA_8888, metrics.numCharacterColumns, metrics.numCharacterRows)
 
@@ -212,7 +185,7 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     fun writeText(cameraImage: CameraImage, out: OutputStream) {
-        val metrics = getAsciiMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
+        val metrics = textParams.getTextMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
         val asciiResult = getCharacterInfo(
                 cameraImage, pixelChars, metrics)
         val writer = OutputStreamWriter(out, Charsets.UTF_8)
@@ -226,7 +199,7 @@ class AsciiEffect(private val rs: RenderScript,
     }
 
     fun writeHtml(cameraImage: CameraImage, out: OutputStream) {
-        val metrics = getAsciiMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
+        val metrics = textParams.getTextMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
         val asciiResult = getCharacterInfo(
                 cameraImage, pixelChars, metrics)
 

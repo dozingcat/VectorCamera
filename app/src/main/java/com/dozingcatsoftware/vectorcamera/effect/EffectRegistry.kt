@@ -310,6 +310,7 @@ class EffectRegistry {
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
+            CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
             else -> throw IllegalArgumentException("Unknown effect: " + name)
         }
     }

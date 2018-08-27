@@ -165,6 +165,13 @@ void RS_KERNEL writeCharacterToBitmap(uint32_t x, uint32_t y) {
     writeCharacterPixels(x, y, pixelIndex, colorMode != 0, textColor);
 }
 
+// Accepts two input allocations containing the index of the character to draw
+// (from characterBitmapInput) and the color of the character.
+void RS_KERNEL writeCharacterToBitmapWithColor(
+        uint32_t pixelIndex, uchar4 color, uint32_t x, uint32_t y) {
+    writeCharacterPixels(x, y, pixelIndex, true, color);
+}
+
 // Returns the text color to use in the RGB components, and the average brightness in alpha.
 // This is used when rendering to HTML or text, so setting brightness lets the caller determine
 // which character to draw.
