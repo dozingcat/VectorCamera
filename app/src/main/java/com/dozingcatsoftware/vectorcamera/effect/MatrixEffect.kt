@@ -9,54 +9,100 @@ import android.renderscript.Element
 import android.renderscript.RenderScript
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import java.util.*
+
+class Raindrop(val x: Int, val y: Int, val startTick: Long)
 
 class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
 
     private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
+    private val raindrops = HashSet<Raindrop>()
+    private var raindropTick = 0L
+    private var raindropLifetime = 10L
+    private var newRaindropProbPerFrame = 0.05
+
     private var characterTemplateAllocation: Allocation? = null
     private var characterIndexAllocation: Allocation? = null
     private var characterColorAllocation: Allocation? = null
+    private var averageBrightnessAllocation: Allocation? = null
     private var bitmapOutputAllocation: Allocation? = null
     private val script = ScriptC_ascii(rs)
 
     override fun effectName() = EFFECT_NAME
 
-    private fun updateGridCharacters(metrics: TextMetrics) {
+    private fun updateGridCharacters(metrics: TextMetrics, rand: Random) {
+        val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val prevCharAlloc = characterIndexAllocation
         characterIndexAllocation = reuseOrCreate2dAllocation(
                 characterIndexAllocation, rs, Element::U32,
                 metrics.numCharacterColumns, metrics.numCharacterRows)
         if (prevCharAlloc == characterIndexAllocation) {
-            // Maybe change a character.
+            // Change a character.
+            val newChar = intArrayOf(rand.nextInt(NUM_MATRIX_CHARS))
+            val offset = Math.abs(rand.nextInt() % numCells)
+            characterIndexAllocation!!.copy1DRangeFrom(offset, 1, newChar)
         }
         else {
             // Initialize with random characters.
-            val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
             val indices = IntArray(numCells)
             for (i in 0 until numCells) {
-                indices[i] = i % NUM_MATRIX_CHARS
+                indices[i] = rand.nextInt(NUM_MATRIX_CHARS)
             }
             characterIndexAllocation!!.copyFrom(indices)
         }
     }
 
-    private fun updateGridColors(metrics: TextMetrics) {
+    private fun maxRaindrops(metrics: TextMetrics): Int {
+        return Math.min(10, metrics.numCharacterColumns / 10)
+    }
+
+    private fun updateGridColors(metrics: TextMetrics, blockAverages: ByteArray, rand: Random) {
+        val prevColorAlloc = characterColorAllocation
         characterColorAllocation = reuseOrCreate2dAllocation(
-                characterColorAllocation, rs, Element::U8_4,
+                characterColorAllocation, rs, Element::RGBA_8888,
                 metrics.numCharacterColumns, metrics.numCharacterRows)
+        if (prevColorAlloc != characterColorAllocation) {
+            raindrops.clear()
+        }
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val ca = ByteArray(4 * numCells)
         for (i in 0 until numCells) {
-            // ca[i] = (0xff00ff00).toInt()
+            // A component of blockAverages is brightness, map to green.
             ca[4*i] = 0
-            ca[4*i + 1] = 0xff.toByte()
+            ca[4*i + 1] = blockAverages[4*i + 3]
             ca[4*i + 2] = 0
             ca[4*i + 3] = 0xff.toByte()
         }
+        var rit = raindrops.iterator()
+        while (rit.hasNext()) {
+            val drop = rit.next()
+            if (raindropTick - drop.startTick >= raindropLifetime) {
+                rit.remove()
+            }
+        }
+        if (raindrops.size < maxRaindrops(metrics) && rand.nextDouble() < newRaindropProbPerFrame) {
+            raindrops.add(Raindrop(
+                    rand.nextInt(metrics.numCharacterColumns),
+                    rand.nextInt(metrics.numCharacterRows),
+                    raindropTick))
+        }
+        for (drop in raindrops) {
+            // Adjust rain direction depending on orientation.
+            val y = drop.y + (raindropTick - drop.startTick).toInt()
+            if (y < metrics.numCharacterRows) {
+                val baseOffset = 4 * (y * metrics.numCharacterColumns + drop.x)
+                ca[baseOffset] = 0xff.toByte()
+                ca[baseOffset + 1] = 0xff.toByte()
+                ca[baseOffset + 2] = 0xff.toByte()
+                ca[baseOffset + 3] = 0xff.toByte()
+            }
+        }
+        raindropTick += 1
         characterColorAllocation!!.copyFrom(ca)
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
+        val rand = Random(cameraImage.timestamp)
         val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
         // TODO: Reuse resultBitmap and charBitmap if possible.
         val resultBitmap = Bitmap.createBitmap(
@@ -79,11 +125,7 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         }
         characterTemplateAllocation = reuseOrCreate2dAllocation(characterTemplateAllocation,
                 rs, Element::RGBA_8888,charBitmap.width, charBitmap.height)
-
         characterTemplateAllocation!!.copyFrom(charBitmap)
-
-        updateGridCharacters(metrics)
-        updateGridColors(metrics)
 
         bitmapOutputAllocation = reuseOrCreate2dAllocation(bitmapOutputAllocation,
                 rs, Element::RGBA_8888, resultBitmap.width, resultBitmap.height)
@@ -97,11 +139,33 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         script._numCharColumns = metrics.numCharacterColumns
         script._numCharRows = metrics.numCharacterRows
         script._numCharacters = pixelChars.length
-        script._flipHorizontal = cameraImage.orientation.xFlipped
-        script._flipVertical = cameraImage.orientation.yFlipped
+        // Only flip on the final output, otherwise we'll double flip and end up with no change.
+        script._flipHorizontal = false
+        script._flipVertical = false
         script._portrait = metrics.isPortrait
         script._colorMode = 0
+        if (cameraImage.planarYuvAllocations != null) {
+            script._hasSingleYuvAllocation = false
+            script._yInput = cameraImage.planarYuvAllocations.y
+            script._uInput = cameraImage.planarYuvAllocations.u
+            script._vInput = cameraImage.planarYuvAllocations.v
+        }
+        else {
+            script._hasSingleYuvAllocation = true
+            script._yuvInput = cameraImage.singleYuvAllocation
+        }
 
+        averageBrightnessAllocation = reuseOrCreate2dAllocation(averageBrightnessAllocation,
+                rs, Element::RGBA_8888, metrics.numCharacterColumns, metrics.numCharacterRows)
+        script.forEach_computeCharacterInfoForBlock(averageBrightnessAllocation)
+        val blockAverages = ByteArray(averageBrightnessAllocation!!.bytesSize)
+        averageBrightnessAllocation!!.copyTo(blockAverages)
+
+        updateGridCharacters(metrics, rand)
+        updateGridColors(metrics, blockAverages, rand)
+
+        script._flipHorizontal = cameraImage.orientation.xFlipped
+        script._flipVertical = cameraImage.orientation.yFlipped
         script.forEach_writeCharacterToBitmapWithColor(
                 characterIndexAllocation, characterColorAllocation)
         bitmapOutputAllocation!!.copyTo(resultBitmap)

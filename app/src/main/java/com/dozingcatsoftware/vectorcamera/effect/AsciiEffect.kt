@@ -156,13 +156,12 @@ class AsciiEffect(private val rs: RenderScript,
             script._yInput = cameraImage.planarYuvAllocations.y
             script._uInput = cameraImage.planarYuvAllocations.u
             script._vInput = cameraImage.planarYuvAllocations.v
-            script.forEach_computeCharacterInfoForBlock(asciiBlockAllocation)
         }
         else {
             script._hasSingleYuvAllocation = true
             script._yuvInput = cameraImage.singleYuvAllocation
-            script.forEach_computeCharacterInfoForBlock(asciiBlockAllocation)
         }
+        script.forEach_computeCharacterInfoForBlock(asciiBlockAllocation)
 
         val allocBytes = ByteArray(4 * metrics.numCharacterColumns * metrics.numCharacterRows)
         asciiBlockAllocation!!.copyTo(allocBytes)
