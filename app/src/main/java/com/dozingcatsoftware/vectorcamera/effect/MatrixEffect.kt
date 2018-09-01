@@ -10,16 +10,21 @@ import android.renderscript.RenderScript
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import java.util.*
+import kotlin.math.min
+import kotlin.math.roundToInt
 
-class Raindrop(val x: Int, val y: Int, val startTick: Long)
+class Raindrop(val x: Int, val y: Int, val startTimestamp: Long) {
+    var length = -1L
+}
 
 class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
 
     private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
     private val raindrops = HashSet<Raindrop>()
-    private var raindropTick = 0L
-    private var raindropLifetime = 10L
+    private var raindropLifetimeMillis = 5000L
+    private var raindropMillisPerMovement = 500L
     private var newRaindropProbPerFrame = 0.05
+    private var maxRaindropLength = 10
 
     private var characterTemplateAllocation: Allocation? = null
     private var characterIndexAllocation: Allocation? = null
@@ -37,10 +42,14 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
                 characterIndexAllocation, rs, Element::U32,
                 metrics.numCharacterColumns, metrics.numCharacterRows)
         if (prevCharAlloc == characterIndexAllocation) {
-            // Change a character.
-            val newChar = intArrayOf(rand.nextInt(NUM_MATRIX_CHARS))
-            val offset = Math.abs(rand.nextInt() % numCells)
-            characterIndexAllocation!!.copy1DRangeFrom(offset, 1, newChar)
+            // Change characters.
+            val newChar = IntArray(1)
+            val numChanged = numCells / 300
+            for (i in 0 until numChanged) {
+                newChar[0] = rand.nextInt(NUM_MATRIX_CHARS)
+                val offset = rand.nextInt(numCells)
+                characterIndexAllocation!!.copy1DRangeFrom(offset, 1, newChar)
+            }
         }
         else {
             // Initialize with random characters.
@@ -56,7 +65,8 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         return Math.min(10, metrics.numCharacterColumns / 10)
     }
 
-    private fun updateGridColors(metrics: TextMetrics, blockAverages: ByteArray, rand: Random) {
+    private fun updateGridColors(
+            ci: CameraImage, metrics: TextMetrics, blockAverages: ByteArray, rand: Random) {
         val prevColorAlloc = characterColorAllocation
         characterColorAllocation = reuseOrCreate2dAllocation(
                 characterColorAllocation, rs, Element::RGBA_8888,
@@ -76,7 +86,8 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         var rit = raindrops.iterator()
         while (rit.hasNext()) {
             val drop = rit.next()
-            if (raindropTick - drop.startTick >= raindropLifetime) {
+            val diff = ci.timestamp - drop.startTimestamp
+            if (diff < 0 || diff > raindropLifetimeMillis) {
                 rit.remove()
             }
         }
@@ -84,20 +95,34 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
             raindrops.add(Raindrop(
                     rand.nextInt(metrics.numCharacterColumns),
                     rand.nextInt(metrics.numCharacterRows),
-                    raindropTick))
+                    ci.timestamp))
         }
+        val maxDist = raindropLifetimeMillis / raindropMillisPerMovement
         for (drop in raindrops) {
-            // Adjust rain direction depending on orientation.
-            val y = drop.y + (raindropTick - drop.startTick).toInt()
-            if (y < metrics.numCharacterRows) {
+            val dir = if (ci.orientation.yFlipped) -1 else 1
+            val ticks = (ci.timestamp - drop.startTimestamp) / raindropMillisPerMovement
+            // If the raindrop is extending into a new cell, change that cell's character.
+            val length = min(maxRaindropLength.toLong(), ticks)
+            val growing = (length > drop.length)
+            drop.length = length
+            for (dy in 0..length) {
+                val y = drop.y + (dy * dir).toInt()
+                if (y < 0 || y >= metrics.numCharacterRows) {
+                    break
+                }
+                if (growing && (dy == length)) {
+                    val newChar = intArrayOf(rand.nextInt(NUM_MATRIX_CHARS))
+                    characterIndexAllocation!!.copy2DRangeFrom(drop.x, y, 1, 1, newChar)
+                }
+                val fraction = 1.0 - (length - dy).toDouble() / maxDist
+                val brightness = (255 * fraction).roundToInt().toByte()
                 val baseOffset = 4 * (y * metrics.numCharacterColumns + drop.x)
-                ca[baseOffset] = 0xff.toByte()
-                ca[baseOffset + 1] = 0xff.toByte()
-                ca[baseOffset + 2] = 0xff.toByte()
+                ca[baseOffset] = if (dy == length) brightness else 0
+                ca[baseOffset + 1] = brightness
+                ca[baseOffset + 2] = if (dy == length) brightness else 0
                 ca[baseOffset + 3] = 0xff.toByte()
             }
         }
-        raindropTick += 1
         characterColorAllocation!!.copyFrom(ca)
     }
 
@@ -162,7 +187,7 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         averageBrightnessAllocation!!.copyTo(blockAverages)
 
         updateGridCharacters(metrics, rand)
-        updateGridColors(metrics, blockAverages, rand)
+        updateGridColors(cameraImage, metrics, blockAverages, rand)
 
         script._flipHorizontal = cameraImage.orientation.xFlipped
         script._flipVertical = cameraImage.orientation.yFlipped
