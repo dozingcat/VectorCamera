@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import android.util.Size
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import java.util.*
@@ -25,6 +26,8 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
     private var raindropMillisPerMovement = 500L
     private var newRaindropProbPerFrame = 0.05
     private var maxRaindropLength = 10
+    // Every frame, this fraction of characters will change.
+    private var charChangeProbPerFrame = 1.0 / 300
 
     private var characterTemplateAllocation: Allocation? = null
     private var characterIndexAllocation: Allocation? = null
@@ -44,7 +47,7 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         if (prevCharAlloc == characterIndexAllocation) {
             // Change characters.
             val newChar = IntArray(1)
-            val numChanged = numCells / 300
+            val numChanged = (numCells * charChangeProbPerFrame).toInt()
             for (i in 0 until numChanged) {
                 newChar[0] = rand.nextInt(NUM_MATRIX_CHARS)
                 val offset = rand.nextInt(numCells)
@@ -126,31 +129,48 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         characterColorAllocation!!.copyFrom(ca)
     }
 
+    private fun updateCharTemplateBitmap(charPixelSize: Size) {
+        val charBitmapWidth = charPixelSize.width * NUM_MATRIX_CHARS
+        val origTemplateAlloc = characterTemplateAllocation
+        characterTemplateAllocation = reuseOrCreate2dAllocation(characterTemplateAllocation,
+                rs, Element::RGBA_8888, charBitmapWidth, charPixelSize.height)
+        // Only recreate character bitmap if the dimensions changed.
+        if (characterTemplateAllocation != origTemplateAlloc) {
+            val paint = Paint()
+            paint.textSize = charPixelSize.height * 5f / 6
+            paint.color = Color.argb(255, 0, 255, 0)
+
+            val charBitmap = Bitmap.createBitmap(
+                    charBitmapWidth, charPixelSize.height, Bitmap.Config.ARGB_8888)
+            val charBitmapCanvas = Canvas(charBitmap)
+            charBitmapCanvas.drawColor(Color.argb(255, 0, 0, 0))
+            val normalChars = MATRIX_NORMAL_CHARS
+            val reversedChars = MATRIX_REVERSED_CHARS
+            val numNormalChars = normalChars.length
+            for (i in 0 until numNormalChars) {
+                charBitmapCanvas.drawText(normalChars[i].toString(),
+                        (i * charPixelSize.width).toFloat(), charPixelSize.height - 1f, paint)
+            }
+            // Reversed characters are drawn at negative X positions so that after the scale
+            // transform they'll be in the right place.
+            charBitmapCanvas.scale(-1f, 1f)
+            for (i in 0 until reversedChars.length) {
+                charBitmapCanvas.drawText(reversedChars[i].toString(),
+                        -((normalChars.length + i + 1) * charPixelSize.width).toFloat(),
+                        charPixelSize.height - 1f, paint)
+            }
+            characterTemplateAllocation!!.copyFrom(charBitmap)
+        }
+    }
+
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         val rand = Random(cameraImage.timestamp)
         val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
-        // TODO: Reuse resultBitmap and charBitmap if possible.
         val resultBitmap = Bitmap.createBitmap(
                 metrics.outputSize.width, metrics.outputSize.height, Bitmap.Config.ARGB_8888)
         val cps = metrics.charPixelSize
-        // Create Bitmap and draw each character into it.
-        // TODO: Reverse English characters.
-        val pixelChars = MATRIX_CHARS + MATRIX_REVERSED_CHARS
-        val paint = Paint()
-        paint.textSize = cps.height * 5f / 6
-        paint.color = Color.argb(255, 0, 255, 0)
 
-        val charBitmap = Bitmap.createBitmap(
-                cps.width * pixelChars.length, cps.height, Bitmap.Config.ARGB_8888)
-        val charBitmapCanvas = Canvas(charBitmap)
-        charBitmapCanvas.drawColor(Color.argb(255, 0, 0, 0))
-        for (i in 0 until pixelChars.length) {
-            charBitmapCanvas.drawText(pixelChars[i].toString(),
-                    (i * cps.width).toFloat(), cps.height - 1f, paint)
-        }
-        characterTemplateAllocation = reuseOrCreate2dAllocation(characterTemplateAllocation,
-                rs, Element::RGBA_8888,charBitmap.width, charBitmap.height)
-        characterTemplateAllocation!!.copyFrom(charBitmap)
+        updateCharTemplateBitmap(cps)
 
         bitmapOutputAllocation = reuseOrCreate2dAllocation(bitmapOutputAllocation,
                 rs, Element::RGBA_8888, resultBitmap.width, resultBitmap.height)
@@ -163,7 +183,7 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         script._characterPixelHeight = cps.height
         script._numCharColumns = metrics.numCharacterColumns
         script._numCharRows = metrics.numCharacterRows
-        script._numCharacters = pixelChars.length
+        script._numCharacters = NUM_MATRIX_CHARS
         // Only flip on the final output, otherwise we'll double flip and end up with no change.
         script._flipHorizontal = false
         script._flipVertical = false
@@ -202,11 +222,11 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
         const val DEFAULT_CHARACTER_COLUMNS = 120
 
         // Hirigana and half-width katakana characters, and (reversed) English letters and numbers.
-        const val MATRIX_CHARS =
+        const val MATRIX_NORMAL_CHARS =
                 "ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕ" +
                 "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ"
         const val MATRIX_REVERSED_CHARS = "QWERTYUIOPASDFGHJKLZXCVBNM1234567890"
-        const val NUM_MATRIX_CHARS = MATRIX_CHARS.length + MATRIX_REVERSED_CHARS.length
+        const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): MatrixEffect {
             val numCharColumns = params.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
