@@ -15,17 +15,17 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 class Raindrop(val x: Int, val y: Int, val startTimestamp: Long) {
-    var length = -1L
+    var prevLength = -1L
 }
 
 class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
 
     private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
     private val raindrops = HashSet<Raindrop>()
-    private var raindropLifetimeMillis = 5000L
-    private var raindropMillisPerMovement = 500L
+    private var raindropDecayMillis = 2000L
+    private var raindropMillisPerTick = 200L
     private var newRaindropProbPerFrame = 0.05
-    private var maxRaindropLength = 10
+    private var maxRaindropLength = 15
     // Every frame, this fraction of characters will change.
     private var charChangeProbPerFrame = 1.0 / 300
 
@@ -86,6 +86,7 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
             ca[4*i + 2] = 0
             ca[4*i + 3] = 0xff.toByte()
         }
+        val raindropLifetimeMillis = maxRaindropLength * raindropMillisPerTick + raindropDecayMillis
         var rit = raindrops.iterator()
         while (rit.hasNext()) {
             val drop = rit.next()
@@ -100,14 +101,13 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
                     rand.nextInt(metrics.numCharacterRows),
                     ci.timestamp))
         }
-        val maxDist = raindropLifetimeMillis / raindropMillisPerMovement
         for (drop in raindrops) {
             val dir = if (ci.orientation.yFlipped) -1 else 1
-            val ticks = (ci.timestamp - drop.startTimestamp) / raindropMillisPerMovement
+            val ticks = (ci.timestamp - drop.startTimestamp) / raindropMillisPerTick
             // If the raindrop is extending into a new cell, change that cell's character.
             val length = min(maxRaindropLength.toLong(), ticks)
-            val growing = (length > drop.length)
-            drop.length = length
+            val growing = (length > drop.prevLength)
+            drop.prevLength = length
             for (dy in 0..length) {
                 val y = drop.y + (dy * dir).toInt()
                 if (y < 0 || y >= metrics.numCharacterRows) {
@@ -117,12 +117,17 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
                     val newChar = intArrayOf(rand.nextInt(NUM_MATRIX_CHARS))
                     characterIndexAllocation!!.copy2DRangeFrom(drop.x, y, 1, 1, newChar)
                 }
-                val fraction = 1.0 - (length - dy).toDouble() / maxDist
+                val millisSinceActive =
+                        ci.timestamp - (drop.startTimestamp + dy * raindropMillisPerTick)
+                val fraction = 1.0 - (millisSinceActive.toDouble() / raindropLifetimeMillis)
+                if (fraction <= 0) {
+                    continue
+                }
                 val brightness = (255 * fraction).roundToInt().toByte()
                 val baseOffset = 4 * (y * metrics.numCharacterColumns + drop.x)
-                ca[baseOffset] = if (dy == length) brightness else 0
+                ca[baseOffset] = if (dy == ticks) brightness else 0
                 ca[baseOffset + 1] = brightness
-                ca[baseOffset + 2] = if (dy == length) brightness else 0
+                ca[baseOffset + 2] = if (dy == ticks) brightness else 0
                 ca[baseOffset + 3] = 0xff.toByte()
             }
         }

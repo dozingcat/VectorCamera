@@ -383,8 +383,9 @@ class MainActivity : Activity() {
             }
             if (inEffectSelectionMode) {
                 previousEffect = currentEffect
-                currentEffect = CombinationEffect(effectRegistry.defaultEffectFunctions(
-                        rs, preferences.lookupFunction, EffectContext.COMBO_GRID))
+                val comboEffects = effectRegistry.defaultEffectFunctions(
+                        rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
+                currentEffect = CombinationEffect(comboEffects, 50)
                 preferredImageSize = ImageSize.EFFECT_GRID
                 controlLayout.visibility = View.GONE
                 Log.i(TAG, "Showing combo grid")

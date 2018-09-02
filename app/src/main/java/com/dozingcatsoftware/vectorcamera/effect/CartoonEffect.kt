@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
 import android.renderscript.*
+import com.dozingcatsoftware.util.ScriptC_planar_yuv_to_rgba
 import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
@@ -18,6 +19,7 @@ class CartoonEffect(val rs: RenderScript): Effect {
 
     private var rgbAllocation: Allocation? = null
     private var yuvToRgbScript = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs))
+    private var planarYuvToRgbScript = ScriptC_planar_yuv_to_rgba(rs)
 
     private var toonAllocation: Allocation? = null
     private var toonLutScript = ScriptIntrinsicLUT.create(rs, Element.U8_4(rs))
@@ -27,8 +29,16 @@ class CartoonEffect(val rs: RenderScript): Effect {
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         rgbAllocation = reuseOrCreate2dAllocation(rgbAllocation,
                 rs, Element::U8_4, cameraImage.width(), cameraImage.height())
-        yuvToRgbScript.setInput(cameraImage.singleYuvAllocation!!)
-        yuvToRgbScript.forEach(rgbAllocation)
+        if (cameraImage.singleYuvAllocation != null) {
+            yuvToRgbScript.setInput(cameraImage.singleYuvAllocation!!)
+            yuvToRgbScript.forEach(rgbAllocation)
+        }
+        else {
+            planarYuvToRgbScript._yInputAlloc = cameraImage.planarYuvAllocations!!.y
+            planarYuvToRgbScript._uInputAlloc = cameraImage.planarYuvAllocations!!.u
+            planarYuvToRgbScript._vInputAlloc = cameraImage.planarYuvAllocations!!.v
+            planarYuvToRgbScript.forEach_convertToRgba(rgbAllocation)
+        }
 
         blurredAllocation = reuseOrCreate2dAllocation(blurredAllocation,
                 rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
@@ -57,7 +67,7 @@ class CartoonEffect(val rs: RenderScript): Effect {
     }
 
     companion object {
-        val EFFECT_NAME = "cartoon"
+        const val EFFECT_NAME = "cartoon"
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): CartoonEffect {
             return CartoonEffect(rs)

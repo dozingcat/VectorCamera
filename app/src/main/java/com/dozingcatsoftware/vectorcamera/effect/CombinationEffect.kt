@@ -13,7 +13,9 @@ import com.dozingcatsoftware.vectorcamera.CameraImage
  * the UI for selecting an effect.
  */
 class CombinationEffect(
-        private val effectFactories: List<() -> Effect>): Effect {
+        private val effectFactories: List<() -> Effect>,
+        private val maxMillisPerFrame: Long = Long.MAX_VALUE,
+        private val timeFn: (() -> Long) = System::currentTimeMillis): Effect {
 
     override fun effectName() = "combination"
 
@@ -50,8 +52,8 @@ class CombinationEffect(
         val shouldRotate = cameraImage.orientation.portrait
         val srcRect = RectF(0f, 0f, tileBuffer.width.toFloat(), tileBuffer.height.toFloat())
 
-        // Update as many subeffects as we can in the time limit specified by FRAME_LIMIT_MS.
-        val t0 = System.currentTimeMillis()
+        // Update as many subeffects as we can in the time limit specified by maxMillisPerFrame.
+        val t0 = timeFn()
         var numUpdated = 0
         while (true) {
             val ei = effectIndex
@@ -74,9 +76,9 @@ class CombinationEffect(
             resultCanvas.drawBitmap(tileBuffer, null, dstRect, null)
 
             effectIndex = (effectIndex + 1) % effectFactories.size
-            val t = System.currentTimeMillis()
+            val t = timeFn()
             numUpdated += 1
-            if (numUpdated >= effectFactories.size || t - t0 > FRAME_LIMIT_MS) {
+            if (numUpdated >= effectFactories.size || t - t0 > maxMillisPerFrame) {
                 break
             }
         }
@@ -86,8 +88,5 @@ class CombinationEffect(
 
     companion object {
         const val TAG = "CombinationEffect"
-        // When computing a frame, stop rendering subeffects and return the current grid image after
-        // this many milliseconds.
-        const val FRAME_LIMIT_MS = 50
     }
 }
