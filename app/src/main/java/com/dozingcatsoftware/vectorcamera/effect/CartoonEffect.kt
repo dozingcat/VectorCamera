@@ -30,13 +30,14 @@ class CartoonEffect(val rs: RenderScript): Effect {
         rgbAllocation = reuseOrCreate2dAllocation(rgbAllocation,
                 rs, Element::U8_4, cameraImage.width(), cameraImage.height())
         if (cameraImage.singleYuvAllocation != null) {
-            yuvToRgbScript.setInput(cameraImage.singleYuvAllocation!!)
+            yuvToRgbScript.setInput(cameraImage.singleYuvAllocation)
             yuvToRgbScript.forEach(rgbAllocation)
         }
         else {
-            planarYuvToRgbScript._yInputAlloc = cameraImage.planarYuvAllocations!!.y
-            planarYuvToRgbScript._uInputAlloc = cameraImage.planarYuvAllocations!!.u
-            planarYuvToRgbScript._vInputAlloc = cameraImage.planarYuvAllocations!!.v
+            val planarAllocs = cameraImage.planarYuvAllocations!!
+            planarYuvToRgbScript._yInputAlloc = planarAllocs.y
+            planarYuvToRgbScript._uInputAlloc = planarAllocs.u
+            planarYuvToRgbScript._vInputAlloc = planarAllocs.v
             planarYuvToRgbScript.forEach_convertToRgba(rgbAllocation)
         }
 

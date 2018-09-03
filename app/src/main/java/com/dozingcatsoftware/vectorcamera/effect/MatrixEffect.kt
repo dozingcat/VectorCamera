@@ -18,7 +18,7 @@ class Raindrop(val x: Int, val y: Int, val startTimestamp: Long) {
     var prevLength = -1L
 }
 
-class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
+class MatrixEffect(val rs: RenderScript, val numPreferredCharColumns: Int): Effect {
 
     private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
     private val raindrops = HashSet<Raindrop>()
@@ -37,6 +37,8 @@ class MatrixEffect(val rs: RenderScript, numPreferredCharColumns: Int): Effect {
     private val script = ScriptC_ascii(rs)
 
     override fun effectName() = EFFECT_NAME
+
+    override fun effectParameters() = mapOf<String, Any>("numColumns" to numPreferredCharColumns)
 
     private fun updateGridCharacters(metrics: TextMetrics, rand: Random) {
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
