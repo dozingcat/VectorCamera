@@ -51,15 +51,16 @@ class VCPreferencesActivity : PreferenceActivity() {
             })
         }
         // Same for number of characters.
+        val textEffectNames = setOf("ascii", "matrix")
         val numColumnsPrefId = getString(R.string.numAsciiColumnsPrefId)
         pm.findPreference(numColumnsPrefId).setOnPreferenceChangeListener({pref, value ->
             handler.post({
                 val storedPrefs = VCPreferences(this)
-                if (storedPrefs.effectName() == "ascii") {
+                if (textEffectNames.contains(storedPrefs.effectName())) {
                     val params = storedPrefs.effectParameters()
                     val newEffectParams = HashMap(params)
                     newEffectParams["numColumns"] = Integer.parseInt(value as String)
-                    storedPrefs.saveEffectInfo("ascii", newEffectParams)
+                    storedPrefs.saveEffectInfo(storedPrefs.effectName(), newEffectParams)
                 }
             })
             true

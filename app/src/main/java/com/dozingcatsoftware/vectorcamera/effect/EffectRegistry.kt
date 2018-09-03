@@ -51,6 +51,16 @@ class EffectRegistry {
                         )
                 ))
             },
+            // Blue
+            {rs, prefsFn, context ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(0, 0, 255)
+                        )
+                ))
+            },
             // Cyan
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -62,7 +72,28 @@ class EffectRegistry {
                 ))
             },
 
-            // Row 2, edges on non-black.
+            // Row 2
+            // Purple
+            {rs, prefsFn, context ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 0, 255)
+                        )
+                ))
+            },
+            // Yellow
+            {rs, prefsFn, context ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 0)
+                        )
+                ))
+            },
+
             // Black on white.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -73,13 +104,13 @@ class EffectRegistry {
                         )
                 ))
             },
-            // Blue on white.
+            // Green on white.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(255, 255, 255),
-                                "maxColor" to listOf(0, 0, 255)
+                                "maxColor" to listOf(0, 160, 0)
                         )
                 ))
             },
@@ -93,6 +124,18 @@ class EffectRegistry {
                         )
                 ))
             },
+            // Blue on white.
+            {rs, prefsFn, context ->
+                EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(255, 255, 255),
+                                "maxColor" to listOf(0, 0, 255)
+                        )
+                ))
+            },
+
+            // Row 3
             // Yellow background, 2d gradient colors.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -124,7 +167,6 @@ class EffectRegistry {
                 ))
             },
 
-            // Row 3, animations.
             // Animated colors.
             // Blue-green edges on black.
             {rs, prefsFn, context ->
@@ -189,6 +231,8 @@ class EffectRegistry {
                         )
                 ))
             },
+
+            // Row 4
             // Rainbow, animated vertically on white background.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -210,7 +254,6 @@ class EffectRegistry {
                 ))
             },
 
-            // Row 4.
             // Solid effects
             {rs, prefsFn, context ->
                 SolidColorEffect.fromParameters(rs, mapOf(
@@ -280,7 +323,16 @@ class EffectRegistry {
                         "prefId" to "pixelChars.FULL_COLOR"
                 ))
             },
-            {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) }
+            {rs, prefsFn, context ->
+                MatrixEffect.fromParameters(rs, mapOf(
+                        "numColumns" to numAsciiColumns(prefsFn)
+                ))
+            },
+
+            // Row 6
+            {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
+
+            {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) }
     )
 
     fun defaultEffectCount() = baseEffects.size
@@ -308,6 +360,8 @@ class EffectRegistry {
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
+            CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
+            MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)
             else -> throw IllegalArgumentException("Unknown effect: " + name)
         }
     }
