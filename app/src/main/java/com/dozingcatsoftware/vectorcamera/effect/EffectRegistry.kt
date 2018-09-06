@@ -325,7 +325,14 @@ class EffectRegistry {
             },
             {rs, prefsFn, context ->
                 MatrixEffect.fromParameters(rs, mapOf(
-                        "numColumns" to numAsciiColumns(prefsFn)
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "edges" to true
+                ))
+            },
+            {rs, prefsFn, context ->
+                MatrixEffect.fromParameters(rs, mapOf(
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "edges" to false
                 ))
             },
 

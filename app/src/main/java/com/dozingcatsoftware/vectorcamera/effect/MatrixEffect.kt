@@ -18,7 +18,11 @@ class Raindrop(val x: Int, val y: Int, val startTimestamp: Long) {
     var prevLength = -1L
 }
 
-class MatrixEffect(val rs: RenderScript, val numPreferredCharColumns: Int): Effect {
+class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Effect {
+
+    private val numPreferredCharColumns =
+            effectParams.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
+    private val computeEdges = effectParams.get("edges") == true
 
     private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
     private val raindrops = HashSet<Raindrop>()
@@ -33,12 +37,14 @@ class MatrixEffect(val rs: RenderScript, val numPreferredCharColumns: Int): Effe
     private var characterIndexAllocation: Allocation? = null
     private var characterColorAllocation: Allocation? = null
     private var averageBrightnessAllocation: Allocation? = null
+    private var charBrightnessAllocation: Allocation? = null
     private var bitmapOutputAllocation: Allocation? = null
-    private val script = ScriptC_ascii(rs)
+    private val textScript = ScriptC_ascii(rs)
+    private val edgeScript = ScriptC_edge(rs)
 
     override fun effectName() = EFFECT_NAME
 
-    override fun effectParameters() = mapOf<String, Any>("numColumns" to numPreferredCharColumns)
+    override fun effectParameters() = effectParams
 
     private fun updateGridCharacters(metrics: TextMetrics, rand: Random) {
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
@@ -84,7 +90,7 @@ class MatrixEffect(val rs: RenderScript, val numPreferredCharColumns: Int): Effe
         for (i in 0 until numCells) {
             // A component of blockAverages is brightness, map to green.
             ca[4*i] = 0
-            ca[4*i + 1] = blockAverages[4*i + 3]
+            ca[4*i + 1] = blockAverages[i]
             ca[4*i + 2] = 0
             ca[4*i + 3] = 0xff.toByte()
         }
@@ -182,43 +188,56 @@ class MatrixEffect(val rs: RenderScript, val numPreferredCharColumns: Int): Effe
         bitmapOutputAllocation = reuseOrCreate2dAllocation(bitmapOutputAllocation,
                 rs, Element::RGBA_8888, resultBitmap.width, resultBitmap.height)
 
-        script._characterBitmapInput = characterTemplateAllocation
-        script._imageOutput = bitmapOutputAllocation
-        script._inputImageWidth = cameraImage.width()
-        script._inputImageHeight = cameraImage.height()
-        script._characterPixelWidth = cps.width
-        script._characterPixelHeight = cps.height
-        script._numCharColumns = metrics.numCharacterColumns
-        script._numCharRows = metrics.numCharacterRows
-        script._numCharacters = NUM_MATRIX_CHARS
+        textScript._characterBitmapInput = characterTemplateAllocation
+        textScript._imageOutput = bitmapOutputAllocation
+        textScript._inputImageWidth = cameraImage.width()
+        textScript._inputImageHeight = cameraImage.height()
+        textScript._characterPixelWidth = cps.width
+        textScript._characterPixelHeight = cps.height
+        textScript._numCharColumns = metrics.numCharacterColumns
+        textScript._numCharRows = metrics.numCharacterRows
+        textScript._numCharacters = NUM_MATRIX_CHARS
         // Only flip on the final output, otherwise we'll double flip and end up with no change.
-        script._flipHorizontal = false
-        script._flipVertical = false
-        script._portrait = metrics.isPortrait
-        script._colorMode = 0
+        textScript._flipHorizontal = false
+        textScript._flipVertical = false
+        textScript._portrait = metrics.isPortrait
+        textScript._colorMode = 0
         if (cameraImage.planarYuvAllocations != null) {
-            script._hasSingleYuvAllocation = false
-            script._yInput = cameraImage.planarYuvAllocations.y
-            script._uInput = cameraImage.planarYuvAllocations.u
-            script._vInput = cameraImage.planarYuvAllocations.v
+            textScript._hasSingleYuvAllocation = false
+            textScript._yInput = cameraImage.planarYuvAllocations.y
+            textScript._uInput = cameraImage.planarYuvAllocations.u
+            textScript._vInput = cameraImage.planarYuvAllocations.v
         }
         else {
-            script._hasSingleYuvAllocation = true
-            script._yuvInput = cameraImage.singleYuvAllocation
+            textScript._hasSingleYuvAllocation = true
+            textScript._yuvInput = cameraImage.singleYuvAllocation
         }
 
         averageBrightnessAllocation = reuseOrCreate2dAllocation(averageBrightnessAllocation,
-                rs, Element::RGBA_8888, metrics.numCharacterColumns, metrics.numCharacterRows)
-        script.forEach_computeCharacterInfoForBlock(averageBrightnessAllocation)
-        val blockAverages = ByteArray(averageBrightnessAllocation!!.bytesSize)
-        averageBrightnessAllocation!!.copyTo(blockAverages)
+                rs, Element::U8, metrics.numCharacterColumns, metrics.numCharacterRows)
+        textScript.forEach_computeBrightnessForBlock(averageBrightnessAllocation)
+
+        if (computeEdges) {
+            charBrightnessAllocation = reuseOrCreate2dAllocation(charBrightnessAllocation,
+                    rs, Element::U8, metrics.numCharacterColumns, metrics.numCharacterRows)
+            edgeScript._gWidth = metrics.numCharacterColumns
+            edgeScript._gHeight = metrics.numCharacterRows
+            edgeScript._gYuvInput = averageBrightnessAllocation
+            edgeScript.forEach_computeEdges(charBrightnessAllocation)
+        }
+        else {
+            charBrightnessAllocation = averageBrightnessAllocation
+        }
+
+        val blockAverages = ByteArray(charBrightnessAllocation!!.bytesSize)
+        charBrightnessAllocation!!.copyTo(blockAverages)
 
         updateGridCharacters(metrics, rand)
         updateGridColors(cameraImage, metrics, blockAverages, rand)
 
-        script._flipHorizontal = cameraImage.orientation.xFlipped
-        script._flipVertical = cameraImage.orientation.yFlipped
-        script.forEach_writeCharacterToBitmapWithColor(
+        textScript._flipHorizontal = cameraImage.orientation.xFlipped
+        textScript._flipVertical = cameraImage.orientation.yFlipped
+        textScript.forEach_writeCharacterToBitmapWithColor(
                 characterIndexAllocation, characterColorAllocation)
         bitmapOutputAllocation!!.copyTo(resultBitmap)
         return resultBitmap
@@ -237,7 +256,7 @@ class MatrixEffect(val rs: RenderScript, val numPreferredCharColumns: Int): Effe
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): MatrixEffect {
             val numCharColumns = params.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
-            return MatrixEffect(rs, numCharColumns)
+            return MatrixEffect(rs, params)
         }
     }
 }
