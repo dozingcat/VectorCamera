@@ -183,3 +183,12 @@ uchar4 RS_KERNEL computeCharacterInfoForBlock(uint32_t x, uint32_t y) {
     textColor.a = averageColor.a;
     return textColor;
 }
+
+// Returns just the average brightness for a block. Somewhat ineffecient because
+// `computeBlockAverageColor` also computes the average R/G/B components.
+uchar RS_KERNEL computeBrightnessForBlock(uint32_t x, uint32_t y) {
+    uint32_t actualX = flipHorizontal ? numCharColumns - 1 - x : x;
+    uint32_t actualY = flipVertical ? numCharRows - 1 - y : y;
+    uchar4 averageColor = computeBlockAverageColor(actualX, actualY);
+    return averageColor.a;
+}
