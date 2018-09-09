@@ -15,7 +15,8 @@ class EffectRegistry {
                else Animated2dGradient.DEFAULT_PIXELS_PER_CELL
     }
 
-    // 25 effects, shown in 5x5 grid.
+    // 36 effects, shown in 6x6 grid.
+    // See Animated2dGradient.kt for description of gradient grids.
     val baseEffects = listOf<(RenderScript, (String, String) -> String, EffectContext) -> Effect>(
 
             // Row 1, edges on black.
@@ -255,6 +256,7 @@ class EffectRegistry {
             },
 
             // Solid effects
+            // Rainbow 2d gradient.
             {rs, prefsFn, context ->
                 SolidColorEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -269,22 +271,31 @@ class EffectRegistry {
                         )
                 ))
             },
-            {rs, prefsFn, context -> PermuteColorEffect.rgbToBrg(rs) },
-            {rs, prefsFn, context -> PermuteColorEffect.rgbToGbr(rs) },
-            {rs, prefsFn, context -> PermuteColorEffect.flipUV(rs) },
-            // Emboss grayscale.
+            // Cyan background, purple/red/yellow foreground.
             {rs, prefsFn, context ->
-                Convolve3x3Effect.fromParameters(rs, mapOf(
-                        "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
+                SolidColorEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
-                                "type" to "fixed",
-                                "minColor" to listOf(0, 0, 0),
-                                "maxColor" to listOf(255, 255, 255)
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 255, 255),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,0,255, 255,0,0, 255,0,255, 255,0,0),
+                                                listOf(255,0,0, 255,128,0, 255,0,0, 255,128,0),
+                                                listOf(255,128,0, 255,0,0, 255,128,0, 255,0,0),
+                                                listOf(255,0,0, 255,0,255, 255,0,0, 255,0,255)
+                                        )
+                                ),
+                                "speedX" to 500,
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
                 ))
             },
 
-            // Row 5. ASCII effects, with unmodified input as last effect.
+            {rs, prefsFn, context -> PermuteColorEffect.rgbToBrg(rs) },
+            {rs, prefsFn, context -> PermuteColorEffect.rgbToGbr(rs) },
+            {rs, prefsFn, context -> PermuteColorEffect.flipUV(rs) },
+
+            // Row 5. Text effects.
             {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -339,7 +350,32 @@ class EffectRegistry {
             // Row 6
             {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
 
-            {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) }
+            // Grayscale negative.
+            {rs, prefsFn, context ->
+                SolidColorEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(255, 255, 255),
+                                "maxColor" to listOf(0, 0, 0)
+                        )
+                ))
+            },
+
+            {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) },
+
+            // Emboss grayscale.
+            {rs, prefsFn, context ->
+                Convolve3x3Effect.fromParameters(rs, mapOf(
+                        "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 255)
+                        )
+                ))
+            }
+
+    // TODO: Customizable edge/solid effects.
     )
 
     fun defaultEffectCount() = baseEffects.size
