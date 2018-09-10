@@ -65,6 +65,19 @@ class VCPreferencesActivity : PreferenceActivity() {
             })
             true
         })
+        // And update matrix text color.
+        val matrixColorPrefId = getString(R.string.matrixTextColorPrefId)
+        pm.findPreference(matrixColorPrefId).setOnPreferenceChangeListener({pref, value ->
+            handler.post({
+                val storedPrefs = VCPreferences(this)
+                if (storedPrefs.effectName() == "matrix") {
+                    val params = storedPrefs.effectParameters()
+                    val newEffectParams = HashMap(params)
+                    newEffectParams["textColor"] = value
+                    storedPrefs.saveEffectInfo(storedPrefs.effectName(), newEffectParams)
+                }
+            })
+        })
     }
 
     /**

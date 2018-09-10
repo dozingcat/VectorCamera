@@ -9,6 +9,7 @@ import android.renderscript.Element
 import android.renderscript.RenderScript
 import android.util.Size
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
+import com.dozingcatsoftware.util.toUInt
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import java.util.*
 import kotlin.math.min
@@ -23,6 +24,11 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
     private val numPreferredCharColumns =
             effectParams.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
     private val computeEdges = effectParams.get("edges") == true
+    private val textColor = effectParams.getOrElse("textColor", {0x00ff00}) as Int
+    private val maxTextRed = (textColor shr 16) and 0xff
+    private val maxTextGreen = (textColor shr 8) and 0xff
+    private val maxTextBlue = textColor and 0xff
+
 
     private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
     private val raindrops = HashSet<Raindrop>()
@@ -88,10 +94,10 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val ca = ByteArray(4 * numCells)
         for (i in 0 until numCells) {
-            // A component of blockAverages is brightness, map to green.
-            ca[4*i] = 0
-            ca[4*i + 1] = blockAverages[i]
-            ca[4*i + 2] = 0
+            val fraction = toUInt(blockAverages[i]) / 255.0
+            ca[4*i] = (fraction * maxTextRed).toByte()
+            ca[4*i + 1] = (fraction * maxTextGreen).toByte()
+            ca[4*i + 2] = (fraction * maxTextBlue).toByte()
             ca[4*i + 3] = 0xff.toByte()
         }
         val raindropLifetimeMillis = maxRaindropLength * raindropMillisPerTick + raindropDecayMillis
@@ -133,9 +139,11 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
                 }
                 val brightness = (255 * fraction).roundToInt().toByte()
                 val baseOffset = 4 * (y * metrics.numCharacterColumns + drop.x)
-                ca[baseOffset] = if (dy == ticks) brightness else 0
-                ca[baseOffset + 1] = brightness
-                ca[baseOffset + 2] = if (dy == ticks) brightness else 0
+                ca[baseOffset] = if (dy == ticks) brightness else (fraction * maxTextRed).toByte()
+                ca[baseOffset + 1] =
+                        if (dy == ticks) brightness else (fraction * maxTextGreen).toByte()
+                ca[baseOffset + 2] =
+                        if (dy == ticks) brightness else (fraction * maxTextBlue).toByte()
                 ca[baseOffset + 3] = 0xff.toByte()
             }
         }
@@ -255,7 +263,6 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
         const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
 
         fun fromParameters(rs: RenderScript, params: Map<String, Any>): MatrixEffect {
-            val numCharColumns = params.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
             return MatrixEffect(rs, params)
         }
     }
