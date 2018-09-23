@@ -32,6 +32,9 @@
     <string name="fullColorPixelCharsPrefSummary">Characters for full color mode.</string>
     <string name="fullColorPixelCharsPrefMessage">Enter characters to use in images from darkest to brightest. Full color mode usually works best with fewer or even just one character. Leave blank for default of O8@</string>
 
+    <string name="matrixTextColorPrefId">matrixTextColor</string>
+    <string name="matrixTextColorPrefTitle">Matrix text color</string>
+
     <string name="shareDialogYesLabel">Share</string>
     <string name="shareDialogNoLabel">Cancel</string>
     <string name="shareActionTitle">Share using</string>

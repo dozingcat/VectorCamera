@@ -17,7 +17,7 @@ class EffectRegistry {
 
     // 36 effects, shown in 6x6 grid.
     // See Animated2dGradient.kt for description of gradient grids.
-    val baseEffects = listOf<(RenderScript, (String, String) -> String, EffectContext) -> Effect>(
+    val baseEffects = listOf<(RenderScript, (String, Any) -> Any, EffectContext) -> Effect>(
 
             // Row 1, edges on black.
             // Edge strength->brightness, preserve colors.
@@ -337,12 +337,14 @@ class EffectRegistry {
             {rs, prefsFn, context ->
                 MatrixEffect.fromParameters(rs, mapOf(
                         "numColumns" to numAsciiColumns(prefsFn),
+                        "textColor" to matrixTextColor(prefsFn, 0x00ff00),
                         "edges" to true
                 ))
             },
             {rs, prefsFn, context ->
                 MatrixEffect.fromParameters(rs, mapOf(
                         "numColumns" to numAsciiColumns(prefsFn),
+                        "textColor" to matrixTextColor(prefsFn, 0x00ff00),
                         "edges" to false
                 ))
             },
@@ -380,12 +382,12 @@ class EffectRegistry {
 
     fun defaultEffectCount() = baseEffects.size
 
-    fun defaultEffectAtIndex(index: Int, rs: RenderScript, prefsFn: (String, String) -> String,
+    fun defaultEffectAtIndex(index: Int, rs: RenderScript, prefsFn: (String, Any) -> Any,
                              context: EffectContext = EffectContext.NORMAL): Effect {
         return baseEffects[index](rs, prefsFn, context)
     }
 
-    fun defaultEffectFunctions(rs: RenderScript, prefsFn: (String, String) -> String,
+    fun defaultEffectFunctions(rs: RenderScript, prefsFn: (String, Any) -> Any,
                                context: EffectContext = EffectContext.NORMAL): List<() -> Effect> {
         val fns = mutableListOf<() -> Effect>()
         for (i in 0 until defaultEffectCount()) {
@@ -405,7 +407,7 @@ class EffectRegistry {
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)
-            else -> throw IllegalArgumentException("Unknown effect: " + name)
+            else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
 
@@ -413,8 +415,8 @@ class EffectRegistry {
             effectForNameAndParameters(rs, metadata.name, metadata.parameters)
 }
 
-private fun numAsciiColumns(prefsFn: (String, String) -> String): Int {
-    val prefsVal = prefsFn("numAsciiColumns", "")
+private fun numAsciiColumns(prefsFn: (String, Any) -> Any): Int {
+    val prefsVal = prefsFn("numAsciiColumns", "") as String
     if (!prefsVal.isEmpty()) {
         try {
             return Integer.parseInt(prefsVal)
@@ -425,10 +427,14 @@ private fun numAsciiColumns(prefsFn: (String, String) -> String): Int {
 }
 
 private fun asciiChars(
-        prefsFn: (String, String) -> String, prefId: String, defValue: String): String {
-    val prefsVal = prefsFn(prefId, defValue)
+        prefsFn: (String, Any) -> Any, prefId: String, defValue: String): String {
+    val prefsVal = prefsFn(prefId, defValue) as String
     if (prefsVal.isEmpty()) {
         return defValue
     }
     return prefsVal
+}
+
+private fun matrixTextColor(prefsFn: (String, Any) -> Any, defValue: Int): Int {
+    return prefsFn("matrixTextColor", defValue) as Int
 }

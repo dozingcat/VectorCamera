@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory android:title="Preferences">
         <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
@@ -36,6 +38,12 @@
             android:enabled="true"
             android:title="@string/fullColorPixelCharsPrefTitle"
             android:dialogMessage="@string/fullColorPixelCharsPrefMessage" />
+        <com.jaredrummler.android.colorpicker.ColorPreference
+            android:key="@string/matrixTextColorPrefId"
+            android:title="@string/matrixTextColorPrefTitle"
+            android:defaultValue="@color/matrixDefaultColor"
+            app:cpv_colorPresets="@array/matrixPresetColors"
+            app:cpv_colorShape="square" />
     </PreferenceCategory>
 
 </PreferenceScreen>

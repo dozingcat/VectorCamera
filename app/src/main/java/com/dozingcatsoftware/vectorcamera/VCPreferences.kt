@@ -28,8 +28,14 @@ class VCPreferences(val context: Context) {
         }
     }
 
-    val lookupFunction = fun(key: String, defaultValue: String): String {
-        return sharedPrefs().getString(key, defaultValue)
+    val lookupFunction = fun(key: String, defaultValue: Any): Any {
+        if (defaultValue is String) {
+            return sharedPrefs().getString(key, defaultValue)
+        }
+        if (defaultValue is Int) {
+            return sharedPrefs().getInt(key, defaultValue)
+        }
+        throw IllegalArgumentException("Unsupported type: ${defaultValue.javaClass}")
     }
 
     fun saveEffectInfo(effectName: String, params: Map<String, Any>) {
