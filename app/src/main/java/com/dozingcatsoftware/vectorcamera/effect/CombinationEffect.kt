@@ -33,9 +33,10 @@ class CombinationEffect(
 
     override fun createBitmap(originalCameraImage: CameraImage): Bitmap {
         val gridSize = Math.ceil(Math.sqrt(effectFactories.size.toDouble())).toInt()
-        val cameraImage = originalCameraImage.withDisplaySize(Size(
+        val tileSize = Size(
                 originalCameraImage.displaySize.width / gridSize,
-                originalCameraImage.displaySize.height / gridSize))
+                originalCameraImage.displaySize.height / gridSize)
+        val cameraImage = originalCameraImage.copy(displaySize=tileSize)
         // We're rendering several subeffects at low resolution; use the full display resolution
         // for the combined image.
         val outputWidth = originalCameraImage.displaySize.width
@@ -65,6 +66,9 @@ class CombinationEffect(
 
             var gridX = if (shouldRotate) (ei / gridSize) else (ei % gridSize)
             var gridY = if (shouldRotate) (gridSize - 1 - ei % gridSize) else (ei / gridSize)
+            // If the source camera image is flipped in the X and/or Y direction, we need to fill
+            // the grid in a correspondingly flipped way, so that when the final grid image is drawn
+            // it will end up in the correct orientation.
             if (cameraImage.orientation.xFlipped) {
                 gridX = gridSize - 1 - gridX
             }

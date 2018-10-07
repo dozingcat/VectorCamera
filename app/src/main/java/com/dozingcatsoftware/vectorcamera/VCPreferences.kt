@@ -12,11 +12,11 @@ import com.dozingcatsoftware.util.mapToJsonString
 
 class VCPreferences(val context: Context) {
 
-    val effectRegistry = EffectRegistry()
+    private val effectRegistry = EffectRegistry()
 
     private fun sharedPrefs() = PreferenceManager.getDefaultSharedPreferences(context)
 
-    fun effectName() = sharedPrefs().getString(EFFECT_NAME_KEY, "")
+    fun effectName(): String = sharedPrefs().getString(EFFECT_NAME_KEY, "")
 
     fun useHighQualityPreview() = sharedPrefs().getBoolean(HIGH_QUALITY_PREVIEW_KEY, false)
 
@@ -47,7 +47,7 @@ class VCPreferences(val context: Context) {
 
     fun effectParameters(): Map<String, Any> {
         val effectJson = sharedPrefs().getString(EFFECT_PARAMETERS_KEY, "")
-        if (effectJson.length == 0) {
+        if (effectJson.isEmpty()) {
             return mapOf()
         }
         return jsonStringToMap(effectJson)

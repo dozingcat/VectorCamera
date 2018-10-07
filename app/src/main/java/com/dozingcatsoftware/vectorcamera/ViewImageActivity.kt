@@ -109,8 +109,9 @@ class ViewImageActivity : Activity() {
                                       forcePortrait: Boolean? = null): ProcessedBitmap {
         var inputImage = createCameraImage(metadata)
         if (forcePortrait != null) {
-            inputImage = inputImage.withDisplaySizeAndOrientation(
-                    inputImage.displaySize, inputImage.orientation.withPortrait(forcePortrait))
+            inputImage = inputImage.copy(
+                    displaySize=inputImage.displaySize,
+                    orientation=inputImage.orientation.withPortrait(forcePortrait))
         }
         val bitmap = effect.createBitmap(inputImage)
         return ProcessedBitmap(effect, inputImage, bitmap)

@@ -12,7 +12,6 @@ import com.dozingcatsoftware.util.create2dAllocation
  * The image data is either a YUV allocation in `singleYuvAllocation`, or separate Y/U/V allocations
  * in `planarYuvAllocations`.
  */
-
 data class CameraImage(val rs: RenderScript,
                        val singleYuvAllocation: Allocation?,
                        val planarYuvAllocations: PlanarYuvAllocations?,
@@ -30,16 +29,6 @@ data class CameraImage(val rs: RenderScript,
     }
 
     fun size() = Size(width(), height())
-
-    fun withDisplaySize(ds: Size): CameraImage {
-        return CameraImage(
-                rs, singleYuvAllocation, planarYuvAllocations, orientation, status, timestamp, ds)
-    }
-
-    fun withDisplaySizeAndOrientation(ds: Size, o: ImageOrientation): CameraImage {
-        return CameraImage(
-                rs, singleYuvAllocation, planarYuvAllocations, o, status, timestamp, ds)
-    }
 
     fun resizedTo(size: Size): CameraImage {
         val resizeScript = ScriptIntrinsicResize.create(rs)

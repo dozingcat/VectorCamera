@@ -122,6 +122,14 @@
 
     </FrameLayout>
 
+    <com.dozingcatsoftware.vectorcamera.EditColorSchemeView
+        android:id="@+id/editSchemeView"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginLeft="54dp"
+        android:layout_marginRight="72dp" />
+
     <ImageView
         android:id="@+id/staticGrid"
         android:layout_width="match_parent"
