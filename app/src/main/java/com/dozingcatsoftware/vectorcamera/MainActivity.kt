@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
+import android.util.TypedValue
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
@@ -82,6 +83,8 @@ class MainActivity : Activity() {
         staticGrid.setOnTouchListener(this::handleEffectGridTouch)
         cameraActionButton.onShutterButtonClick = this::handleShutterClick
         cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
+        editSchemeView.activity = this
+        editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
 
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
@@ -180,12 +183,10 @@ class MainActivity : Activity() {
     fun updateLayout(isPortrait: Boolean) {
         Log.i(TAG, "updateLayout: ${isPortrait}")
         layoutIsPortrait = isPortrait
-        val layoutWidth =
-                if (isPortrait) FrameLayout.LayoutParams.MATCH_PARENT
-                else FrameLayout.LayoutParams.WRAP_CONTENT
-        val layoutHeight =
-                if (isPortrait) FrameLayout.LayoutParams.WRAP_CONTENT
-                else FrameLayout.LayoutParams.MATCH_PARENT
+        val match = FrameLayout.LayoutParams.MATCH_PARENT
+        val wrap = FrameLayout.LayoutParams.WRAP_CONTENT
+        val layoutWidth = if (isPortrait) match else wrap
+        val layoutHeight = if (isPortrait) wrap else match
         val orientation = if (isPortrait) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         val direction =
                 if (isPortrait) LinearLayout.LAYOUT_DIRECTION_RTL
@@ -204,6 +205,17 @@ class MainActivity : Activity() {
             rightBottomControlBar.layoutParams = params
             rightBottomControlBar.orientation = orientation
             rightBottomControlBar.layoutDirection = direction
+        }
+        run {
+            val params = FrameLayout.LayoutParams(match, match)
+            val metrics = resources.displayMetrics
+            val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
+            val iconMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 54f, metrics)
+            params.topMargin = if (isPortrait) iconMargin.toInt() else 0
+            params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
+            params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
+            params.rightMargin = if (isPortrait) 0 else shutterMargin.toInt()
+            editSchemeView.layoutParams = params
         }
     }
 
@@ -312,7 +324,7 @@ class MainActivity : Activity() {
             // class that holds a CameraImage, display size, and portrait flag.
             val ds = getLandscapeDisplaySize(this)
             val orientation = imageFromCamera.orientation.withPortrait(isPortraitOrientation())
-            val cameraImage = imageFromCamera.withDisplaySizeAndOrientation(ds, orientation)
+            val cameraImage = imageFromCamera.copy(displaySize=ds, orientation=orientation)
             if (cameraImage.status == CameraStatus.CAPTURING_PHOTO) {
                 Log.i(TAG, "Restarting preview capture")
                 restartCameraImageGenerator()
@@ -516,6 +528,10 @@ class MainActivity : Activity() {
             }
             cameraActionButton.setImageResource(resId)
         }
+    }
+
+    private fun handleCustomColorSchemeChanged(cs: CustomColorScheme) {
+
     }
 
     private fun takePicture() {

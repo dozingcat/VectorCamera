@@ -1,6 +1,10 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
+import android.graphics.Color
 import android.renderscript.RenderScript
+import com.dozingcatsoftware.util.jsonStringToMap
+import com.dozingcatsoftware.vectorcamera.CustomColorScheme
+import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
 
 enum class EffectContext {
     NORMAL,
@@ -9,11 +13,6 @@ enum class EffectContext {
 }
 
 class EffectRegistry {
-
-    private fun gradientPixelsPerCell(context: EffectContext): Int {
-        return if (context == EffectContext.COMBO_GRID || context == EffectContext.PRELOAD) 20
-               else Animated2dGradient.DEFAULT_PIXELS_PER_CELL
-    }
 
     // 36 effects, shown in 6x6 grid.
     // See Animated2dGradient.kt for description of gradient grids.
@@ -375,6 +374,13 @@ class EffectRegistry {
                                 "maxColor" to listOf(255, 255, 255)
                         )
                 ))
+            },
+
+            // Custom.
+            {rs, prefsFn, context ->
+                createCustomEffect(rs, prefsFn, context, "custom1",
+                        CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
+                                Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             }
 
     // TODO: Customizable edge/solid effects.
@@ -415,6 +421,11 @@ class EffectRegistry {
             effectForNameAndParameters(rs, metadata.name, metadata.parameters)
 }
 
+private fun gradientPixelsPerCell(context: EffectContext): Int {
+    return if (context == EffectContext.COMBO_GRID || context == EffectContext.PRELOAD) 20
+    else Animated2dGradient.DEFAULT_PIXELS_PER_CELL
+}
+
 private fun numAsciiColumns(prefsFn: (String, Any) -> Any): Int {
     val prefsVal = prefsFn("numAsciiColumns", "") as String
     if (!prefsVal.isEmpty()) {
@@ -437,4 +448,40 @@ private fun asciiChars(
 
 private fun matrixTextColor(prefsFn: (String, Any) -> Any, defValue: Int): Int {
     return prefsFn("matrixTextColor", defValue) as Int
+}
+
+private fun rgbComponents(vararg colors: Int): List<Int> {
+    val rgbList = mutableListOf<Int>()
+    for (c in colors) {
+        rgbList.add(Color.red(c))
+        rgbList.add(Color.green(c))
+        rgbList.add(Color.blue(c))
+    }
+    return rgbList
+}
+
+private fun createCustomEffect(
+        rs: RenderScript,
+        prefsFn: (String, Any) -> Any,
+        ctx: EffectContext,
+        customEffectId: String,
+        defaultScheme: CustomColorScheme): Effect {
+    val schemeJson =
+            try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+            catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomColorScheme.fromMap(schemeJson, defaultScheme)
+    // Construct a gradient grid from the CustomColorScheme colors.
+    val params = mapOf(
+            "type" to "grid_gradient",
+            "minColor" to rgbComponents(scheme.backgroundColor),
+            "grid" to listOf(listOf(rgbComponents(
+                    scheme.topLeftColor, scheme.topRightColor,
+                    scheme.bottomLeftColor, scheme.bottomRightColor))),
+            "pixelsPerCell" to gradientPixelsPerCell(ctx)
+            )
+    val baseEffect = when (scheme.type) {
+        CustomColorSchemeType.EDGE -> EdgeEffect.fromParameters(rs, params)
+        CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(rs, params)
+    }
+    return CustomEffect(baseEffect, ctx)
 }

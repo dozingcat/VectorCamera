@@ -47,8 +47,8 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
                 metadata.frameTimestamps[frameIndex], displaySize)
         val fp = forcePortrait
         if (fp != null) {
-            cameraImage = cameraImage.withDisplaySizeAndOrientation(
-                    displaySize, cameraImage.orientation.withPortrait(fp))
+            cameraImage = cameraImage.copy(
+                    displaySize=displaySize, orientation=cameraImage.orientation.withPortrait(fp))
         }
         return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
     }
