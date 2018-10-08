@@ -80,7 +80,6 @@ class MainActivity : Activity() {
         settingsButton.setOnClickListener(this::gotoPreferences)
         convertPictureButton.setOnClickListener(this::convertExistingPicture)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
-        staticGrid.setOnTouchListener(this::handleEffectGridTouch)
         cameraActionButton.onShutterButtonClick = this::handleShutterClick
         cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
         editSchemeView.activity = this
@@ -388,34 +387,26 @@ class MainActivity : Activity() {
             return
         }
         inEffectSelectionMode = !inEffectSelectionMode
-        if (preferences.useLiveGridPreview()) {
-            if (!cameraImageGenerator.status.isCapturing()) {
-                Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
-                return
-            }
-            if (inEffectSelectionMode) {
-                previousEffect = currentEffect
-                val comboEffects = effectRegistry.defaultEffectFunctions(
-                        rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
-                currentEffect = CombinationEffect(comboEffects, 50)
-                preferredImageSize = ImageSize.EFFECT_GRID
-                controlLayout.visibility = View.GONE
-                Log.i(TAG, "Showing combo grid")
-            }
-            else {
-                currentEffect = previousEffect
-                preferredImageSize = previewImageSizeFromPrefs()
-                Log.i(TAG, "Exiting combo grid")
-            }
-            restartCameraImageGenerator()
-            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+        if (!cameraImageGenerator.status.isCapturing()) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
+            return
+        }
+        if (inEffectSelectionMode) {
+            previousEffect = currentEffect
+            val comboEffects = effectRegistry.defaultEffectFunctions(
+                    rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
+            currentEffect = CombinationEffect(comboEffects, 50)
+            preferredImageSize = ImageSize.EFFECT_GRID
+            controlLayout.visibility = View.GONE
+            Log.i(TAG, "Showing combo grid")
         }
         else {
-            // If we're showing the static effect selection grid image, keep the camera running.
-            // It wastes some CPU because the processed images won't be visible, but it avoids bugs
-            // when stopping and starting the camera.
-            staticGrid.visibility = if (inEffectSelectionMode) View.VISIBLE else View.GONE
+            currentEffect = previousEffect
+            preferredImageSize = previewImageSizeFromPrefs()
+            Log.i(TAG, "Exiting combo grid")
         }
+        restartCameraImageGenerator()
+        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
         controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
     }
 
@@ -478,11 +469,8 @@ class MainActivity : Activity() {
             inEffectSelectionMode = false
             overlayView.visibility = View.VISIBLE
             controlLayout.visibility = View.VISIBLE
-            staticGrid.visibility = View.GONE
-            if (preferences.useLiveGridPreview()) {
-                preferredImageSize = previewImageSizeFromPrefs()
-                restartCameraImageGenerator()
-            }
+            preferredImageSize = previewImageSizeFromPrefs()
+            restartCameraImageGenerator()
             imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
             return true
         }
