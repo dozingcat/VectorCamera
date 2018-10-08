@@ -1,18 +1,22 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.CustomColorScheme
 
 class CustomEffect(
         private val baseEffect: Effect,
-        private val context: EffectContext) : Effect {
+        private val context: EffectContext,
+        val colorScheme: CustomColorScheme,
+        val customSchemeId: String) : Effect {
 
     override fun effectName() = baseEffect.effectName()
 
     override fun effectParameters() = baseEffect.effectParameters()
+
+    override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+        baseEffect.drawBackground(cameraImage, canvas, rect)
+    }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         val bitmap = baseEffect.createBitmap(cameraImage)

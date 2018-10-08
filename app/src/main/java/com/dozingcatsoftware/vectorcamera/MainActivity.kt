@@ -11,16 +11,13 @@ import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
 import android.util.TypedValue
-import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
-import com.dozingcatsoftware.vectorcamera.effect.Effect
-import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import com.dozingcatsoftware.vectorcamera.effect.EffectContext
+import com.dozingcatsoftware.vectorcamera.effect.*
 
 
 enum class ShutterMode {IMAGE, VIDEO}
@@ -44,6 +41,10 @@ class MainActivity : Activity() {
     private var inEffectSelectionMode = false
     private var lastBitmapTimestamp = 0L
     private var previousFingerSpacing = 0.0
+
+    // For updating custom schemes, we need to keep the effect index and scheme ID.
+    private var effectIndex = 0
+    private var customSchemeId = ""
 
     private var videoRecorder: VideoRecorder? = null
     private var videoFrameMetadata: MediaMetadata? = null
@@ -80,7 +81,6 @@ class MainActivity : Activity() {
         settingsButton.setOnClickListener(this::gotoPreferences)
         convertPictureButton.setOnClickListener(this::convertExistingPicture)
         overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
-        staticGrid.setOnTouchListener(this::handleEffectGridTouch)
         cameraActionButton.onShutterButtonClick = this::handleShutterClick
         cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
         editSchemeView.activity = this
@@ -158,7 +158,7 @@ class MainActivity : Activity() {
         }
     }
 
-    fun updateControls() {
+    private fun updateControls() {
         var shutterResId = R.drawable.btn_camera_shutter_holo
         if (shutterMode == ShutterMode.VIDEO) {
             shutterResId = if (videoRecorder == null) R.drawable.btn_video_shutter_holo
@@ -180,7 +180,7 @@ class MainActivity : Activity() {
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
     }
 
-    fun updateLayout(isPortrait: Boolean) {
+    private fun updateLayout(isPortrait: Boolean) {
         Log.i(TAG, "updateLayout: ${isPortrait}")
         layoutIsPortrait = isPortrait
         val match = FrameLayout.LayoutParams.MATCH_PARENT
@@ -388,35 +388,28 @@ class MainActivity : Activity() {
             return
         }
         inEffectSelectionMode = !inEffectSelectionMode
-        if (preferences.useLiveGridPreview()) {
-            if (!cameraImageGenerator.status.isCapturing()) {
-                Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
-                return
-            }
-            if (inEffectSelectionMode) {
-                previousEffect = currentEffect
-                val comboEffects = effectRegistry.defaultEffectFunctions(
-                        rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
-                currentEffect = CombinationEffect(comboEffects, 50)
-                preferredImageSize = ImageSize.EFFECT_GRID
-                controlLayout.visibility = View.GONE
-                Log.i(TAG, "Showing combo grid")
-            }
-            else {
-                currentEffect = previousEffect
-                preferredImageSize = previewImageSizeFromPrefs()
-                Log.i(TAG, "Exiting combo grid")
-            }
-            restartCameraImageGenerator()
-            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+        if (!cameraImageGenerator.status.isCapturing()) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
+            return
+        }
+        if (inEffectSelectionMode) {
+            previousEffect = currentEffect
+            val comboEffects = effectRegistry.defaultEffectFunctions(
+                    rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
+            currentEffect = CombinationEffect(comboEffects, 50)
+            preferredImageSize = ImageSize.EFFECT_GRID
+            controlLayout.visibility = View.GONE
+            Log.i(TAG, "Showing combo grid")
         }
         else {
-            // If we're showing the static effect selection grid image, keep the camera running.
-            // It wastes some CPU because the processed images won't be visible, but it avoids bugs
-            // when stopping and starting the camera.
-            staticGrid.visibility = if (inEffectSelectionMode) View.VISIBLE else View.GONE
+            currentEffect = previousEffect
+            preferredImageSize = previewImageSizeFromPrefs()
+            Log.i(TAG, "Exiting combo grid")
         }
+        restartCameraImageGenerator()
+        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
         controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
+        editSchemeView.visibility = View.GONE
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
@@ -456,7 +449,7 @@ class MainActivity : Activity() {
 
     private fun handleEffectGridTouch(view: View, event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
-            if (preferences.useLiveGridPreview() && !cameraImageGenerator.status.isCapturing()) {
+            if (!cameraImageGenerator.status.isCapturing()) {
                 Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
                 return true
             }
@@ -466,24 +459,28 @@ class MainActivity : Activity() {
             val tileHeight = view.height / gridSize
             val tileX = (event.x / tileWidth).toInt()
             val tileY = (event.y / tileHeight).toInt()
-            val index = gridSize * tileY + tileX
+            var index = gridSize * tileY + tileX
+            index = Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
+            effectIndex = index
+            Log.i(TAG, "Selected effect ${index}")
 
-            val effectIndex =
-                    Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
-            Log.i(TAG, "Selected effect ${effectIndex}")
-            val eff = effectRegistry.defaultEffectAtIndex(
-                    effectIndex, rs, preferences.lookupFunction)
-            currentEffect = eff
+            val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
             preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
             inEffectSelectionMode = false
             overlayView.visibility = View.VISIBLE
             controlLayout.visibility = View.VISIBLE
-            staticGrid.visibility = View.GONE
-            if (preferences.useLiveGridPreview()) {
-                preferredImageSize = previewImageSizeFromPrefs()
-                restartCameraImageGenerator()
-            }
+            preferredImageSize = previewImageSizeFromPrefs()
+            restartCameraImageGenerator()
             imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+
+            if (eff is CustomEffect) {
+                editSchemeView.setScheme(eff.colorScheme)
+                editSchemeView.visibility = View.VISIBLE
+                customSchemeId = eff.customSchemeId
+            }
+            else {
+                customSchemeId = ""
+            }
             return true
         }
         return false
@@ -531,7 +528,19 @@ class MainActivity : Activity() {
     }
 
     private fun handleCustomColorSchemeChanged(cs: CustomColorScheme) {
-
+        if (customSchemeId.isEmpty()) {
+            return
+        }
+        // The order matters here because `defaultEffectAtIndex` reads from the preferences.
+        preferences.saveCustomScheme(customSchemeId, cs)
+        // Keeping customSchemeId and effectIndex as instance variables is ugly. The problem is that
+        // when the user selects a custom effect, `currentEffect` gets set to the underlying effect
+        // rather than the "wrapper" CustomEffect.
+        val newEffect = effectRegistry.defaultEffectAtIndex(
+                effectIndex, rs, preferences.lookupFunction)
+        // Save the resulting effect so that it will restore correctly.
+        preferences.saveEffectInfo(newEffect.effectName(), newEffect.effectParameters())
+        restartCameraImageGenerator()
     }
 
     private fun takePicture() {

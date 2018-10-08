@@ -21,6 +21,7 @@ class EffectRegistry {
             // Row 1, edges on black.
             // Edge strength->brightness, preserve colors.
             {rs, prefsFn, context -> EdgeLuminanceEffect(rs) },
+
             // White
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -376,10 +377,17 @@ class EffectRegistry {
                 ))
             },
 
-            // Custom.
+            // Custom edge.
             {rs, prefsFn, context ->
                 createCustomEffect(rs, prefsFn, context, "custom1",
                         CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
+                                Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
+            },
+
+            // Custom solid.
+            {rs, prefsFn, context ->
+                createCustomEffect(rs, prefsFn, context, "custom2",
+                        CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             }
 
@@ -483,5 +491,5 @@ private fun createCustomEffect(
         CustomColorSchemeType.EDGE -> EdgeEffect.fromParameters(rs, params)
         CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(rs, params)
     }
-    return CustomEffect(baseEffect, ctx)
+    return CustomEffect(baseEffect, ctx, scheme, customEffectId)
 }

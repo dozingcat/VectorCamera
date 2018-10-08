@@ -20,8 +20,6 @@ class VCPreferences(val context: Context) {
 
     fun useHighQualityPreview() = sharedPrefs().getBoolean(HIGH_QUALITY_PREVIEW_KEY, false)
 
-    fun useLiveGridPreview() = sharedPrefs().getBoolean(LIVE_GRID_PREVIEW_KEY, false)
-
     fun setUseHighQualityPreview(flag: Boolean) {
         withPrefsEditor {
             it.putBoolean(HIGH_QUALITY_PREVIEW_KEY, flag)
@@ -67,6 +65,12 @@ class VCPreferences(val context: Context) {
         return defaultFn()
     }
 
+    fun saveCustomScheme(id: String, scheme: CustomColorScheme) {
+        withPrefsEditor {
+            it.putString(id, mapToJsonString(scheme.toMap()))
+        }
+    }
+
     private fun withPrefsEditor(editFn: (SharedPreferences.Editor) -> Unit) {
         val editor = PreferenceManager.getDefaultSharedPreferences(context).edit()
         editFn(editor)
@@ -78,6 +82,5 @@ class VCPreferences(val context: Context) {
         const val EFFECT_NAME_KEY = "effectName"
         const val EFFECT_PARAMETERS_KEY = "effectParams"
         const val HIGH_QUALITY_PREVIEW_KEY = "highQualityPreview"
-        const val LIVE_GRID_PREVIEW_KEY="liveGridPreview"
     }
 }

@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Color
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
@@ -13,13 +14,19 @@ import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 
 class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(context, attrs) {
 
-    var scheme = CustomColorScheme(CustomColorSchemeType.EDGE, 0, 0, 0, 0, 0)
-    var changeCallback: ((CustomColorScheme) -> Unit)? = null
-    lateinit var contentView: View
     lateinit var activity: Activity
+    private var scheme = CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
+            Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE)
+    var changeCallback: ((CustomColorScheme) -> Unit)? = null
+    private lateinit var contentView: View
 
     init {
         initView()
+    }
+
+    fun setScheme(s: CustomColorScheme) {
+        scheme = s
+        findViewById<CheckBox>(R.id.solidCheckbox).isChecked = s.type == CustomColorSchemeType.SOLID
     }
 
     private fun initView() {
@@ -64,7 +71,10 @@ class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(
     private fun handleColorButton(
             getColorFn: ((CustomColorScheme) -> Int),
             setColorFn: ((CustomColorScheme, Int) -> CustomColorScheme)) {
-        val dlg = ColorPickerDialog.newBuilder().setColor(getColorFn(this.scheme)).create()
+        // Make sure alpha is set.
+        val currentColor = (0xff000000 or getColorFn(this.scheme).toLong()).toInt()
+        val dlg = ColorPickerDialog.newBuilder()
+                .setColor(currentColor).create()
 
         dlg.setColorPickerDialogListener(object: ColorPickerDialogListener {
             override fun onDialogDismissed(dialogId: Int) {}
