@@ -1,9 +1,6 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
 import com.dozingcatsoftware.vectorcamera.CameraImage
 
 class CustomEffect(
@@ -13,6 +10,10 @@ class CustomEffect(
     override fun effectName() = baseEffect.effectName()
 
     override fun effectParameters() = baseEffect.effectParameters()
+
+    override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
+        baseEffect.drawBackground(cameraImage, canvas, rect)
+    }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         val bitmap = baseEffect.createBitmap(cameraImage)

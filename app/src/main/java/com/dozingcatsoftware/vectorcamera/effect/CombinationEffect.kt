@@ -19,8 +19,8 @@ class CombinationEffect(
 
     override fun effectName() = "combination"
 
-    var effectIndex = 0
-    var resultBitmap: Bitmap? = null
+    private var effectIndex = 0
+    private var resultBitmap: Bitmap? = null
 
     private fun getResultBitmap(width: Int, height: Int): Bitmap {
         var b = resultBitmap
