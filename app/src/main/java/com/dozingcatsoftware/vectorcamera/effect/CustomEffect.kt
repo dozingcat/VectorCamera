@@ -2,10 +2,13 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.*
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.CustomColorScheme
 
 class CustomEffect(
         private val baseEffect: Effect,
-        private val context: EffectContext) : Effect {
+        private val context: EffectContext,
+        val colorScheme: CustomColorScheme,
+        val customSchemeId: String) : Effect {
 
     override fun effectName() = baseEffect.effectName()
 

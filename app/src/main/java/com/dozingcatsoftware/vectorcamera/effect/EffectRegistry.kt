@@ -491,5 +491,5 @@ private fun createCustomEffect(
         CustomColorSchemeType.EDGE -> EdgeEffect.fromParameters(rs, params)
         CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(rs, params)
     }
-    return CustomEffect(baseEffect, ctx)
+    return CustomEffect(baseEffect, ctx, scheme, customEffectId)
 }
