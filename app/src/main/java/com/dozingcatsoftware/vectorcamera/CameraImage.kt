@@ -42,15 +42,14 @@ data class CameraImage(val rs: RenderScript,
 
         return if (singleYuvAllocation != null) {
             val outputAlloc = doResize(singleYuvAllocation, size.width, size.height)
-            withAllocation(rs, outputAlloc, orientation, status, timestamp, displaySize)
+            copy(singleYuvAllocation = outputAlloc)
         }
         else {
             val planes = planarYuvAllocations!!
             val yOutput = doResize(planes.y, size.width, size.height)
             val uOutput = doResize(planes.u, size.width / 2, size.height / 2)
             val vOutput = doResize(planes.v, size.width / 2, size.height / 2)
-            withAllocationSet(rs, PlanarYuvAllocations(yOutput, uOutput, vOutput),
-                    orientation, status, timestamp, displaySize)
+            copy(planarYuvAllocations = PlanarYuvAllocations(yOutput, uOutput, vOutput))
         }
     }
 
