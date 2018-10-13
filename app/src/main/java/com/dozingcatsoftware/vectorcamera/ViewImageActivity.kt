@@ -208,7 +208,7 @@ class ViewImageActivity : Activity() {
             if (waitDialog == null) {
                 waitDialog = ProgressDialog(this)
                 waitDialog!!.isIndeterminate = true
-                waitDialog!!.setMessage(getString(R.string.sharePictureExporting))
+                waitDialog!!.setMessage(getString(R.string.exportingImageMessage))
                 waitDialog!!.setCancelable(false)
                 Log.i(TAG, "Showing wait dialog")
                 waitDialog!!.show()
@@ -229,8 +229,7 @@ class ViewImageActivity : Activity() {
                     })
                 }
                 finally {
-                    handler.post({waitDialog?.cancel()})
-
+                    waitDialog?.dismiss()
                 }
             }).start()
         }

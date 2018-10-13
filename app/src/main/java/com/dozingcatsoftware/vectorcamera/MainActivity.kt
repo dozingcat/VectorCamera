@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.vectorcamera
 
 import android.app.Activity
+import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -272,45 +273,61 @@ class MainActivity : Activity() {
             overlayView.invalidate()
             // Save image or video frame if necessary.
             if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
-                Log.i(TAG, "Saving picture")
-                if (pb.yuvBytes == null) {
-                    Log.w(TAG, "yuvBytes not set for saved image")
-                }
-                Thread({
-                    try {
-                        val photoId = photoLibrary.savePhoto(this, pb)
-                        handler.post({
-                            ViewImageActivity.startActivityWithImageId(this, photoId)
-                        })
-                        // Write the PNG in the background since it's slower.
-                        photoLibrary.writePngImage(this, pb, photoId)
-                    }
-                    catch (ex: Exception) {
-                        Log.w(TAG, "Error saving photo: " + ex)
-                    }
-                }).start()
+                saveImage(pb)
             }
             if (pb.sourceImage.status == CameraStatus.CAPTURING_VIDEO) {
-                val vr = videoRecorder
-                if (vr != null) {
-                    if (pb.yuvBytes != null) {
-                        if (videoFrameMetadata == null) {
-                            videoFrameMetadata = MediaMetadata(
-                                    MediaType.VIDEO,
-                                    currentEffect!!.effectMetadata(),
-                                    pb.sourceImage.width(),
-                                    pb.sourceImage.height(),
-                                    pb.sourceImage.orientation,
-                                    pb.sourceImage.timestamp)
-                        }
-                        vr.recordFrame(pb.sourceImage.timestamp, pb.yuvBytes)
-                    }
-                    else {
-                        Log.w(TAG, "yuvBytes not set for video frame")
-                    }
-                }
+                recordVideoFrame(pb)
             }
         })
+    }
+
+    private fun saveImage(pb: ProcessedBitmap) {
+        Log.i(TAG, "Saving picture")
+        if (pb.yuvBytes == null) {
+            Log.w(TAG, "yuvBytes not set for saved image")
+        }
+        // This can take a while, so show a spinner. Should it allow the user to cancel?
+        val saveIndicator = ProgressDialog(this)
+        saveIndicator.isIndeterminate = true
+        saveIndicator.setMessage(getString(R.string.savingImageMessage))
+        saveIndicator.setCancelable(false)
+        saveIndicator.show()
+        (Thread {
+            try {
+                val photoId = photoLibrary.savePhoto(this, pb)
+                saveIndicator.dismiss()
+                handler.post {
+                    ViewImageActivity.startActivityWithImageId(this, photoId)
+                }
+                // Write the PNG in the background since it's slower.
+                photoLibrary.writePngImage(this, pb, photoId)
+            }
+            catch (ex: Exception) {
+                Log.w(TAG, "Error saving photo: ${ex}")
+                saveIndicator.dismiss()
+            }
+        }).start()
+    }
+
+    private fun recordVideoFrame(pb: ProcessedBitmap) {
+        val vr = videoRecorder
+        if (vr != null) {
+            if (pb.yuvBytes != null) {
+                if (videoFrameMetadata == null) {
+                    videoFrameMetadata = MediaMetadata(
+                            MediaType.VIDEO,
+                            currentEffect!!.effectMetadata(),
+                            pb.sourceImage.width(),
+                            pb.sourceImage.height(),
+                            pb.sourceImage.orientation,
+                            pb.sourceImage.timestamp)
+                }
+                vr.recordFrame(pb.sourceImage.timestamp, pb.yuvBytes)
+            }
+            else {
+                Log.w(TAG, "yuvBytes not set for video frame")
+            }
+        }
     }
 
     private fun effectFromPreferences(): Effect {

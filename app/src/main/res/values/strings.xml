@@ -32,6 +32,9 @@
     <string name="matrixTextColorPrefId">matrixTextColor</string>
     <string name="matrixTextColorPrefTitle">Matrix text color</string>
 
+    <string name="savingImageMessage">Saving image...</string>
+    <string name="exportingImageMessage">Exporting image...</string>
+
     <string name="shareDialogYesLabel">Share</string>
     <string name="shareDialogNoLabel">Cancel</string>
     <string name="shareActionTitle">Share using</string>
