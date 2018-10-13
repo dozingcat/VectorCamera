@@ -11,6 +11,7 @@ import android.os.Handler
 import android.renderscript.RenderScript
 import android.support.v4.content.FileProvider
 import android.util.Log
+import android.util.Size
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
@@ -80,8 +81,12 @@ class ViewImageActivity : Activity() {
     private fun showModeSelectionGrid(isPortrait: Boolean) {
         val comboEffect = CombinationEffect(
                 effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
-        // FIXME: This is slow because the saved image is high resolution.
-        showImage(comboEffect, photoLibrary.metadataForItemId(imageId), isPortrait)
+        // Shrink the image so each combo grid cell doesn't have to process the full size.
+        // May want to incrementally show the grid as cells are rendered, like for the live view.
+        val metadata = photoLibrary.metadataForItemId(imageId)
+        val gridSize = effectRegistry.gridSizeForDefaultEffects()
+        val perCellSize = Size(metadata.width / gridSize, metadata.height / gridSize)
+        showImage(comboEffect, metadata, isPortrait, perCellSize)
         controlBar.visibility = View.GONE
         effectSelectionIsPortrait = isPortrait
     }
@@ -106,19 +111,25 @@ class ViewImageActivity : Activity() {
     }
 
     private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata,
-                                      forcePortrait: Boolean? = null): ProcessedBitmap {
+                                      forcePortrait: Boolean? = null,
+                                      newSize: Size? = null): ProcessedBitmap {
         var inputImage = createCameraImage(metadata)
         if (forcePortrait != null) {
             inputImage = inputImage.copy(
                     displaySize=inputImage.displaySize,
                     orientation=inputImage.orientation.withPortrait(forcePortrait))
         }
+        if (newSize != null) {
+            inputImage = inputImage.resizedTo(newSize)
+        }
         val bitmap = effect.createBitmap(inputImage)
         return ProcessedBitmap(effect, inputImage, bitmap)
     }
 
-    private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null) {
-        overlayView.processedBitmap = createProcessedBitmap(effect, metadata, forcePortrait)
+    private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null,
+                          newSize: Size? = null) {
+        overlayView.processedBitmap =
+                createProcessedBitmap(effect, metadata, forcePortrait, newSize)
         overlayView.invalidate()
     }
 
@@ -127,7 +138,7 @@ class ViewImageActivity : Activity() {
         if (event.action == MotionEvent.ACTION_DOWN) {
             if (inEffectSelectionMode) {
                 val numEffects = effectRegistry.defaultEffectCount()
-                val gridSize = Math.ceil(Math.sqrt(numEffects.toDouble())).toInt()
+                val gridSize = effectRegistry.gridSizeForDefaultEffects()
                 val tileWidth = view.width / gridSize
                 val tileHeight = view.height / gridSize
                 val tileX = (event.x / tileWidth).toInt()
@@ -316,7 +327,7 @@ class ViewImageActivity : Activity() {
     }
 
     companion object {
-        val TAG = "ViewImageActivity"
+        const val TAG = "ViewImageActivity"
 
         fun startActivityWithImageId(parent: Activity, imageId: String): Intent {
             val intent = Intent(parent, ViewImageActivity::class.java)

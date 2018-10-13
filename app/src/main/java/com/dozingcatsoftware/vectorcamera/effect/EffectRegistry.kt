@@ -396,6 +396,9 @@ class EffectRegistry {
 
     fun defaultEffectCount() = baseEffects.size
 
+    // The smallest N such that a N*N grid can show all the effects, e.g. 5 for 25.
+    fun gridSizeForDefaultEffects() = Math.ceil(Math.sqrt(defaultEffectCount().toDouble())).toInt()
+
     fun defaultEffectAtIndex(index: Int, rs: RenderScript, prefsFn: (String, Any) -> Any,
                              context: EffectContext = EffectContext.NORMAL): Effect {
         return baseEffects[index](rs, prefsFn, context)
