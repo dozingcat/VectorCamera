@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.util.Log
 import android.view.View
 import android.widget.AdapterView.OnItemClickListener
 import android.widget.GridView
@@ -16,6 +17,7 @@ import com.dozingcatsoftware.util.scaledBitmapFromURIWithMinimumSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.io.FileNotFoundException
 import java.text.DateFormat
 import java.text.DecimalFormat
 import java.text.NumberFormat
@@ -78,35 +80,51 @@ class ImageListActivity : Activity() {
     private fun loadGridCellImage(view: ImageView, itemId: String) {
         val self = this
         GlobalScope.launch(Dispatchers.IO) {
-            val imageUri = Uri.fromFile(self.photoLibrary.thumbnailFileForItemId(itemId))
-            val bitmap = scaledBitmapFromURIWithMinimumSize(
-                    self, imageUri, ImageListActivity.CELL_WIDTH, ImageListActivity.CELL_HEIGHT)
-            handler.post {view.setImageBitmap(bitmap)}
+            try {
+                val imageUri = Uri.fromFile(self.photoLibrary.thumbnailFileForItemId(itemId))
+                val bitmap = scaledBitmapFromURIWithMinimumSize(
+                        self, imageUri, ImageListActivity.CELL_WIDTH, ImageListActivity.CELL_HEIGHT)
+                handler.post {view.setImageBitmap(bitmap)}
+            }
+            catch (ex: Exception) {
+                Log.e(TAG, "Error reading image thumbnail", ex)
+            }
         }
     }
 
     private fun loadGridCellDateField(view: TextView, itemId: String) {
         val self = this
         GlobalScope.launch(Dispatchers.IO) {
-            val metadata = self.photoLibrary.metadataForItemId(itemId)
-            val dateCreated = Date(metadata.timestamp)
-            handler.post {view.text = ImageListActivity.GRID_DATE_FORMAT.format(dateCreated)}
+            try {
+                val metadata = self.photoLibrary.metadataForItemId(itemId)
+                val dateCreated = Date(metadata.timestamp)
+                handler.post {view.text = ImageListActivity.GRID_DATE_FORMAT.format(dateCreated)}
+            }
+            catch (ex: Exception) {
+                Log.e(TAG, "Error reading image date", ex)
+            }
         }
     }
 
     private fun loadGridCellSizeField(view: TextView, itemId: String) {
         val self = this
         GlobalScope.launch(Dispatchers.IO) {
-            val sizeInBytes = self.photoLibrary.fileSizeForItemId(itemId)
-            val mb = sizeInBytes / 1e6
-            val formatter =
-                    if (mb >= 10) ImageListActivity.GRID_SIZE_FORMAT_LARGE
-                    else ImageListActivity.GRID_SIZE_FORMAT_SMALL
-            handler.post {view.text = formatter.format(mb) + " MB"}
+            try {
+                val sizeInBytes = self.photoLibrary.fileSizeForItemId(itemId)
+                val mb = sizeInBytes / 1e6
+                val formatter =
+                        if (mb >= 10) ImageListActivity.GRID_SIZE_FORMAT_LARGE
+                        else ImageListActivity.GRID_SIZE_FORMAT_SMALL
+                handler.post {view.text = formatter.format(mb) + " MB"}
+            }
+            catch (ex: Exception) {
+                Log.e(TAG, "Error reading image size", ex);
+            }
         }
     }
 
     companion object {
+        const val TAG = "ImageListActivity"
         // These should match the dimensions in imagegrid.xml and imagegrid_cell.xml.
         const val CELL_WIDTH = 160
         const val CELL_HEIGHT = 120
