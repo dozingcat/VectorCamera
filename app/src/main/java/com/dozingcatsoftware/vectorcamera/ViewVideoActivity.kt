@@ -55,7 +55,6 @@ class ViewVideoActivity: Activity() {
     private lateinit var rs : RenderScript
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
-    private var effectSelectionIsPortrait = false
     private var originalEffect: Effect? = null
     private val effectRegistry = EffectRegistry()
     private lateinit var videoReader: VideoReader
@@ -79,7 +78,6 @@ class ViewVideoActivity: Activity() {
         playPauseButton.setOnClickListener(this::togglePlay)
         deleteButton.setOnClickListener(this::deleteVideo)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
-        // TODO: sharing
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")
@@ -396,7 +394,7 @@ class ViewVideoActivity: Activity() {
     }
 
     companion object {
-        val TAG = "ViewVideoActivity"
+        const val TAG = "ViewVideoActivity"
 
         fun startActivityWithVideoId(parent: Activity, videoId: String): Intent {
             val intent = Intent(parent, ViewVideoActivity::class.java)

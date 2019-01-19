@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
 import android.view.View
 import android.widget.AdapterView.OnItemClickListener
 import android.widget.GridView
@@ -12,13 +13,13 @@ import android.widget.ImageView
 import android.widget.SimpleAdapter
 import android.widget.TextView
 import com.dozingcatsoftware.util.scaledBitmapFromURIWithMinimumSize
-import kotlinx.coroutines.experimental.android.UI
-import kotlinx.coroutines.experimental.async
-import org.jetbrains.anko.coroutines.experimental.bg
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.DecimalFormat
 import java.text.NumberFormat
-import java.util.*
+import java.util.Date
 
 
 class ImageListActivity : Activity() {
@@ -26,6 +27,7 @@ class ImageListActivity : Activity() {
 
     private lateinit var gridView: GridView
     private var gridImageIds: List<String>? = null
+    private val handler = Handler()
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,42 +74,35 @@ class ImageListActivity : Activity() {
         noImagesView.visibility = if (cellMaps.isNotEmpty()) View.GONE else View.VISIBLE
     }
 
-    // Images and metadata info are loaded asynchronously using Anko coroutines:
-    // https://github.com/Kotlin/anko/wiki/Anko-Coroutines
+    // Images and metadata info are loaded asynchronously using Kotlin coroutines:
     private fun loadGridCellImage(view: ImageView, itemId: String) {
         val self = this
-        async(UI) {
+        GlobalScope.launch(Dispatchers.IO) {
             val imageUri = Uri.fromFile(self.photoLibrary.thumbnailFileForItemId(itemId))
-            val bitmap = (bg {
-                scaledBitmapFromURIWithMinimumSize(
-                        self, imageUri, ImageListActivity.CELL_WIDTH, ImageListActivity.CELL_HEIGHT)
-            }).await()
-            view.setImageBitmap(bitmap)
+            val bitmap = scaledBitmapFromURIWithMinimumSize(
+                    self, imageUri, ImageListActivity.CELL_WIDTH, ImageListActivity.CELL_HEIGHT)
+            handler.post {view.setImageBitmap(bitmap)}
         }
     }
 
     private fun loadGridCellDateField(view: TextView, itemId: String) {
         val self = this
-        async(UI) {
-            val metadata = (bg {
-                self.photoLibrary.metadataForItemId(itemId)
-            }).await()
+        GlobalScope.launch(Dispatchers.IO) {
+            val metadata = self.photoLibrary.metadataForItemId(itemId)
             val dateCreated = Date(metadata.timestamp)
-            view.text = ImageListActivity.GRID_DATE_FORMAT.format(dateCreated)
+            handler.post {view.text = ImageListActivity.GRID_DATE_FORMAT.format(dateCreated)}
         }
     }
 
     private fun loadGridCellSizeField(view: TextView, itemId: String) {
         val self = this
-        async(UI) {
-            val sizeInBytes = (bg {
-                self.photoLibrary.fileSizeForItemId(itemId)
-            }).await()
+        GlobalScope.launch(Dispatchers.IO) {
+            val sizeInBytes = self.photoLibrary.fileSizeForItemId(itemId)
             val mb = sizeInBytes / 1e6
             val formatter =
                     if (mb >= 10) ImageListActivity.GRID_SIZE_FORMAT_LARGE
                     else ImageListActivity.GRID_SIZE_FORMAT_SMALL
-            view.text = formatter.format(mb) + " MB"
+            handler.post {view.text = formatter.format(mb) + " MB"}
         }
     }
 
@@ -123,6 +118,5 @@ class ImageListActivity : Activity() {
             parent.startActivity(Intent(parent, ImageListActivity::class.java))
         }
     }
-
 }
 
