@@ -20,7 +20,7 @@
 // Based on vpxenc.c
 
 typedef struct encoding_context {
-	struct EbmlGlobal ebml;
+	struct WebmOutputContext woc;
 	vpx_codec_enc_cfg_t cfg;
 	vpx_codec_ctx_t codec;
 	FILE *output;
@@ -30,8 +30,7 @@ typedef struct encoding_context {
 	int frame_count;
 	int timebase_unit_count;  // elapsed "timebase units" which VP8 uses internally, always 1/30 sec?
 	float timebase_units_per_second;
-	int hash;
-	int deadline; 
+	int deadline;
 } encoding_context;
 
 static encoding_context gContext = {0};
@@ -48,21 +47,20 @@ int start_encode(encoding_context *context, char *path, int width, int height, f
 	
 	FILE *outfile = fopen(path, "wb");
 	if (!outfile) return 1001;
-	context->ebml.stream = outfile;
+	context->woc.stream = outfile;
 	
 	if (!vpx_img_alloc(&context->vpx_image, VPX_IMG_FMT_I420, width, height, 1)) return 1002;
 	
 	if (0!=vpx_codec_enc_init(&context->codec, WG_CODEC_INTERFACE, &context->cfg, 0)) return 1003;
 	
-	struct vpx_rational framerate = {fps, 1};
-	const struct VpxRational pixel_aspect_ratio = {1, 1};
-	write_webm_file_header(&context->ebml, &context->cfg, &framerate, STEREO_FORMAT_MONO, WG_FOURCC, &pixel_aspect_ratio);
+	struct VpxRational framerate = {fps, 1};
+	write_webm_file_header(&context->woc, &context->cfg, STEREO_FORMAT_MONO, WG_FOURCC, &framerate);
 	
 	return 0;
 }
 
 int cleanup(encoding_context *context) {
-	fclose(context->ebml.stream);
+	fclose(context->woc.stream);
 	vpx_img_free(&context->vpx_image);
 	if (0!=vpx_codec_destroy(&context->codec)) return 1099;
 	if (context->frame_durations) {
@@ -103,7 +101,7 @@ int write_webm_frame_data(encoding_context *context, vpx_image_t *image) {
 	while( (pkt = vpx_codec_get_cx_data(&context->codec, &iter)) ) {
 		switch (pkt->kind) {
 			case VPX_CODEC_CX_FRAME_PKT:
-				write_webm_block(&context->ebml, &context->cfg, pkt);
+				write_webm_block(&context->woc, &context->cfg, pkt);
 				break;
 			default:
 				break;
@@ -148,7 +146,7 @@ int encode_argb_frame(encoding_context *context, int *argb) {
 
 
 int finish_encode(encoding_context *context) {
-	write_webm_file_footer(&context->ebml);
+	write_webm_file_footer(&context->woc);
 	return cleanup(context);
 }
 

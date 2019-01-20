@@ -6,10 +6,11 @@
 // in the file PATENTS.  All contributing project authors may
 // be found in the AUTHORS file in the root of the source tree.
 
-#include "mkvmuxerutil.hpp"
+#include "mkvmuxer/mkvmuxerutil.h"
 
 #ifdef __ANDROID__
 #include <fcntl.h>
+#include <unistd.h>
 #endif
 
 #include <cassert>
@@ -19,15 +20,10 @@
 #include <cstring>
 #include <ctime>
 #include <new>
-#include <unistd.h>
 
-#include "mkvwriter.hpp"
-#include "webmids.hpp"
-
-#ifdef _MSC_VER
-// Disable MSVC warnings that suggest making code non-portable.
-#pragma warning(disable : 4996)
-#endif
+#include "common/webmids.h"
+#include "mkvmuxer/mkvmuxer.h"
+#include "mkvmuxer/mkvwriter.h"
 
 namespace mkvmuxer {
 
@@ -45,18 +41,20 @@ uint64 WriteBlock(IMkvWriter* writer, const Frame* const frame, int64 timecode,
   uint64 block_additions_payload_size = 0;
   uint64 block_additions_elem_size = 0;
   if (frame->additional()) {
-    block_additional_elem_size = EbmlElementSize(
-        kMkvBlockAdditional, frame->additional(), frame->additional_length());
-    block_addid_elem_size = EbmlElementSize(kMkvBlockAddID, frame->add_id());
+    block_additional_elem_size =
+        EbmlElementSize(libwebm::kMkvBlockAdditional, frame->additional(),
+                        frame->additional_length());
+    block_addid_elem_size = EbmlElementSize(
+        libwebm::kMkvBlockAddID, static_cast<uint64>(frame->add_id()));
 
     block_more_payload_size =
         block_addid_elem_size + block_additional_elem_size;
     block_more_elem_size =
-        EbmlMasterElementSize(kMkvBlockMore, block_more_payload_size) +
+        EbmlMasterElementSize(libwebm::kMkvBlockMore, block_more_payload_size) +
         block_more_payload_size;
     block_additions_payload_size = block_more_elem_size;
     block_additions_elem_size =
-        EbmlMasterElementSize(kMkvBlockAdditions,
+        EbmlMasterElementSize(libwebm::kMkvBlockAdditions,
                               block_additions_payload_size) +
         block_additions_payload_size;
   }
@@ -64,7 +62,8 @@ uint64 WriteBlock(IMkvWriter* writer, const Frame* const frame, int64 timecode,
   uint64 discard_padding_elem_size = 0;
   if (frame->discard_padding() != 0) {
     discard_padding_elem_size =
-        EbmlElementSize(kMkvDiscardPadding, frame->discard_padding());
+        EbmlElementSize(libwebm::kMkvDiscardPadding,
+                        static_cast<int64>(frame->discard_padding()));
   }
 
   const uint64 reference_block_timestamp =
@@ -72,28 +71,30 @@ uint64 WriteBlock(IMkvWriter* writer, const Frame* const frame, int64 timecode,
   uint64 reference_block_elem_size = 0;
   if (!frame->is_key()) {
     reference_block_elem_size =
-        EbmlElementSize(kMkvReferenceBlock, reference_block_timestamp);
+        EbmlElementSize(libwebm::kMkvReferenceBlock, reference_block_timestamp);
   }
 
   const uint64 duration = frame->duration() / timecode_scale;
   uint64 block_duration_elem_size = 0;
   if (duration > 0)
-    block_duration_elem_size = EbmlElementSize(kMkvBlockDuration, duration);
+    block_duration_elem_size =
+        EbmlElementSize(libwebm::kMkvBlockDuration, duration);
 
   const uint64 block_payload_size = 4 + frame->length();
   const uint64 block_elem_size =
-      EbmlMasterElementSize(kMkvBlock, block_payload_size) + block_payload_size;
+      EbmlMasterElementSize(libwebm::kMkvBlock, block_payload_size) +
+      block_payload_size;
 
   const uint64 block_group_payload_size =
       block_elem_size + block_additions_elem_size + block_duration_elem_size +
       discard_padding_elem_size + reference_block_elem_size;
 
-  if (!WriteEbmlMasterElement(writer, kMkvBlockGroup,
+  if (!WriteEbmlMasterElement(writer, libwebm::kMkvBlockGroup,
                               block_group_payload_size)) {
     return 0;
   }
 
-  if (!WriteEbmlMasterElement(writer, kMkvBlock, block_payload_size))
+  if (!WriteEbmlMasterElement(writer, libwebm::kMkvBlock, block_payload_size))
     return 0;
 
   if (WriteUInt(writer, frame->track_number()))
@@ -110,44 +111,48 @@ uint64 WriteBlock(IMkvWriter* writer, const Frame* const frame, int64 timecode,
     return 0;
 
   if (frame->additional()) {
-    if (!WriteEbmlMasterElement(writer, kMkvBlockAdditions,
+    if (!WriteEbmlMasterElement(writer, libwebm::kMkvBlockAdditions,
                                 block_additions_payload_size)) {
       return 0;
     }
 
-    if (!WriteEbmlMasterElement(writer, kMkvBlockMore, block_more_payload_size))
+    if (!WriteEbmlMasterElement(writer, libwebm::kMkvBlockMore,
+                                block_more_payload_size))
       return 0;
 
-    if (!WriteEbmlElement(writer, kMkvBlockAddID, frame->add_id()))
+    if (!WriteEbmlElement(writer, libwebm::kMkvBlockAddID,
+                          static_cast<uint64>(frame->add_id())))
       return 0;
 
-    if (!WriteEbmlElement(writer, kMkvBlockAdditional, frame->additional(),
-                          frame->additional_length())) {
+    if (!WriteEbmlElement(writer, libwebm::kMkvBlockAdditional,
+                          frame->additional(), frame->additional_length())) {
       return 0;
     }
   }
 
   if (frame->discard_padding() != 0 &&
-      !WriteEbmlElement(writer, kMkvDiscardPadding, frame->discard_padding())) {
+      !WriteEbmlElement(writer, libwebm::kMkvDiscardPadding,
+                        static_cast<int64>(frame->discard_padding()))) {
     return false;
   }
 
-  if (!frame->is_key() &&
-      !WriteEbmlElement(writer, kMkvReferenceBlock,
-                        reference_block_timestamp)) {
+  if (!frame->is_key() && !WriteEbmlElement(writer, libwebm::kMkvReferenceBlock,
+                                            reference_block_timestamp)) {
     return false;
   }
 
-  if (duration > 0 && !WriteEbmlElement(writer, kMkvBlockDuration, duration)) {
+  if (duration > 0 &&
+      !WriteEbmlElement(writer, libwebm::kMkvBlockDuration, duration)) {
     return false;
   }
-  return EbmlMasterElementSize(kMkvBlockGroup, block_group_payload_size) +
+  return EbmlMasterElementSize(libwebm::kMkvBlockGroup,
+                               block_group_payload_size) +
          block_group_payload_size;
 }
 
 uint64 WriteSimpleBlock(IMkvWriter* writer, const Frame* const frame,
                         int64 timecode) {
-  if (WriteID(writer, kMkvSimpleBlock))
+  if (WriteID(writer, libwebm::kMkvSimpleBlock))
     return 0;
 
   const int32 size = static_cast<int32>(frame->length()) + 4;
@@ -170,7 +175,7 @@ uint64 WriteSimpleBlock(IMkvWriter* writer, const Frame* const frame,
   if (writer->Write(frame->frame(), static_cast<uint32>(frame->length())))
     return 0;
 
-  return GetUIntSize(kMkvSimpleBlock) + GetCodedUIntSize(size) + 4 +
+  return GetUIntSize(libwebm::kMkvSimpleBlock) + GetCodedUIntSize(size) + 4 +
          frame->length();
 }
 
@@ -243,11 +248,15 @@ uint64 EbmlElementSize(uint64 type, int64 value) {
 }
 
 uint64 EbmlElementSize(uint64 type, uint64 value) {
+  return EbmlElementSize(type, value, 0);
+}
+
+uint64 EbmlElementSize(uint64 type, uint64 value, uint64 fixed_size) {
   // Size of EBML ID
-  int32 ebml_size = GetUIntSize(type);
+  uint64 ebml_size = GetUIntSize(type);
 
   // Datasize
-  ebml_size += GetUIntSize(value);
+  ebml_size += (fixed_size > 0) ? fixed_size : GetUIntSize(value);
 
   // Size of Datasize
   ebml_size++;
@@ -279,7 +288,7 @@ uint64 EbmlElementSize(uint64 type, const char* value) {
   ebml_size += strlen(value);
 
   // Size of Datasize
-  ebml_size++;
+  ebml_size += GetCodedUIntSize(strlen(value));
 
   return ebml_size;
 }
@@ -429,13 +438,23 @@ bool WriteEbmlMasterElement(IMkvWriter* writer, uint64 type, uint64 size) {
 }
 
 bool WriteEbmlElement(IMkvWriter* writer, uint64 type, uint64 value) {
+  return WriteEbmlElement(writer, type, value, 0);
+}
+
+bool WriteEbmlElement(IMkvWriter* writer, uint64 type, uint64 value,
+                      uint64 fixed_size) {
   if (!writer)
     return false;
 
   if (WriteID(writer, type))
     return false;
 
-  const uint64 size = GetUIntSize(value);
+  uint64 size = GetUIntSize(value);
+  if (fixed_size > 0) {
+    if (size > fixed_size)
+      return false;
+    size = fixed_size;
+  }
   if (WriteUInt(writer, size))
     return false;
 
@@ -555,8 +574,8 @@ uint64 WriteVoidElement(IMkvWriter* writer, uint64 size) {
 
   // Subtract one for the void ID and the coded size.
   uint64 void_entry_size = size - 1 - GetCodedUIntSize(size - 1);
-  uint64 void_size =
-      EbmlMasterElementSize(kMkvVoid, void_entry_size) + void_entry_size;
+  uint64 void_size = EbmlMasterElementSize(libwebm::kMkvVoid, void_entry_size) +
+                     void_entry_size;
 
   if (void_size != size)
     return 0;
@@ -565,7 +584,7 @@ uint64 WriteVoidElement(IMkvWriter* writer, uint64 size) {
   if (payload_position < 0)
     return 0;
 
-  if (WriteID(writer, kMkvVoid))
+  if (WriteID(writer, libwebm::kMkvVoid))
     return 0;
 
   if (WriteUInt(writer, void_entry_size))
@@ -592,9 +611,7 @@ void GetVersion(int32* major, int32* minor, int32* build, int32* revision) {
   *revision = 0;
 }
 
-}  // namespace mkvmuxer
-
-mkvmuxer::uint64 mkvmuxer::MakeUID(unsigned int* seed) {
+uint64 MakeUID(unsigned int* seed) {
   uint64 uid = 0;
 
 #ifdef __MINGW32__
@@ -609,10 +626,11 @@ mkvmuxer::uint64 mkvmuxer::MakeUID(unsigned int* seed) {
     (void)seed;
     const int32 nn = rand();
 #elif __ANDROID__
+    (void)seed;
     int32 temp_num = 1;
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd != -1) {
-      read(fd, &temp_num, sizeof(int32));
+      read(fd, &temp_num, sizeof(temp_num));
       close(fd);
     }
     const int32 nn = temp_num;
@@ -628,3 +646,98 @@ mkvmuxer::uint64 mkvmuxer::MakeUID(unsigned int* seed) {
 
   return uid;
 }
+
+bool IsMatrixCoefficientsValueValid(uint64_t value) {
+  switch (value) {
+    case mkvmuxer::Colour::kGbr:
+    case mkvmuxer::Colour::kBt709:
+    case mkvmuxer::Colour::kUnspecifiedMc:
+    case mkvmuxer::Colour::kReserved:
+    case mkvmuxer::Colour::kFcc:
+    case mkvmuxer::Colour::kBt470bg:
+    case mkvmuxer::Colour::kSmpte170MMc:
+    case mkvmuxer::Colour::kSmpte240MMc:
+    case mkvmuxer::Colour::kYcocg:
+    case mkvmuxer::Colour::kBt2020NonConstantLuminance:
+    case mkvmuxer::Colour::kBt2020ConstantLuminance:
+      return true;
+  }
+  return false;
+}
+
+bool IsChromaSitingHorzValueValid(uint64_t value) {
+  switch (value) {
+    case mkvmuxer::Colour::kUnspecifiedCsh:
+    case mkvmuxer::Colour::kLeftCollocated:
+    case mkvmuxer::Colour::kHalfCsh:
+      return true;
+  }
+  return false;
+}
+
+bool IsChromaSitingVertValueValid(uint64_t value) {
+  switch (value) {
+    case mkvmuxer::Colour::kUnspecifiedCsv:
+    case mkvmuxer::Colour::kTopCollocated:
+    case mkvmuxer::Colour::kHalfCsv:
+      return true;
+  }
+  return false;
+}
+
+bool IsColourRangeValueValid(uint64_t value) {
+  switch (value) {
+    case mkvmuxer::Colour::kUnspecifiedCr:
+    case mkvmuxer::Colour::kBroadcastRange:
+    case mkvmuxer::Colour::kFullRange:
+    case mkvmuxer::Colour::kMcTcDefined:
+      return true;
+  }
+  return false;
+}
+
+bool IsTransferCharacteristicsValueValid(uint64_t value) {
+  switch (value) {
+    case mkvmuxer::Colour::kIturBt709Tc:
+    case mkvmuxer::Colour::kUnspecifiedTc:
+    case mkvmuxer::Colour::kReservedTc:
+    case mkvmuxer::Colour::kGamma22Curve:
+    case mkvmuxer::Colour::kGamma28Curve:
+    case mkvmuxer::Colour::kSmpte170MTc:
+    case mkvmuxer::Colour::kSmpte240MTc:
+    case mkvmuxer::Colour::kLinear:
+    case mkvmuxer::Colour::kLog:
+    case mkvmuxer::Colour::kLogSqrt:
+    case mkvmuxer::Colour::kIec6196624:
+    case mkvmuxer::Colour::kIturBt1361ExtendedColourGamut:
+    case mkvmuxer::Colour::kIec6196621:
+    case mkvmuxer::Colour::kIturBt202010bit:
+    case mkvmuxer::Colour::kIturBt202012bit:
+    case mkvmuxer::Colour::kSmpteSt2084:
+    case mkvmuxer::Colour::kSmpteSt4281Tc:
+    case mkvmuxer::Colour::kAribStdB67Hlg:
+      return true;
+  }
+  return false;
+}
+
+bool IsPrimariesValueValid(uint64_t value) {
+  switch (value) {
+    case mkvmuxer::Colour::kReservedP0:
+    case mkvmuxer::Colour::kIturBt709P:
+    case mkvmuxer::Colour::kUnspecifiedP:
+    case mkvmuxer::Colour::kReservedP3:
+    case mkvmuxer::Colour::kIturBt470M:
+    case mkvmuxer::Colour::kIturBt470Bg:
+    case mkvmuxer::Colour::kSmpte170MP:
+    case mkvmuxer::Colour::kSmpte240MP:
+    case mkvmuxer::Colour::kFilm:
+    case mkvmuxer::Colour::kIturBt2020:
+    case mkvmuxer::Colour::kSmpteSt4281P:
+    case mkvmuxer::Colour::kJedecP22Phosphors:
+      return true;
+  }
+  return false;
+}
+
+}  // namespace mkvmuxer
