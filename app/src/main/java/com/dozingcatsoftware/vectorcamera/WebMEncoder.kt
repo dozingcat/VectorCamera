@@ -1,5 +1,6 @@
 package com.dozingcatsoftware.vectorcamera
 
+import android.util.Log
 import java.io.File
 
 /**
@@ -14,6 +15,8 @@ class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
     private val outputHeight = videoReader.outputVideoHeight()
 
     fun startEncoding() {
+        val arch = System.getProperty("os.arch")
+        Log.i(TAG, "Starting video encoding, os.arch=${arch}")
         val framesPerSecond = (numFrames / videoReader.totalDurationMillis()).toFloat() / 1000f
         val frameRelativeEndTimes = IntArray(numFrames)
         frameRelativeEndTimes[0] = videoReader.frameDurationMillis(0).toInt()
@@ -54,7 +57,7 @@ class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
     external fun nativeCancelEncoding(): Int
 
     companion object {
-        val TAG = "WebMEncoder"
+        const val TAG = "WebMEncoder"
 
         init {
             System.loadLibrary("vectorcamera")
