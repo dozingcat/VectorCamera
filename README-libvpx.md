@@ -1,7 +1,7 @@
 Vector Camera uses the libvpx library to create WebM videos. This repository
 includes only the subset of libvpx headers and source needed for the NDK code in
 vc_video.c to build. The code needs to link against the full libvpx library,
-which is included as a binary for ARM and x86 in jni/libvpx_prebuilt_libs.
+which is included as a binary for ARM and x86 in app/src/main/cpp/libvpx_prebuilt_libs.
 These are the steps I used to build Android-compatible libraries from the
 libvpx sources.
 
@@ -17,7 +17,7 @@ for example `export NDK=/home/foo/android/android-ndk-r15c`.
 for the current libraries is 5cbd333f3b491f6ecb41387acf72e8ec27d8a474; later
 versions may or may not work.
 
-Each library has its own special snowflake build process.
+The build process is not terribly reliable; each architecture has its own process.
 
 ## 32-bit ARM
 
@@ -65,7 +65,7 @@ Then cd to the parent directory (app/src/main) and run:
 $NDK/ndk-build
 ```
 If that works, it will create a `libvpx.a` library in obj/local/arm64-v8a. Copy it to
-`cpp/libvpx_prebuilt_libs/arm64-v8a`. This library is very large; around around 8MB
+`cpp/libvpx_prebuilt_libs/arm64-v8a`. This library is very large; around around 7MB
 compared to under 1MB for the others. However when you build the final APK it gets
 stripped, so the final APK size is reasonable.
 
@@ -104,7 +104,7 @@ This should produce a `libvpx.a` file in the libvpx directory.
 Copy it to `app/src/main/cpp/libvpx_prebuilt_libs/x86`.
 Then run `make distclean` from the libvpx directory.
 
-(Why do we have to disable mmx and sse? The mysteries of life).
+(Similar to ARM, SSE has to be disabled for reasons I haven't figured out).
 
 ## 64-bit x86
 
