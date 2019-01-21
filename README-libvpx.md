@@ -6,18 +6,18 @@ These are the steps I used to build Android-compatible libraries from the
 libvpx sources.
 
 1. Download a standalone NDK from https://developer.android.com/ndk/downloads/.
-r15 was the latest version I was able to use; apparently later versions changed
+r15 was the latest version I was able to use; later versions changed the
 the directory structure in ways that confuse the libvpx scripts.
 
 2. In a terminal, set the NDK variable to the full path to the NDK directory,
-for example "export NDK=/home/foo/android/android-ndk-r15c".
+for example `export NDK=/home/foo/android/android-ndk-r15c`.
 
 3. In app/src/main/jni, check out the libvpx repository:
-"git clone https://chromium.googlesource.com/webm/libvpx". The revision used
+`git clone https://chromium.googlesource.com/webm/libvpx`. The revision used
 for the current libraries is 5cbd333f3b491f6ecb41387acf72e8ec27d8a474; later
 versions may or may not work.
 
-Each library is its own special snowflake build process.
+Each library has its own special snowflake build process.
 
 ## 32-bit ARM
 
@@ -32,14 +32,15 @@ make
 ```
 
 If all goes well, this will produce `libvpx.a` in the libvpx directory.
-Copy it to app/src/main/cpp/libvpx_prebuilt_libs/armeabi-v7a.
-Then run "make distclean" from the libvpx directory.
+Copy it to `app/src/main/cpp/libvpx_prebuilt_libs/armeabi-v7a`.
+Then run `make distclean` from the libvpx directory.
 
 (It fails if neon isn't disabled. I haven't looked into that deeply).
 
 ## 64-bit ARM
 
-This will use the `ndk-build` tool from the NDK. (I couldn't get ndk-build to
+This uses the `ndk-build` tool from the NDK, which is the reason for the "jni"
+directory and its Application.mk and Android.mk files. (I couldn't get ndk-build to
 work for the 32-bit library, and directly building doesn't work for 64-bit. Fun).
 
 HACK: The libvpx configuration scripts don't seem to be fully aware of the NDK
@@ -53,9 +54,9 @@ check_cmd() {
   #"$@" >>${logfile} 2>&1
 }
 ```
-Now from the "jni" directory, run:
+Now from the "app/src/main/jni" directory, run:
 ```
-libvpx/configure --target=arm64-android-gcc --sdk-path=$NDK \
+libvpx/configure --target=arm64-android-gcc \
 --disable-examples --disable-docs --disable-tools \
 --disable-vp8-decoder --disable-vp9-decoder --enable-vp8-encoder --disable-vp9-encoder
 ```
@@ -64,13 +65,15 @@ Then cd to the parent directory (app/src/main) and run:
 $NDK/ndk-build
 ```
 If that works, it will create a `libvpx.a` library in obj/local/arm64-v8a. Copy it to
-cpp/libvpx_prebuilt_libs/arm64-v8a.
+`cpp/libvpx_prebuilt_libs/arm64-v8a`. This library is very large; around around 8MB
+compared to under 1MB for the others. However when you build the final APK it gets
+stripped, so the final APK size is reasonable.
 
 To clean up, run `rm *.h` from app/src/main and `make distclean` from app/src/main/jni.
 Also revert the changes in libvpx/build/make/configure.sh.
 
-Note: specifically for this target, later NDKs appear to work; I was able to use r19.
-The library in the repository was still built with r15 for consistency with the others.
+Note: for this target later NDKs appear to work; I was able to use r19.
+The library in the repository was still built with r15 for consistency.
 
 ## 32-bit x86
 
@@ -98,8 +101,8 @@ LDFLAGS="--sysroot=$NDK/platforms/android-9/arch-x86" ./configure \
 make
 ```
 This should produce a `libvpx.a` file in the libvpx directory.
-Copy it to app/src/main/cpp/libvpx_prebuilt_libs/x86.
-Then run "make distclean" from the libvpx directory.
+Copy it to `app/src/main/cpp/libvpx_prebuilt_libs/x86`.
+Then run `make distclean` from the libvpx directory.
 
 (Why do we have to disable mmx and sse? The mysteries of life).
 
@@ -124,5 +127,5 @@ make
 ```
 
 This should produce a `libvpx.a` file in the libvpx directory.
-Copy it to app/src/main/cpp/libvpx_prebuilt_libs/x86_64.
-Then run "make distclean" from the libvpx directory.
+Copy it to `app/src/main/cpp/libvpx_prebuilt_libs/x86_64`.
+Then run `make distclean` from the libvpx directory.

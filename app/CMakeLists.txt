@@ -10,8 +10,8 @@ add_library(
     vpx
     STATIC
     IMPORTED
-
 )
+
 set_target_properties(
     vpx
     PROPERTIES IMPORTED_LOCATION
