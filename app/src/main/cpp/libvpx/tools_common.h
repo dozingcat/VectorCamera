@@ -7,8 +7,8 @@
  *  in the file PATENTS.  All contributing project authors may
  *  be found in the AUTHORS file in the root of the source tree.
  */
-#ifndef TOOLS_COMMON_H_
-#define TOOLS_COMMON_H_
+#ifndef VPX_TOOLS_COMMON_H_
+#define VPX_TOOLS_COMMON_H_
 
 #include <stdio.h>
 
@@ -26,28 +26,32 @@
 /* MSVS uses _f{seek,tell}i64. */
 #define fseeko _fseeki64
 #define ftello _ftelli64
+typedef int64_t FileOffset;
 #elif defined(_WIN32)
 /* MinGW uses f{seek,tell}o64 for large files. */
 #define fseeko fseeko64
 #define ftello ftello64
-#endif  /* _WIN32 */
+typedef off64_t FileOffset;
+#elif CONFIG_OS_SUPPORT
+#include <sys/types.h> /* NOLINT */
+typedef off_t FileOffset;
+/* Use 32-bit file operations in WebM file format when building ARM
+ * executables (.axf) with RVCT. */
+#else
+#define fseeko fseek
+#define ftello ftell
+typedef long FileOffset; /* NOLINT */
+#endif /* CONFIG_OS_SUPPORT */
 
 #if CONFIG_OS_SUPPORT
 #if defined(_MSC_VER)
-#include <io.h>  /* NOLINT */
-#define isatty   _isatty
-#define fileno   _fileno
+#include <io.h> /* NOLINT */
+#define isatty _isatty
+#define fileno _fileno
 #else
-#include <unistd.h>  /* NOLINT */
-#endif  /* _MSC_VER */
-#endif  /* CONFIG_OS_SUPPORT */
-
-/* Use 32-bit file operations in WebM file format when building ARM
- * executables (.axf) with RVCT. */
-#if !CONFIG_OS_SUPPORT
-#define fseeko fseek
-#define ftello ftell
-#endif  /* CONFIG_OS_SUPPORT */
+#include <unistd.h> /* NOLINT */
+#endif              /* _MSC_VER */
+#endif              /* CONFIG_OS_SUPPORT */
 
 #define LITERALU64(hi, lo) ((((uint64_t)hi) << 32) | lo)
 
@@ -55,14 +59,13 @@
 #define PATH_MAX 512
 #endif
 
-#define IVF_FRAME_HDR_SZ (4 + 8)  /* 4 byte size + 8 byte timestamp */
+#define IVF_FRAME_HDR_SZ (4 + 8) /* 4 byte size + 8 byte timestamp */
 #define IVF_FILE_HDR_SZ 32
 
 #define RAW_FRAME_HDR_SZ sizeof(uint32_t)
 
 #define VP8_FOURCC 0x30385056
 #define VP9_FOURCC 0x30395056
-#define VP10_FOURCC 0x303a5056
 
 enum VideoFileType {
   FILE_TYPE_RAW,
@@ -158,7 +161,7 @@ void vpx_img_truncate_16_to_8(vpx_image_t *dst, vpx_image_t *src);
 #endif
 
 #ifdef __cplusplus
-}  /* extern "C" */
+} /* extern "C" */
 #endif
 
-#endif  // TOOLS_COMMON_H_
+#endif  // VPX_TOOLS_COMMON_H_

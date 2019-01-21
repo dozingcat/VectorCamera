@@ -1,5 +1,5 @@
 URL: https://chromium.googlesource.com/webm/libwebm
-Version: 476366249e1fda7710a389cd41c57db42305e0d4
+Version: 9f23fbc50e7a76c815b1d3f0309abe1066301331
 License: BSD
 License File: LICENSE.txt
 
@@ -7,4 +7,14 @@ Description:
 libwebm is used to handle WebM container I/O.
 
 Local Changes:
-* <none>
+Only keep:
+ - Android.mk
+ - AUTHORS.TXT
+ - common/
+    file_util.cc/h
+    hdr_util.cc/h
+    webmids.h
+ - LICENSE.TXT
+ - mkvmuxer/
+ - mkvparser/
+ - PATENTS.TXT

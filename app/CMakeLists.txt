@@ -9,28 +9,35 @@ cmake_minimum_required(VERSION 3.4.1)
 add_library(
     vpx
     STATIC
-    IMPORTED)
+    IMPORTED
+)
+
 set_target_properties(
     vpx
     PROPERTIES IMPORTED_LOCATION
-    ${PROJECT_SOURCE_DIR}/src/main/cpp/libvpx_prebuilt_libs/${ANDROID_ABI}/libvpx.a)
+    ${PROJECT_SOURCE_DIR}/src/main/cpp/libvpx_prebuilt_libs/${ANDROID_ABI}/libvpx.a
+)
 
 # Library with functions to write WebM files.
 add_library(
     webmenc
     STATIC
     src/main/cpp/libvpx/webmenc.cc
-    src/main/cpp/libvpx/third_party/libwebm/mkvmuxer.cpp
-    src/main/cpp/libvpx/third_party/libwebm/mkvmuxerutil.cpp
-    src/main/cpp/libvpx/third_party/libwebm/mkvparser.cpp
-    src/main/cpp/libvpx/third_party/libwebm/mkvreader.cpp
-    src/main/cpp/libvpx/third_party/libwebm/mkvwriter.cpp)
+    src/main/cpp/libvpx/third_party/libwebm/mkvmuxer/mkvmuxer.cc
+    src/main/cpp/libvpx/third_party/libwebm/mkvmuxer/mkvmuxerutil.cc
+    src/main/cpp/libvpx/third_party/libwebm/mkvmuxer/mkvwriter.cc
+    src/main/cpp/libvpx/third_party/libwebm/mkvparser/mkvparser.cc
+    src/main/cpp/libvpx/third_party/libwebm/mkvparser/mkvreader.cc
+)
+
+target_include_directories(webmenc PRIVATE src/main/cpp/libvpx/third_party/libwebm)
 
 # Main shared library loaded by the app.
 add_library(
     vectorcamera
     SHARED
-    src/main/cpp/vc_video.c )
+    src/main/cpp/vc_video.c
+)
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
@@ -41,4 +48,5 @@ target_link_libraries(
     vectorcamera
     # Libraries to link.
     vpx
-    webmenc)
+    webmenc
+)
