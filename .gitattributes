@@ -1,0 +1,3 @@
+# For Github language detection. See https://github.com/github/linguist#overrides
+app/src/main/java/org/xiph/* linguist-vendored
+app/src/main/cpp/libvpx/* linguist-vendored
