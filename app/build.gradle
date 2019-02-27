@@ -16,7 +16,7 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                cppFlags "-O3"
+                cppFlags "-O3 -std=c++11"
             }
         }
         ndk {
