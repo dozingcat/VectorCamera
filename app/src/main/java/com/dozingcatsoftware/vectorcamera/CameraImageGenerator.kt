@@ -149,17 +149,20 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
             allocation = createRenderscriptAllocation(size)
             allocation!!.setOnBufferAvailableListener({
-                // Log.i(TAG, "Got RS buffer")
+                if (it != allocation) {
+                    Log.i(TAG, "Got buffer for previous allocation, discarding")
+                    it.ioReceive()
+                    return@setOnBufferAvailableListener
+                }
                 if (captureSession != null) {
-                    if (this.imageAllocationCallback != null) {
-                        this.imageAllocationCallback!!(CameraImage.withAllocation(
-                                rs, allocation!!, imageOrientation, status, timestampFn()))
-                    }
+                    this.imageAllocationCallback?.invoke(CameraImage.withAllocation(
+                                rs, it, imageOrientation, status, timestampFn()))
                 }
                 else {
                     Log.i(TAG, "captureSession is null, closing image")
                 }
             })
+
             this.status = CameraStatus.CAPTURE_STARTING
             camera!!.createCaptureSession(
                     listOf(allocation!!.surface),
