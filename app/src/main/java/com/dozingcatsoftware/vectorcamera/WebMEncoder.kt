@@ -9,10 +9,10 @@ import java.io.File
  */
 class WebMEncoder(val videoReader: VideoReader, val outputPath: String) {
 
-    private val frameArgb = IntArray(videoReader.outputVideoWidth() * videoReader.outputVideoHeight())
     private val numFrames = videoReader.numberOfFrames()
     private val outputWidth = videoReader.outputVideoWidth()
     private val outputHeight = videoReader.outputVideoHeight()
+    private val frameArgb = IntArray(outputWidth * outputHeight)
 
     fun startEncoding() {
         val arch = System.getProperty("os.arch")

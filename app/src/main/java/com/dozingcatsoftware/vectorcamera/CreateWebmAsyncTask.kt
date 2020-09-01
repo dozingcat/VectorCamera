@@ -32,7 +32,7 @@ class CreateWebmAsyncTask(
             tempVideoOnlyFile.parentFile.mkdirs()
             Log.i(TAG, "Writing to ${tempVideoOnlyFile.path}")
 
-            val encoder = WebMEncoder(videoReader, tempVideoOnlyFile.path)
+            val encoder = WebMEncoder2(videoReader, tempVideoOnlyFile.path)
             encoder.startEncoding()
             for (frameIndex in 0 until videoReader.numberOfFrames()) {
                 if (this.isCancelled) {
@@ -66,7 +66,7 @@ class CreateWebmAsyncTask(
                                     bytesRead.toDouble() / audioFileSize))
                         })
 
-                tempVideoOnlyFile.delete()
+                // tempVideoOnlyFile.delete()
                 fileToMove = tempCombinedFile
             }
             else {

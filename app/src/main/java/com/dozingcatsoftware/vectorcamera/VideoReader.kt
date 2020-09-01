@@ -5,10 +5,11 @@ import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import java.io.ByteArrayInputStream
+import java.nio.ByteBuffer
 
 // Maybe get rid of PhotoLibrary parameter and pass files/metadata as individual arguments.
-class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val videoId: String,
-                  var displaySize: Size) {
+class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, videoId: String,
+                  private val displaySize: Size) {
     private val videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
     private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray
@@ -31,7 +32,7 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
     fun outputVideoHeight() = if (isPortrait()) metadata.width else metadata.height
     fun numberOfFrames() = metadata.frameTimestamps.size
 
-    private fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
+    fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
 
     fun bitmapForFrame(frameIndex: Int): ProcessedBitmap {
         if (frameIndex < 0 || frameIndex >= numberOfFrames()) {
@@ -51,6 +52,14 @@ class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val vide
                     displaySize=displaySize, orientation=cameraImage.orientation.withPortrait(fp))
         }
         return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
+    }
+
+    fun fillArgbBufferForFrame(buffer: ByteBuffer, frameIndex: Int) {
+        val bpf = bytesPerFrame().toLong()
+        videoFile.seek(frameIndex * bpf)
+        videoFile.readFully(frameBuffer)
+        buffer.position(0)
+        buffer.put(frameBuffer)
     }
 
     fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {
