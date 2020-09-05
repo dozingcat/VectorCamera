@@ -66,7 +66,7 @@ class CreateWebmAsyncTask(
                                     bytesRead.toDouble() / audioFileSize))
                         })
 
-                // tempVideoOnlyFile.delete()
+                tempVideoOnlyFile.delete()
                 fileToMove = tempCombinedFile
             }
             else {
