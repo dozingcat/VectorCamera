@@ -32,7 +32,7 @@ class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, vide
     fun outputVideoHeight() = if (isPortrait()) metadata.width else metadata.height
     fun numberOfFrames() = metadata.frameTimestamps.size
 
-    fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
+    private fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
 
     fun bitmapForFrame(frameIndex: Int): ProcessedBitmap {
         if (frameIndex < 0 || frameIndex >= numberOfFrames()) {
@@ -52,14 +52,6 @@ class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, vide
                     displaySize=displaySize, orientation=cameraImage.orientation.withPortrait(fp))
         }
         return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
-    }
-
-    fun fillArgbBufferForFrame(buffer: ByteBuffer, frameIndex: Int) {
-        val bpf = bytesPerFrame().toLong()
-        videoFile.seek(frameIndex * bpf)
-        videoFile.readFully(frameBuffer)
-        buffer.position(0)
-        buffer.put(frameBuffer)
     }
 
     fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {

@@ -112,10 +112,17 @@ class YuvImageBuffers(
         val width: Int, val height: Int, val y: ByteArray, val u: ByteArray, val v: ByteArray) {
 
     companion object {
-        fun fromBitmap(bitmap: Bitmap): YuvImageBuffers {
+        fun fromBitmap(bitmap: Bitmap, fixedWidth: Int = 0, fixedHeight: Int = 0): YuvImageBuffers {
+            if (fixedWidth > bitmap.width || fixedHeight > bitmap.height) {
+                throw IllegalArgumentException(
+                        "Specified dimensions (${fixedWidth}x${fixedHeight}) exceed bitmap size " +
+                        "(${bitmap.width}x${bitmap.height}")
+            }
             // Force width and height to be even.
-            val width = bitmap.width - (bitmap.width and 1)
-            val height = bitmap.height - (bitmap.height and 1)
+            val baseWidth = if (fixedWidth > 0) fixedWidth else bitmap.width
+            val baseHeight = if (fixedHeight > 0) fixedHeight else bitmap.height
+            val width = baseWidth - (baseWidth and 1)
+            val height = baseHeight - (baseHeight and 1)
 
             val yBuffer = ByteArray(width * height)
             val uBuffer = ByteArray(width * height / 4)
