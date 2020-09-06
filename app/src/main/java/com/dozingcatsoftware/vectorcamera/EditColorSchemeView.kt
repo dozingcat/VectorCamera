@@ -1,6 +1,5 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.app.Activity
 import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
@@ -9,12 +8,13 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import androidx.fragment.app.FragmentActivity
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 
 class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(context, attrs) {
 
-    lateinit var activity: Activity
+    lateinit var activity: FragmentActivity
     private var scheme = CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
             Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE)
     var changeCallback: ((CustomColorScheme) -> Unit)? = null
@@ -84,7 +84,7 @@ class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(
                 changeCallback?.invoke(scheme)
             }
         })
-        dlg.show(activity.fragmentManager, "color-picker-dialog")
+        dlg.show(activity.supportFragmentManager, "color-picker-dialog")
     }
 
     private fun handleTypeCheckbox(cb: CheckBox) {
