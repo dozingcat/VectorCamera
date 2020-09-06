@@ -5,10 +5,11 @@ import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import java.io.ByteArrayInputStream
+import java.nio.ByteBuffer
 
 // Maybe get rid of PhotoLibrary parameter and pass files/metadata as individual arguments.
-class VideoReader(val rs: RenderScript, val photoLibrary: PhotoLibrary, val videoId: String,
-                  var displaySize: Size) {
+class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, videoId: String,
+                  private val displaySize: Size) {
     private val videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
     private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray

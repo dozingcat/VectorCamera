@@ -15,8 +15,8 @@ import com.dozingcatsoftware.ebml.MatroskaID;
 // This class was copied from WireGoggles; there was no need to modify it or convert it to Kotlin.
 public class CombineAudioVideo {
 
-    public static interface EncoderDelegate {
-        public void receivedOggPage(long bytesRead);
+    public interface EncoderDelegate {
+        void receivedOggPage(long bytesRead);
     }
 
     /** Writes SimpleBlock elements containing Ogg pages to the EBML output file. Stops writing when the next Ogg page
