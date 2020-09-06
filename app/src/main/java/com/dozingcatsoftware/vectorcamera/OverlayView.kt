@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
@@ -15,12 +16,8 @@ class OverlayView(context: Context, attrs: AttributeSet) : View(context, attrs) 
     var touchEventHandler: ((OverlayView, MotionEvent) -> Unit)? = null
 
     private val flipMatrix = Matrix()
-    private val blackPaint = Paint()
     private val imageRect = RectF()
-
-    init {
-        blackPaint.setARGB(255, 0, 0, 0)
-    }
+    private val blackPaint = Paint().apply {color = Color.BLACK}
 
     override fun onDraw(canvas: Canvas) {
         val pb = this.processedBitmap
