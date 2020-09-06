@@ -30,9 +30,6 @@ class WebMEncoder(private val videoReader: VideoReader, private val outputPath: 
     private var videoTrackIndex = -1
     private lateinit var frameRelativeEndTimes: IntArray
 
-    private val bufferInfo = MediaCodec.BufferInfo()
-
-
     fun startEncoding() {
         val mimeType = MediaFormat.MIMETYPE_VIDEO_VP8
         val framesPerSecond = (numFrames / videoReader.totalDurationMillis()).toFloat() / 1000f
@@ -52,8 +49,6 @@ class WebMEncoder(private val videoReader: VideoReader, private val outputPath: 
         videoTrackIndex = muxer.addTrack(format)
         muxer.start()
 
-        val arch = System.getProperty("os.arch")
-        Log.i(TAG, "Starting video encoding, os.arch=${arch}")
         frameRelativeEndTimes = IntArray(numFrames)
         frameRelativeEndTimes[0] = videoReader.frameDurationMillis(0).toInt()
         for (i in 1 until numFrames) {
@@ -67,7 +62,6 @@ class WebMEncoder(private val videoReader: VideoReader, private val outputPath: 
             throw IllegalArgumentException("Invalid frame index: ${frameIndex}")
         }
         val inputBufferId = encoder.dequeueInputBuffer(1_000_000)
-        Log.i("ENC", "inputBufferId: ${inputBufferId}")
         if (inputBufferId < 0) {
             throw RuntimeException("Can't dequeue input buffer")
         }
@@ -75,9 +69,6 @@ class WebMEncoder(private val videoReader: VideoReader, private val outputPath: 
                 ?: throw NullPointerException("Input buffer is null")
 
         // Render a bitmap with the selected effect, extract the pixels, and send to the encoder.
-        // HERE: This is working, except on Pixel3a in portrait which has weird artifacts.
-        // THEORY: Width must be a multiple of 16(?). 480x640 is fine, 360x640 has lines, and the
-        // "buffer size" in VLC is 368x640.
         val bitmap = videoReader.bitmapForFrame(frameIndex).renderBitmap(
                 videoReader.landscapeVideoWidth(), videoReader.landscapeVideoHeight())
 
@@ -94,6 +85,7 @@ class WebMEncoder(private val videoReader: VideoReader, private val outputPath: 
     }
 
     private fun writeEncoderOutput() {
+        val bufferInfo = MediaCodec.BufferInfo()
         val outputBufferId = encoder.dequeueOutputBuffer(bufferInfo, 1_000_000)
         // There's not always an output buffer; the encoder may need more input.
         if (outputBufferId < 0) {

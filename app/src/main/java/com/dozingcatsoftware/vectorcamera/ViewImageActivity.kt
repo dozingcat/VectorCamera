@@ -9,7 +9,7 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.renderscript.RenderScript
-import android.support.v4.content.FileProvider
+import androidx.core.content.FileProvider
 import android.util.Log
 import android.util.Size
 import android.view.MotionEvent

@@ -1,6 +1,5 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.app.Activity
 import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
@@ -18,12 +17,13 @@ import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.fragment.app.FragmentActivity
 import com.dozingcatsoftware.vectorcamera.effect.*
 
 
 enum class ShutterMode {IMAGE, VIDEO}
 
-class MainActivity : Activity() {
+class MainActivity : FragmentActivity() {
 
     private val handler = Handler()
     private lateinit var cameraSelector: CameraSelector
