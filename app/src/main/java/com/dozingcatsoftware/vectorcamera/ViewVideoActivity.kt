@@ -19,6 +19,7 @@ import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
+import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.util.scanSavedMediaFile
 import kotlinx.android.synthetic.main.view_video.*
 import java.io.File
@@ -292,7 +293,10 @@ class ViewVideoActivity: Activity() {
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Video")
         shareIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        startActivity(Intent.createChooser(shareIntent, "Share video using:"))
+
+        val chooser = Intent.createChooser(shareIntent, getString(R.string.shareActionTitle))
+        grantUriPermissionForIntent(this, fileUri, chooser)
+        startActivity(chooser)
     }
 
     private fun encodeVideo(exportType: ExportType) {
@@ -375,8 +379,10 @@ class ViewVideoActivity: Activity() {
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
         shareIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        startActivity(
-                Intent.createChooser(shareIntent, getString(R.string.shareActionTitle)))
+
+        val chooser = Intent.createChooser(shareIntent, getString(R.string.shareActionTitle))
+        grantUriPermissionForIntent(this, fileUri, chooser)
+        startActivity(chooser)
     }
 
     private fun deleteVideo(view: View) {
