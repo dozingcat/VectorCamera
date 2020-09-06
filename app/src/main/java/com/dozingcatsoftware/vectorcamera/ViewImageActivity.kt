@@ -20,6 +20,7 @@ import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
+import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import kotlinx.android.synthetic.main.view_image.*
 import java.io.File
 
@@ -183,8 +184,10 @@ class ViewImageActivity : Activity() {
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
         shareIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        startActivity(
-                Intent.createChooser(shareIntent, getString(R.string.shareActionTitle)))
+
+        val chooser = Intent.createChooser(shareIntent, getString(R.string.shareActionTitle))
+        grantUriPermissionForIntent(this, fileUri, chooser)
+        startActivity(chooser)
     }
 
     private fun shareImage(metadata: MediaMetadata, effect: Effect) {
