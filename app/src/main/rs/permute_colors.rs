@@ -34,7 +34,8 @@ uchar4 RS_KERNEL permuteColors(uint32_t x, uint32_t y) {
     uchar uu = rsGetElementAtYuv_uchar_U(gYuvInput, x, y);
     uchar vv = rsGetElementAtYuv_uchar_V(gYuvInput, x, y);
     uchar4 rgb = rsYuvToRGBA_uchar4(yy, gFlipUV ? vv : uu, gFlipUV ? uu : vv);
-    uchar4 output = rgb;
+    uchar4 output;
+    output.a = 255;
     output.r = extractComponent(rgb, gRedSource);
     output.g = extractComponent(rgb, gGreenSource);
     output.b = extractComponent(rgb, gBlueSource);
@@ -46,7 +47,8 @@ uchar4 RS_KERNEL permuteColors_planar(uint32_t x, uint32_t y) {
     uchar uu = rsGetElementAt_uchar(gUInput, x / 2, y / 2);
     uchar vv = rsGetElementAt_uchar(gVInput, x / 2, y / 2);
     uchar4 rgb = rsYuvToRGBA_uchar4(yy, gFlipUV ? vv : uu, gFlipUV ? uu : vv);
-    uchar4 output = rgb;
+    uchar4 output;
+    output.a = 255;
     output.r = extractComponent(rgb, gRedSource);
     output.g = extractComponent(rgb, gGreenSource);
     output.b = extractComponent(rgb, gBlueSource);
