@@ -2,6 +2,8 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.util.Log
@@ -21,6 +23,7 @@ class CombinationEffect(
 
     private var effectIndex = 0
     private var resultBitmap: Bitmap? = null
+    private val blackPaint = Paint().apply {color = Color.BLACK}
 
     private fun getResultBitmap(width: Int, height: Int): Bitmap {
         var b = resultBitmap
@@ -43,20 +46,24 @@ class CombinationEffect(
         val outputHeight = originalCameraImage.displaySize.height
         val tileWidth = outputWidth / gridSize
         val tileHeight = outputHeight / gridSize
-        val tileBuffer = Bitmap.createBitmap(
-                outputWidth / gridSize, outputHeight / gridSize, Bitmap.Config.ARGB_8888)
-        val tileCanvas = Canvas(tileBuffer)
 
         val resultBitmap = getResultBitmap(outputWidth, outputHeight)
         val resultCanvas = Canvas(resultBitmap)
 
         val shouldRotate = cameraImage.orientation.portrait
-        val srcRect = RectF(0f, 0f, tileBuffer.width.toFloat(), tileBuffer.height.toFloat())
+        val srcRect = RectF(0f, 0f, tileWidth.toFloat(), tileHeight.toFloat())
 
         // Update as many subeffects as we can in the time limit specified by maxMillisPerFrame.
         val t0 = timeFn()
         var numUpdated = 0
         while (true) {
+            // It would be more efficient to reuse the same Bitmap and Buffer for each tile, but
+            // that causes intermittent display artifacts possibly due to internal buffering.
+            // `tileCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY)` seems like it
+            // should "reset" the canvas, but doesn't seem to have any effect.
+            val tileBuffer = Bitmap.createBitmap(tileWidth, tileHeight, Bitmap.Config.ARGB_8888)
+            val tileCanvas = Canvas(tileBuffer)
+
             val ei = effectIndex
             val effect = effectFactories[ei]()
             val tileBitmap = effect.createBitmap(cameraImage)
@@ -77,6 +84,8 @@ class CombinationEffect(
             }
             val dstRect = Rect(gridX * tileWidth, gridY * tileHeight,
                     (gridX + 1) * tileWidth, (gridY + 1) * tileHeight)
+            // The tile bitmap might have transparency, so we need to clear any previous bitmap.
+            resultCanvas.drawRect(dstRect, blackPaint)
             resultCanvas.drawBitmap(tileBuffer, null, dstRect, null)
 
             effectIndex = (effectIndex + 1) % effectFactories.size
