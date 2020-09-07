@@ -8,23 +8,46 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
-import android.preference.PreferenceActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.PreferenceFragmentCompat
 
-class VCPreferencesActivity : PreferenceActivity() {
-    val handler = Handler()
-
+class VCPreferencesActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        addPreferencesFromResource(R.xml.preferences)
+        // Use a layout that has only a FrameLayout that we replace with the preferences fragment.
+        setContentView(R.layout.preferences_layout)
+        supportFragmentManager
+                .beginTransaction()
+                .replace(R.id.prefs_main, VCPreferencesFragment())
+                .commit()
+    }
+
+    companion object {
+        // sets FLAG_ACTIVITY_NO_HISTORY so exiting and relaunching won't go back to this screen
+        fun startIntent(parent: Activity): Intent {
+            val prefsIntent = Intent(parent, VCPreferencesActivity::class.java)
+            prefsIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+            parent.startActivity(prefsIntent)
+            return prefsIntent
+        }
+    }
+}
+
+class VCPreferencesFragment : PreferenceFragmentCompat() {
+    private val handler = Handler()
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        setPreferencesFromResource(R.xml.preferences, rootKey)
         val pm = this.preferenceManager
 
         val autoConvertPref = pm.findPreference(getString(R.string.autoConvertPicturesPrefsKey))
-        autoConvertPref!!.setOnPreferenceChangeListener({pref, value ->
+        autoConvertPref!!.setOnPreferenceChangeListener { pref, value ->
             // Update broadcast receivers immediately so the change takes effect even if the user
             // doesn't go back to the main activity.
-            setAutoConvertEnabled(this@VCPreferencesActivity, java.lang.Boolean.TRUE == value)
+            setAutoConvertEnabled(
+                    this@VCPreferencesFragment.context!!, java.lang.Boolean.TRUE == value)
             true
-        })
+        }
 
         // HACK: when the user updates the character set of an ASCII effect, update the current
         // effect if it matches. This is so when they return to the main activity the effect will
@@ -35,9 +58,9 @@ class VCPreferencesActivity : PreferenceActivity() {
                 getString(R.string.ansiColorPixelCharsPrefId),
                 getString(R.string.fullColorPixelCharsPrefId))
         for (prefId in asciiPrefIds) {
-            pm.findPreference(prefId).setOnPreferenceChangeListener({pref, value ->
-                handler.post({
-                    val storedPrefs = VCPreferences(this)
+            pm.findPreference(prefId).setOnPreferenceChangeListener { pref, value ->
+                handler.post {
+                    val storedPrefs = VCPreferences(this.context!!)
                     if (storedPrefs.effectName() == "ascii") {
                         val params = storedPrefs.effectParameters()
                         if (params["prefId"] == prefId) {
@@ -46,38 +69,38 @@ class VCPreferencesActivity : PreferenceActivity() {
                             storedPrefs.saveEffectInfo("ascii", newEffectParams)
                         }
                     }
-                })
+                }
                 true
-            })
+            }
         }
         // Same for number of characters.
         val textEffectNames = setOf("ascii", "matrix")
         val numColumnsPrefId = getString(R.string.numAsciiColumnsPrefId)
-        pm.findPreference(numColumnsPrefId).setOnPreferenceChangeListener({pref, value ->
-            handler.post({
-                val storedPrefs = VCPreferences(this)
+        pm.findPreference(numColumnsPrefId).setOnPreferenceChangeListener { pref, value ->
+            handler.post {
+                val storedPrefs = VCPreferences(this.context!!)
                 if (textEffectNames.contains(storedPrefs.effectName())) {
                     val params = storedPrefs.effectParameters()
                     val newEffectParams = HashMap(params)
                     newEffectParams["numColumns"] = Integer.parseInt(value as String)
                     storedPrefs.saveEffectInfo(storedPrefs.effectName(), newEffectParams)
                 }
-            })
+            }
             true
-        })
+        }
         // And update matrix text color.
         val matrixColorPrefId = getString(R.string.matrixTextColorPrefId)
-        pm.findPreference(matrixColorPrefId).setOnPreferenceChangeListener({pref, value ->
-            handler.post({
-                val storedPrefs = VCPreferences(this)
+        pm.findPreference(matrixColorPrefId).setOnPreferenceChangeListener { pref, value ->
+            handler.post {
+                val storedPrefs = VCPreferences(this.context!!)
                 if (storedPrefs.effectName() == "matrix") {
                     val params = storedPrefs.effectParameters()
                     val newEffectParams = HashMap(params)
                     newEffectParams["textColor"] = value
                     storedPrefs.saveEffectInfo(storedPrefs.effectName(), newEffectParams)
                 }
-            })
-        })
+            }
+        }
     }
 
     /**
@@ -101,16 +124,6 @@ class VCPreferencesActivity : PreferenceActivity() {
                     else
                         PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                     PackageManager.DONT_KILL_APP)
-        }
-    }
-
-    companion object {
-        // sets FLAG_ACTIVITY_NO_HISTORY so exiting and relaunching won't go back to this screen
-        fun startIntent(parent: Activity): Intent {
-            val prefsIntent = Intent(parent, VCPreferencesActivity::class.java)
-            prefsIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
-            parent.startActivity(prefsIntent)
-            return prefsIntent
         }
     }
 }
