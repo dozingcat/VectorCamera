@@ -5,14 +5,14 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion 29
     defaultConfig {
         applicationId "com.dozingcatsoftware.vectorcamera"
         minSdkVersion 23
-        targetSdkVersion 28
+        targetSdkVersion 29
         renderscriptTargetApi 23
-        versionCode 11
-        versionName "1.4.3"
+        versionCode 12
+        versionName "1.5.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
