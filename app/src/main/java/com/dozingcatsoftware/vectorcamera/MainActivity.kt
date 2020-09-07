@@ -5,12 +5,12 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
-import android.preference.PreferenceManager
 import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
 import android.util.TypedValue
+import androidx.preference.PreferenceManager
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream

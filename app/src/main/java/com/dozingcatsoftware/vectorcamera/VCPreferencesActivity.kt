@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 
 class VCPreferencesActivity: AppCompatActivity() {
@@ -40,12 +41,11 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
         setPreferencesFromResource(R.xml.preferences, rootKey)
         val pm = this.preferenceManager
 
-        val autoConvertPref = pm.findPreference(getString(R.string.autoConvertPicturesPrefsKey))
+        val autoConvertPref: Preference? = findPreference(getString(R.string.autoConvertPicturesPrefsKey))
         autoConvertPref!!.setOnPreferenceChangeListener { pref, value ->
             // Update broadcast receivers immediately so the change takes effect even if the user
             // doesn't go back to the main activity.
-            setAutoConvertEnabled(
-                    this@VCPreferencesFragment.context!!, java.lang.Boolean.TRUE == value)
+            setAutoConvertEnabled(this.requireContext(), java.lang.Boolean.TRUE == value)
             true
         }
 
@@ -58,9 +58,9 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
                 getString(R.string.ansiColorPixelCharsPrefId),
                 getString(R.string.fullColorPixelCharsPrefId))
         for (prefId in asciiPrefIds) {
-            pm.findPreference(prefId).setOnPreferenceChangeListener { pref, value ->
+            pm.findPreference<Preference?>(prefId)!!.setOnPreferenceChangeListener { pref, value ->
                 handler.post {
-                    val storedPrefs = VCPreferences(this.context!!)
+                    val storedPrefs = VCPreferences(this.requireContext())
                     if (storedPrefs.effectName() == "ascii") {
                         val params = storedPrefs.effectParameters()
                         if (params["prefId"] == prefId) {
@@ -76,9 +76,9 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
         // Same for number of characters.
         val textEffectNames = setOf("ascii", "matrix")
         val numColumnsPrefId = getString(R.string.numAsciiColumnsPrefId)
-        pm.findPreference(numColumnsPrefId).setOnPreferenceChangeListener { pref, value ->
+        pm.findPreference<Preference?>(numColumnsPrefId)!!.setOnPreferenceChangeListener { pref, value ->
             handler.post {
-                val storedPrefs = VCPreferences(this.context!!)
+                val storedPrefs = VCPreferences(this.requireContext())
                 if (textEffectNames.contains(storedPrefs.effectName())) {
                     val params = storedPrefs.effectParameters()
                     val newEffectParams = HashMap(params)
@@ -90,9 +90,9 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
         }
         // And update matrix text color.
         val matrixColorPrefId = getString(R.string.matrixTextColorPrefId)
-        pm.findPreference(matrixColorPrefId).setOnPreferenceChangeListener { pref, value ->
+        pm.findPreference<Preference?>(matrixColorPrefId)!!.setOnPreferenceChangeListener { pref, value ->
             handler.post {
-                val storedPrefs = VCPreferences(this.context!!)
+                val storedPrefs = VCPreferences(this.requireContext())
                 if (storedPrefs.effectName() == "matrix") {
                     val params = storedPrefs.effectParameters()
                     val newEffectParams = HashMap(params)
