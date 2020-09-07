@@ -3,7 +3,7 @@
     <string name="noImagesFound">No pictures found.</string>
 
     <string name="autoConvertPicturesPrefsKey">autoConvertPictures</string>
-    <string name="autoConvertPicturesPrefsTitle">Automatically convert camera pictures</string>
+    <string name="autoConvertPicturesPrefsTitle">Auto-import camera pictures</string>
 
     <string name="numAsciiColumnsPrefId">numAsciiColumns</string>
     <string name="numAsciiColumnsPrefTitle">Number of text columns</string>

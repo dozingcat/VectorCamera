@@ -17,13 +17,13 @@ import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.vectorcamera.effect.*
 
 
 enum class ShutterMode {IMAGE, VIDEO}
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val handler = Handler()
     private lateinit var cameraSelector: CameraSelector

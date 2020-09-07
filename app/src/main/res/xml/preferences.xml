@@ -3,7 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory android:title="Preferences">
+    <PreferenceCategory android:title="Preferences" app:iconSpaceReserved="false">
         <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
             android:enabled="true"
             android:title="@string/autoConvertPicturesPrefsTitle" />
@@ -35,7 +35,7 @@
             android:enabled="true"
             android:title="@string/fullColorPixelCharsPrefTitle"
             android:dialogMessage="@string/fullColorPixelCharsPrefMessage" />
-        <com.jaredrummler.android.colorpicker.ColorPreference
+        <com.jaredrummler.android.colorpicker.ColorPreferenceCompat
             android:key="@string/matrixTextColorPrefId"
             android:title="@string/matrixTextColorPrefTitle"
             android:defaultValue="@color/matrixDefaultColor"
