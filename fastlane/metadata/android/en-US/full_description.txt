@@ -1,0 +1,2 @@
+Vector Camera displays real-time effects applied to what your camera is pointing at. Effects include wireframes and outlines, color shifting, and rendering with text characters. Take pictures and record videos, change their effects, and export or share them. You can also apply the effects to your existing pictures.
+

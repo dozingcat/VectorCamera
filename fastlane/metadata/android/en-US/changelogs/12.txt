@@ -1,0 +1,2 @@
+- Replaced native code for WebM encoding with Android's built-in encoder, which improves video quality and reduces app size.
+- Fixed bugs in grid view, color permutation effects, and sharing files.
