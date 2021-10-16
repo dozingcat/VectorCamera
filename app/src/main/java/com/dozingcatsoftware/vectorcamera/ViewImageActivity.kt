@@ -46,7 +46,7 @@ class ViewImageActivity : Activity() {
         deleteButton.setOnClickListener(this::deleteImage)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
 
-        imageId = intent.getStringExtra("imageId")
+        imageId = intent.getStringExtra("imageId")!!
         loadImage()
     }
 

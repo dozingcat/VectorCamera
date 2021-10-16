@@ -82,7 +82,7 @@ class ViewVideoActivity: Activity() {
         overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         // Yes, this does I/O.
-        videoId = intent.getStringExtra("videoId")
+        videoId = intent.getStringExtra("videoId")!!
         videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
 
         frameSeekBar.max = videoReader.numberOfFrames() - 1

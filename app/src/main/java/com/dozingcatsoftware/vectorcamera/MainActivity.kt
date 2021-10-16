@@ -60,7 +60,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
-        migratePhotoLibraryIfNeeded()
 
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_main)
@@ -316,13 +315,19 @@ class MainActivity : AppCompatActivity() {
                             this.targetCameraImageSize(),
                             this::handleAllocationFromCamera)
                 }
+                if (PermissionsChecker.hasStoragePermission(this)) {
+                    migratePhotoLibraryIfNeeded()
+                }
             }
         }
     }
 
     private fun checkPermissionAndStartCamera() {
-        if (PermissionsChecker.hasCameraPermission(this)) {
+        val hasCamera = PermissionsChecker.hasCameraPermission(this)
+        val hasStorage = PermissionsChecker.hasStoragePermission(this)
+        if (hasCamera && hasStorage) {
             restartCameraImageGenerator()
+            migratePhotoLibraryIfNeeded()
         }
         else {
             PermissionsChecker.requestCameraAndStoragePermissions(this)

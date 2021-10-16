@@ -95,9 +95,9 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
         val ca = ByteArray(4 * numCells)
         for (i in 0 until numCells) {
             val fraction = toUInt(blockAverages[i]) / 255.0
-            ca[4*i] = (fraction * maxTextRed).toByte()
-            ca[4*i + 1] = (fraction * maxTextGreen).toByte()
-            ca[4*i + 2] = (fraction * maxTextBlue).toByte()
+            ca[4*i] = (fraction * maxTextRed).toInt().toByte()
+            ca[4*i + 1] = (fraction * maxTextGreen).toInt().toByte()
+            ca[4*i + 2] = (fraction * maxTextBlue).toInt().toByte()
             ca[4*i + 3] = 0xff.toByte()
         }
         val raindropLifetimeMillis = maxRaindropLength * raindropMillisPerTick + raindropDecayMillis
@@ -139,11 +139,11 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
                 }
                 val brightness = (255 * fraction).roundToInt().toByte()
                 val baseOffset = 4 * (y * metrics.numCharacterColumns + drop.x)
-                ca[baseOffset] = if (dy == ticks) brightness else (fraction * maxTextRed).toByte()
+                ca[baseOffset] = if (dy == ticks) brightness else (fraction * maxTextRed).toInt().toByte()
                 ca[baseOffset + 1] =
-                        if (dy == ticks) brightness else (fraction * maxTextGreen).toByte()
+                        if (dy == ticks) brightness else (fraction * maxTextGreen).toInt().toByte()
                 ca[baseOffset + 2] =
-                        if (dy == ticks) brightness else (fraction * maxTextBlue).toByte()
+                        if (dy == ticks) brightness else (fraction * maxTextBlue).toInt().toByte()
                 ca[baseOffset + 3] = 0xff.toByte()
             }
         }

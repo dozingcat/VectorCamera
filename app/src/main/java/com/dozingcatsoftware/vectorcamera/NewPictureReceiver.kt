@@ -16,13 +16,13 @@ class NewPictureReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             return
         }
-        Log.i(javaClass.name, "Got picture: " + intent.data!!)
+        val data = intent.data!!
+        Log.i(javaClass.name, "Got picture: $data")
         try {
-            ProcessImageOperation().processImage(context, intent.data)
+            ProcessImageOperation().processImage(context, data)
         } catch (ex: Exception) {
             Log.e(javaClass.name, "Error saving picture", ex)
         }
 
     }
-
 }

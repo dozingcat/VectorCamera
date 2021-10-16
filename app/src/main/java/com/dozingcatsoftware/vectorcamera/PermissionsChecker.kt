@@ -24,6 +24,8 @@ object PermissionsChecker {
         return hasPermission(activity, Manifest.permission.RECORD_AUDIO)
     }
 
+    // Storage permissions can probably be removed once all libraries are
+    // moved to private storage.
     fun hasStoragePermission(activity: Activity): Boolean {
         return hasPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE) &&
                hasPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE)

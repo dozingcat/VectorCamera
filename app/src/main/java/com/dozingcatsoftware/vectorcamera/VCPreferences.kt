@@ -16,7 +16,7 @@ class VCPreferences(val context: Context) {
 
     private fun sharedPrefs() = PreferenceManager.getDefaultSharedPreferences(context)
 
-    fun effectName(): String = sharedPrefs().getString(EFFECT_NAME_KEY, "")
+    fun effectName(): String = sharedPrefs().getString(EFFECT_NAME_KEY, "")!!
 
     fun useHighQualityPreview() = sharedPrefs().getBoolean(HIGH_QUALITY_PREVIEW_KEY, false)
 
@@ -28,7 +28,7 @@ class VCPreferences(val context: Context) {
 
     val lookupFunction = fun(key: String, defaultValue: Any): Any {
         if (defaultValue is String) {
-            return sharedPrefs().getString(key, defaultValue)
+            return sharedPrefs().getString(key, defaultValue)!!
         }
         if (defaultValue is Int) {
             return sharedPrefs().getInt(key, defaultValue)
@@ -44,7 +44,7 @@ class VCPreferences(val context: Context) {
     }
 
     fun effectParameters(): Map<String, Any> {
-        val effectJson = sharedPrefs().getString(EFFECT_PARAMETERS_KEY, "")
+        val effectJson = sharedPrefs().getString(EFFECT_PARAMETERS_KEY, "")!!
         if (effectJson.isEmpty()) {
             return mapOf()
         }

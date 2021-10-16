@@ -48,7 +48,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
               imageAllocationCallback: ((CameraImage) -> Unit)? = null) {
         Log.i(TAG, "start(), status=${status}")
         this.captureSize = pickBestSize(
-                cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
                         .getOutputSizes(ImageFormat.YUV_420_888),
                 targetSize)
         this.targetStatus = targetStatus
@@ -213,8 +213,8 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
         request.addTarget(allocation!!.surface)
         if (this.zoomRatio > 0) {
             val cc = cameraCharacteristics
-            val baseRect = cc.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
-            val maxZoom = cc.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)
+            val baseRect = cc.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)!!
+            val maxZoom = cc.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)!!
             val zoom = Math.pow(maxZoom.toDouble(), this.zoomRatio)
             val width = (baseRect.width() / zoom).toInt()
             val height = (baseRect.height() / zoom).toInt()

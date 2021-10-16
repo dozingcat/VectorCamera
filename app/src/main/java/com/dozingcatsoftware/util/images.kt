@@ -69,7 +69,7 @@ fun scaledBitmapFromURIWithMinimumSize(
     options.inSampleSize = Math.min(wratio, hratio).toInt()
 
     return BitmapFactory.decodeStream(
-            context.contentResolver.openInputStream(imageURI), null, options)
+            context.contentResolver.openInputStream(imageURI), null, options)!!
 }
 
 /**
@@ -87,7 +87,7 @@ fun scaledBitmapFromURIWithMaximumSize(
     options.inSampleSize = Math.max(wratio, hratio)
 
     return BitmapFactory.decodeStream(
-            context.contentResolver.openInputStream(imageURI), null, options)
+            context.contentResolver.openInputStream(imageURI), null, options)!!
 }
 
 private fun powerOf2GreaterOrEqual(arg: Double): Int {

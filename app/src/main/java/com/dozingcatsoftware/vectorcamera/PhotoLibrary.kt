@@ -326,15 +326,17 @@ class PhotoLibrary(val rootDirectory: File) {
         fun defaultLibrary(context: Context): PhotoLibrary {
             Log.i(TAG, "external storage dir: ${Environment.getExternalStorageDirectory()}")
             Log.i(TAG, "filesDir: ${context.filesDir}")
-            val baseDir = context.filesDir
+            Log.i(TAG, "externalFilesDir: ${context.getExternalFilesDir(null)}")
             // val baseDir = Environment.getExternalStorageDirectory()
+            val baseDir = context.getExternalFilesDir(null)
             return PhotoLibrary(File(baseDir, "VectorCamera"))
         }
 
         // Checks for the existence of a VectorCamera directory in the root of
-        // external storage, and if found moves it to this library's root.
+        // external storage, and if found moves it to `context.getExternalFilesDir`.
         // Needed to migrate to Android 11, which disallows writing to external
-        // storage except for private app directories.
+        // storage except for app-specific directories.
+        // See https://developer.android.com/training/data-storage/use-cases#migrate-legacy-storage
         fun shouldMigrateToPrivateStorage(context: Context): Boolean {
             val rootDir = File(Environment.getExternalStorageDirectory(), "VectorCamera")
             return rootDir.isDirectory
@@ -342,7 +344,7 @@ class PhotoLibrary(val rootDirectory: File) {
 
         fun migrateToPrivateStorage(context: Context, progressHandler: (fileSize: Long) -> Unit) {
             val rootDir = File(Environment.getExternalStorageDirectory(), "VectorCamera")
-            val privateDir = File(context.filesDir, "VectorCamera")
+            val privateDir = File(context.getExternalFilesDir(null), "VectorCamera")
             if (rootDir.isDirectory) {
                 Log.i(
                     TAG,
