@@ -9,9 +9,9 @@ import com.dozingcatsoftware.util.scaledBitmapFromURIWithMaximumSize
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 
 class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis) {
-    private val photoLibrary = PhotoLibrary.defaultLibrary()
 
     fun processImage(context: Context, imageUri: Uri): String {
+        val photoLibrary = PhotoLibrary.defaultLibrary(context)
         Log.i(TAG, "Processing image: ${imageUri}")
         val t1 = timeFn()
         val rs = RenderScript.create(context)

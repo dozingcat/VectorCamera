@@ -10,6 +10,7 @@ import com.dozingcatsoftware.vectorcamera.effect.EffectMetadata
 import com.dozingcatsoftware.util.*
 import org.json.JSONObject
 import java.io.*
+import java.nio.file.Files
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.GZIPInputStream
@@ -322,9 +323,53 @@ class PhotoLibrary(val rootDirectory: File) {
             PHOTO_ID_FORMAT.timeZone = TimeZone.getTimeZone("UTC")
         }
 
-        fun defaultLibrary(): PhotoLibrary {
-            return PhotoLibrary(
-                    File(Environment.getExternalStorageDirectory(), "VectorCamera"))
+        fun defaultLibrary(context: Context): PhotoLibrary {
+            Log.i(TAG, "external storage dir: ${Environment.getExternalStorageDirectory()}")
+            Log.i(TAG, "filesDir: ${context.filesDir}")
+            val baseDir = context.filesDir
+            // val baseDir = Environment.getExternalStorageDirectory()
+            return PhotoLibrary(File(baseDir, "VectorCamera"))
+        }
+
+        // Checks for the existence of a VectorCamera directory in the root of
+        // external storage, and if found moves it to this library's root.
+        // Needed to migrate to Android 11, which disallows writing to external
+        // storage except for private app directories.
+        fun shouldMigrateToPrivateStorage(context: Context): Boolean {
+            val rootDir = File(Environment.getExternalStorageDirectory(), "VectorCamera")
+            return rootDir.isDirectory
+        }
+
+        fun migrateToPrivateStorage(context: Context, progressHandler: (fileSize: Long) -> Unit) {
+            val rootDir = File(Environment.getExternalStorageDirectory(), "VectorCamera")
+            val privateDir = File(context.filesDir, "VectorCamera")
+            if (rootDir.isDirectory) {
+                Log.i(
+                    TAG,
+                    "Moving directory at ${rootDir.absolutePath} to ${privateDir.absolutePath}"
+                )
+                copyAndRemoveDir(rootDir, privateDir, progressHandler)
+            }
+        }
+
+        private fun copyAndRemoveDir(src: File, dst: File, progressHandler: (fileSize: Long) -> Unit) {
+            src.listFiles().forEach {
+                if (it.isDirectory) {
+                    copyAndRemoveDir(it, File(dst, it.name), progressHandler)
+                } else {
+                    copyAndRemoveFile(it, File(dst, it.name), progressHandler)
+                }
+            }
+            Log.i(TAG, "Copied directory: ${src.absolutePath}")
+            // src.deleteRecursively()
+        }
+
+        private fun copyAndRemoveFile(src: File, dst: File, progressHandler: (fileSize: Long) -> Unit) {
+            src.copyTo(dst, overwrite = true)
+            progressHandler(src.length())
+            // src.delete()
+
+            Log.i(TAG, "Copied file: ${src.absolutePath}")
         }
     }
 }

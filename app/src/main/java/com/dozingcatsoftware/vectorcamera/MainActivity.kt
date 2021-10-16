@@ -1,5 +1,6 @@
 package com.dozingcatsoftware.vectorcamera
 
+import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
@@ -33,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imageProcessor: CameraImageProcessor
     private var preferredImageSize = ImageSize.HALF_SCREEN
 
-    private val photoLibrary = PhotoLibrary.defaultLibrary()
+    private lateinit var photoLibrary: PhotoLibrary
 
     private lateinit var rs: RenderScript
     private val effectRegistry = EffectRegistry()
@@ -57,6 +58,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        photoLibrary = PhotoLibrary.defaultLibrary(this)
+        migratePhotoLibraryIfNeeded()
+
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_main)
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
@@ -145,7 +150,7 @@ class MainActivity : AppCompatActivity() {
                     Log.i(TAG, "Selected photo: ${intent!!.data}")
                     Thread({
                         try {
-                            val imageId = ProcessImageOperation().processImage(this, intent.data)
+                            val imageId = ProcessImageOperation().processImage(this, intent.data!!)
                             handler.post({
                                 ViewImageActivity.startActivityWithImageId(this, imageId)
                             })
@@ -155,6 +160,67 @@ class MainActivity : AppCompatActivity() {
                         }
                     }).start()
                 }
+            }
+        }
+    }
+
+    private fun migratePhotoLibraryIfNeeded() {
+        if (PhotoLibrary.shouldMigrateToPrivateStorage(this)) {
+            handler.post {
+                val migrationSpinner = ProgressDialog(this)
+                migrationSpinner.isIndeterminate = true
+                migrationSpinner.setMessage("Moving library...")
+                migrationSpinner.setCancelable(false)
+                migrationSpinner.show()
+
+                Thread {
+                    var succeeded = false
+                    var numFiles = 0
+                    var totalBytes = 0L
+                    var migrationError: Exception? = null
+                    try {
+                        PhotoLibrary.migrateToPrivateStorage(this) {fileSize ->
+                            handler.post {
+                                numFiles += 1
+                                totalBytes += fileSize
+                                val mb = String.format("%.1f", totalBytes / 1e6)
+                                val msg = "Moving library:\nProcessed $numFiles files, ${mb}MB";
+                                migrationSpinner.setMessage(msg)
+                            }
+                        }
+                        succeeded = true
+                        Log.i(TAG, "Migration succeeded")
+                        if (PhotoLibrary.shouldMigrateToPrivateStorage(this)) {
+                            Log.i(TAG, "Hmm, but previous library is still there?")
+                        }
+                    }
+                    catch (ex: Exception) {
+                        Log.e(TAG, "Migration failed", ex)
+                        migrationError = ex
+                    }
+                    handler.post {
+                        migrationSpinner.hide()
+                        val finishedMsg = if (succeeded)
+                            """
+                                Your Vector Camera library has been moved to private storage.
+                                This is necessary to support Android 11. You shouldn't notice any
+                                difference, but be aware that your library will be deleted if you
+                                uninstall the app.
+                            """.trimIndent().replace(System.lineSeparator(), " ")
+                        else
+                            """
+                                There was an error moving your Vector Camera library to private
+                                storage (necessary to support Android 11). If this persists,
+                                contact bnenning@gmail.com.
+                            """.trimIndent().replace(System.lineSeparator(), " ") +
+                                    "\n\nThe error was:\n$migrationError"
+                        AlertDialog.Builder(this)
+                            .setMessage(finishedMsg)
+                            .setPositiveButton("OK", null)
+                            .show()
+
+                    }
+                }.start()
             }
         }
     }

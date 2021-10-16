@@ -8,11 +8,11 @@
         android:id="@+id/gridview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:paddingTop="10dp"
         android:columnWidth="160dp"
         android:numColumns="auto_fit"
         android:verticalSpacing="10dp"
-        android:horizontalSpacing="0dp"
-        android:stretchMode="spacingWidth"
+        android:stretchMode="spacingWidthUniform"
         android:gravity="center"
         />
 
@@ -20,6 +20,7 @@
         android:id="@+id/noImagesTextView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:padding="10dp"
         android:text="@string/noImagesFound"/>
 
 </FrameLayout>

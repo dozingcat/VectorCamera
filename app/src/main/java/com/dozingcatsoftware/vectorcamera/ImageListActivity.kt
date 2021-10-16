@@ -25,7 +25,7 @@ import java.util.Date
 
 
 class ImageListActivity : Activity() {
-    private val photoLibrary = PhotoLibrary.defaultLibrary()
+    private lateinit var photoLibrary: PhotoLibrary
 
     private lateinit var gridView: GridView
     private var gridImageIds: List<String>? = null
@@ -34,6 +34,7 @@ class ImageListActivity : Activity() {
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.imagegrid)
+        photoLibrary = PhotoLibrary.defaultLibrary(this)
         val self = this
         gridView = findViewById(R.id.gridview)
         gridView.onItemClickListener = OnItemClickListener { parent, view, position, id ->
