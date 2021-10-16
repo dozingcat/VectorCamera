@@ -27,8 +27,7 @@ object PermissionsChecker {
     // Storage permissions can probably be removed once all libraries are
     // moved to private storage.
     fun hasStoragePermission(activity: Activity): Boolean {
-        return hasPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE) &&
-               hasPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        return hasPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
     fun requestCameraAndStoragePermissions(activity: Activity) {
@@ -36,24 +35,19 @@ object PermissionsChecker {
                 arrayOf(
                     Manifest.permission.CAMERA,
                     Manifest.permission.RECORD_AUDIO,
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    Manifest.permission.READ_EXTERNAL_STORAGE),
                 CAMERA_AND_STORAGE_REQUEST_CODE)
     }
 
     fun requestStoragePermissionsToTakePhoto(activity: Activity) {
         activity.requestPermissions(
-                arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                 STORAGE_FOR_PHOTO_REQUEST_CODE)
     }
 
     fun requestStoragePermissionsToGoToLibrary(activity: Activity) {
         activity.requestPermissions(
-                arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                 STORAGE_FOR_LIBRARY_REQUEST_CODE)
     }
 }

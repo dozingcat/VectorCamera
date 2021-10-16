@@ -56,6 +56,8 @@ class MainActivity : AppCompatActivity() {
 
     private var layoutIsPortrait = false
 
+    private var libraryMigrationDone = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -164,7 +166,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun migratePhotoLibraryIfNeeded() {
-        if (PhotoLibrary.shouldMigrateToPrivateStorage(this)) {
+        if (libraryMigrationDone) {
+            return
+        }
+        val needsMigration = PhotoLibrary.shouldMigrateToPrivateStorage(this)
+        if (!needsMigration) {
+            libraryMigrationDone = true
+            return
+        }
+        else {
             handler.post {
                 val migrationSpinner = ProgressDialog(this)
                 migrationSpinner.isIndeterminate = true
@@ -173,7 +183,6 @@ class MainActivity : AppCompatActivity() {
                 migrationSpinner.show()
 
                 Thread {
-                    var succeeded = false
                     var numFiles = 0
                     var totalBytes = 0L
                     var migrationError: Exception? = null
@@ -187,7 +196,7 @@ class MainActivity : AppCompatActivity() {
                                 migrationSpinner.setMessage(msg)
                             }
                         }
-                        succeeded = true
+                        libraryMigrationDone = true
                         Log.i(TAG, "Migration succeeded")
                         if (PhotoLibrary.shouldMigrateToPrivateStorage(this)) {
                             Log.i(TAG, "Hmm, but previous library is still there?")
@@ -199,7 +208,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     handler.post {
                         migrationSpinner.hide()
-                        val finishedMsg = if (succeeded)
+                        val finishedMsg = if (libraryMigrationDone)
                             """
                                 Your Vector Camera library has been moved to private storage.
                                 This is necessary to support Android 11. You shouldn't notice any
