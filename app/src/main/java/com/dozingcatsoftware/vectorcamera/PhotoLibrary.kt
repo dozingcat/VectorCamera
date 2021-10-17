@@ -362,16 +362,15 @@ class PhotoLibrary(val rootDirectory: File) {
                     copyAndRemoveFile(it, File(dst, it.name), progressHandler)
                 }
             }
-            Log.i(TAG, "Copied directory: ${src.absolutePath}")
-            // src.deleteRecursively()
+            val isDeleted = src.delete()
+            Log.i(TAG, "Copied directory: ${src.absolutePath}, deleted=$isDeleted")
         }
 
         private fun copyAndRemoveFile(src: File, dst: File, progressHandler: (fileSize: Long) -> Unit) {
             src.copyTo(dst, overwrite = true)
             progressHandler(src.length())
-            // src.delete()
-
-            Log.i(TAG, "Copied file: ${src.absolutePath}")
+            val isDeleted = src.delete()
+            Log.i(TAG, "Copied file: ${src.absolutePath}, deleted=$isDeleted")
         }
     }
 }
