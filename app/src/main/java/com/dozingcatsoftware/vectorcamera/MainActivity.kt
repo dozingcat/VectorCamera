@@ -325,6 +325,7 @@ class MainActivity : AppCompatActivity() {
                             this::handleAllocationFromCamera)
                 }
                 if (PermissionsChecker.hasStoragePermission(this)) {
+                    Log.i(TAG, "BBB: Migrating library")
                     migratePhotoLibraryIfNeeded()
                 }
             }
@@ -336,6 +337,7 @@ class MainActivity : AppCompatActivity() {
         val hasStorage = PermissionsChecker.hasStoragePermission(this)
         if (hasCamera && hasStorage) {
             restartCameraImageGenerator()
+            Log.i(TAG, "AAA: Migrating library")
             migratePhotoLibraryIfNeeded()
         }
         else {
