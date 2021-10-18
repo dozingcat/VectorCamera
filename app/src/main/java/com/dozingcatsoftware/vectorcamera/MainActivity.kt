@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
 
     private var layoutIsPortrait = false
 
+    private var askedForPermissions = false
     private var libraryMigrationDone = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -331,11 +332,14 @@ class MainActivity : AppCompatActivity() {
     private fun checkPermissionAndStartCamera() {
         val hasCamera = PermissionsChecker.hasCameraPermission(this)
         val hasStorage = PermissionsChecker.hasStoragePermission(this)
-        if (hasCamera && hasStorage) {
+        if (hasCamera) {
             restartCameraImageGenerator()
+        }
+        if (hasStorage) {
             migratePhotoLibraryIfNeeded()
         }
-        else {
+        if (!askedForPermissions && !(hasCamera && hasStorage)) {
+            askedForPermissions = true
             PermissionsChecker.requestCameraAndStoragePermissions(this)
         }
     }
