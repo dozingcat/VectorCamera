@@ -10,7 +10,6 @@ import com.dozingcatsoftware.vectorcamera.effect.EffectMetadata
 import com.dozingcatsoftware.util.*
 import org.json.JSONObject
 import java.io.*
-import java.nio.file.Files
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.GZIPInputStream
