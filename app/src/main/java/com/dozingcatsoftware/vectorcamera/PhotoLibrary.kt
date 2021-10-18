@@ -322,9 +322,54 @@ class PhotoLibrary(val rootDirectory: File) {
             PHOTO_ID_FORMAT.timeZone = TimeZone.getTimeZone("UTC")
         }
 
-        fun defaultLibrary(): PhotoLibrary {
-            return PhotoLibrary(
-                    File(Environment.getExternalStorageDirectory(), "VectorCamera"))
+        fun defaultLibrary(context: Context): PhotoLibrary {
+            Log.i(TAG, "external storage dir: ${Environment.getExternalStorageDirectory()}")
+            Log.i(TAG, "filesDir: ${context.filesDir}")
+            Log.i(TAG, "externalFilesDir: ${context.getExternalFilesDir(null)}")
+            // val baseDir = Environment.getExternalStorageDirectory()
+            val baseDir = context.getExternalFilesDir(null)
+            return PhotoLibrary(File(baseDir, "VectorCamera"))
+        }
+
+        // Checks for the existence of a VectorCamera directory in the root of
+        // external storage, and if found moves it to `context.getExternalFilesDir`.
+        // Needed to migrate to Android 11, which disallows writing to external
+        // storage except for app-specific directories.
+        // See https://developer.android.com/training/data-storage/use-cases#migrate-legacy-storage
+        fun shouldMigrateToPrivateStorage(context: Context): Boolean {
+            val rootDir = File(Environment.getExternalStorageDirectory(), "VectorCamera")
+            return rootDir.isDirectory
+        }
+
+        fun migrateToPrivateStorage(context: Context, progressHandler: (fileSize: Long) -> Unit) {
+            val rootDir = File(Environment.getExternalStorageDirectory(), "VectorCamera")
+            val privateDir = File(context.getExternalFilesDir(null), "VectorCamera")
+            if (rootDir.isDirectory) {
+                Log.i(
+                    TAG,
+                    "Moving directory at ${rootDir.absolutePath} to ${privateDir.absolutePath}"
+                )
+                copyAndRemoveDir(rootDir, privateDir, progressHandler)
+            }
+        }
+
+        private fun copyAndRemoveDir(src: File, dst: File, progressHandler: (fileSize: Long) -> Unit) {
+            src.listFiles().forEach {
+                if (it.isDirectory) {
+                    copyAndRemoveDir(it, File(dst, it.name), progressHandler)
+                } else {
+                    copyAndRemoveFile(it, File(dst, it.name), progressHandler)
+                }
+            }
+            val isDeleted = src.delete()
+            Log.i(TAG, "Copied directory: ${src.absolutePath}, deleted=$isDeleted")
+        }
+
+        private fun copyAndRemoveFile(src: File, dst: File, progressHandler: (fileSize: Long) -> Unit) {
+            src.copyTo(dst, overwrite = true)
+            progressHandler(src.length())
+            val isDeleted = src.delete()
+            Log.i(TAG, "Copied file: ${src.absolutePath}, deleted=$isDeleted")
         }
     }
 }

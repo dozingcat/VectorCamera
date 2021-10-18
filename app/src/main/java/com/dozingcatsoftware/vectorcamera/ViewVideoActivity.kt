@@ -52,7 +52,7 @@ internal enum class ExportType private constructor(
 }
 
 class ViewVideoActivity: Activity() {
-    private val photoLibrary = PhotoLibrary.defaultLibrary()
+    private lateinit var photoLibrary: PhotoLibrary
     private lateinit var rs : RenderScript
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
@@ -73,6 +73,7 @@ class ViewVideoActivity: Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.view_video)
         rs = RenderScript.create(this)
+        photoLibrary = PhotoLibrary.defaultLibrary(this)
 
         shareButton.setOnClickListener(this::doShare)
         switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
@@ -81,7 +82,7 @@ class ViewVideoActivity: Activity() {
         overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         // Yes, this does I/O.
-        videoId = intent.getStringExtra("videoId")
+        videoId = intent.getStringExtra("videoId")!!
         videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
 
         frameSeekBar.max = videoReader.numberOfFrames() - 1

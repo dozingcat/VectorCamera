@@ -26,7 +26,7 @@ import java.io.File
 
 
 class ViewImageActivity : Activity() {
-    private val photoLibrary = PhotoLibrary.defaultLibrary()
+    private lateinit var photoLibrary: PhotoLibrary
     private lateinit var rs : RenderScript
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
@@ -39,13 +39,14 @@ class ViewImageActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.view_image)
         rs = RenderScript.create(this)
+        photoLibrary = PhotoLibrary.defaultLibrary(this)
 
         switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         shareButton.setOnClickListener(this::shareImage)
         deleteButton.setOnClickListener(this::deleteImage)
         overlayView.touchEventHandler = this::handleOverlayViewTouch
 
-        imageId = intent.getStringExtra("imageId")
+        imageId = intent.getStringExtra("imageId")!!
         loadImage()
     }
 

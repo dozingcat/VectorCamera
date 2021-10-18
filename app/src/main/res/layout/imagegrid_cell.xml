@@ -13,12 +13,13 @@
         android:layout_height="120dp" />
 
     <LinearLayout
+        android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="30dp">
 
         <TextView
             android:id="@+id/dateField"
-            android:textSize="14dp"
+            android:textSize="14sp"
             android:layout_width="wrap_content"
             android:layout_height="match_parent" />
 
@@ -29,7 +30,7 @@
 
         <TextView
             android:id="@+id/sizeField"
-            android:textSize="14dp"
+            android:textSize="14sp"
             android:layout_width="wrap_content"
             android:layout_height="match_parent" />
     </LinearLayout>
