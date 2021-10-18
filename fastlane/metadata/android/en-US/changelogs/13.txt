@@ -1,0 +1,1 @@
+- Moved library to app-specific directory, needed for Android 11+ scoped storage.
