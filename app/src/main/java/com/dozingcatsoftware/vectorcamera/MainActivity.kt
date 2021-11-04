@@ -166,6 +166,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isCameraKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                || keyCode == KeyEvent.KEYCODE_CAMERA
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isCameraKey(keyCode)) {
+            controlLayout.visibility = View.VISIBLE
+            handleShutterFocus(pressed = true)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isCameraKey(keyCode)) {
+            handleShutterFocus(pressed = false)
+            handleShutterClick()
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
     private fun migratePhotoLibraryIfNeeded() {
         if (libraryMigrationDone) {
             return
