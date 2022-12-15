@@ -3,12 +3,16 @@ package com.dozingcatsoftware.vectorcamera
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.ProgressDialog
+import android.content.ContentValues
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
+import android.provider.MediaStore
 import android.renderscript.RenderScript
 import androidx.core.content.FileProvider
 import android.view.MotionEvent
@@ -23,6 +27,8 @@ import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.util.scanSavedMediaFile
 import kotlinx.android.synthetic.main.view_video.*
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 
 
 // Ways videos can be exported, and the messages shown in the export progress dialog for each.
@@ -316,7 +322,43 @@ class ViewVideoActivity: Activity() {
             progressDialog.dismiss()
             if (result.status == ProcessVideoTask.ResultStatus.SUCCEEDED) {
                 if (exportType == ExportType.WEBM) {
-                    scanSavedMediaFile(this, result.outputFile!!.path)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Video.Media.DISPLAY_NAME, videoId)
+                            put(MediaStore.Video.Media.TITLE, videoId)
+                            put(MediaStore.Video.Media.RELATIVE_PATH, "${Environment.DIRECTORY_DCIM}/VectorCamera/Videos")
+                            put(MediaStore.Video.Media.MIME_TYPE, "video/webm")
+                            put(MediaStore.Video.Media.IS_PENDING, 1)
+                        }
+
+                        val resolver = this.contentResolver
+                        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+
+                        try {
+                            val outputStream = resolver.openOutputStream(uri!!)
+                            val inputStream = FileInputStream(result.outputFile)
+
+                            outputStream?.apply {
+                                inputStream.copyTo(this)
+                                flush()
+                                close()
+                                inputStream.close()
+                            }
+
+                            values.clear()
+                            values.put(MediaStore.Video.Media.IS_PENDING, 0)
+                            resolver.update(uri, values, null, null)
+                        } catch(e: IOException) {
+                            uri?.let { orphanUri ->
+                                // Don't leave an orphan entry in the MediaStore
+                                this.contentResolver.delete(orphanUri, null, null)
+                            }
+
+                            throw e
+                        }
+                    } else {
+                        scanSavedMediaFile(this, result.outputFile!!.path)
+                    }
                 }
                 val metadata = photoLibrary.metadataForItemId(videoId)
                 val newMetadata = metadata.withExportedEffectMetadata(
@@ -388,7 +430,7 @@ class ViewVideoActivity: Activity() {
 
     private fun deleteVideo(view: View) {
         val deleteFn = { _: DialogInterface, _: Int ->
-            photoLibrary.deleteItem(videoId)
+            photoLibrary.deleteItem(view.context, videoId)
             finish()
         }
 
