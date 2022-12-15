@@ -317,7 +317,7 @@ class ViewImageActivity : Activity() {
 
     private fun deleteImage(view: View) {
         val deleteFn = { _: DialogInterface, _: Int ->
-            photoLibrary.deleteItem(imageId)
+            photoLibrary.deleteItem(this, imageId)
             finish()
         }
 

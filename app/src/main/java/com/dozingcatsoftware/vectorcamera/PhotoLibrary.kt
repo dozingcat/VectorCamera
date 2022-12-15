@@ -1,11 +1,17 @@
 package com.dozingcatsoftware.vectorcamera
 
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.util.Log
 import android.util.Size
+import androidx.core.net.toFile
 import com.dozingcatsoftware.vectorcamera.effect.EffectMetadata
 import com.dozingcatsoftware.util.*
 import org.json.JSONObject
@@ -17,7 +23,9 @@ import java.util.zip.GZIPOutputStream
 
 /**
  * Directory structure:
- * [root]/
+ *
+ * // if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+ * [app-directory]/
  *     thumbnails/
  *         [image_id].jpg
  *         [video_id].jpg
@@ -35,6 +43,30 @@ import java.util.zip.GZIPOutputStream
  *     tmp/
  *         [video ID of recording in progress]_video.dat
  *         [video ID of recording in progress]_audio.pcm
+ *
+ * // if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+ *  [app-directory]/
+ *     thumbnails/
+ *         [image_id].jpg
+ *         [video_id].jpg
+ *     metadata/
+ *         [image_id].json
+ *         [video_id].json
+ *     raw/
+ *         [image_id].gz
+ *         [video_id]_video.dat
+ *         [video_id]_audio.pcm
+ *     tmp/
+ *         [video ID of recording in progress]_video.dat
+ *         [video ID of recording in progress]_audio.pcm
+ * [mediaStore]/
+ *     DCIM/
+ *         VectorCamera/
+ *               Images/
+ *                  [image_id].png
+ *               Videos/
+ *                  [video_id].webm (if exported)
+ *
  *
  *  "raw_tmp" holds in-progress video recordings, so they can be cleaned up if the recording fails.
  *  Images are stored as flattened YUV data; first (width*height) bytes of Y, then
@@ -135,14 +167,52 @@ class PhotoLibrary(val rootDirectory: File) {
     fun writePngImage(context: Context, pb: ProcessedBitmap, itemId: String) {
         val t1 = System.currentTimeMillis()
         val resultBitmap = pb.renderBitmap(pb.sourceImage.width(), pb.sourceImage.height())
-        imageDirectory.mkdirs()
-        val imageFile = imageFileForItemId(itemId)
-        writeFileAtomicallyUsingTempDir(imageFile, getTempDirectory(), {
-            resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-        })
+
+        /** ref:
+         * https://stackoverflow.com/a/63870196/2445763
+         * https://gitlab.com/commonsguy/cw-android-q/-/blob/vFINAL/ConferenceVideos/src/main/java/com/commonsware/android/conferencevideos/VideoRepository.kt
+         * https://stackoverflow.com/a/56990305/2445763
+         **/
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, itemId)
+                put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_DCIM}/VectorCamera/Images")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+
+            try {
+                val outputStream = resolver.openOutputStream(uri!!)
+                Log.d("PhotoLibrary@writePngImage", uri.path.toString())
+                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+
+                values.clear()
+                values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            } catch(e: IOException) {
+                uri?.let { orphanUri ->
+                    // Don't leave an orphan entry in the MediaStore
+                    context.contentResolver.delete(orphanUri, null, null)
+                }
+
+                throw e
+            }
+
+        } else {
+            imageDirectory.mkdirs()
+            val imageFile = imageFileForItemId(itemId)
+
+            writeFileAtomicallyUsingTempDir(imageFile, getTempDirectory()) {
+                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            scanSavedMediaFile(context, imageFile.path)
+        }
+
         val t2 = System.currentTimeMillis()
-        scanSavedMediaFile(context, imageFile.path)
-        Log.i(TAG, "writePngImage: ${t2-t1}")
+        Log.i(TAG, "writePngImage: ${t2 - t1}")
     }
 
     /**
@@ -271,7 +341,7 @@ class PhotoLibrary(val rootDirectory: File) {
     }
 
     fun imageFileForItemId(itemId: String): File {
-        return File(imageDirectory, itemId + ".png")
+        return  File(imageDirectory, itemId + ".png")
     }
 
     fun videoFileForItemId(itemId: String): File {
@@ -302,15 +372,58 @@ class PhotoLibrary(val rootDirectory: File) {
                 videoFramesArchiveForItemId(itemId).length())
     }
 
-    fun deleteItem(itemId: String): Boolean {
-        // Some or all of these will not exist, which is fine.
-        imageFileForItemId(itemId).delete()
-        videoFileForItemId(itemId).delete()
-        rawImageFileForItemId(itemId).delete()
-        rawVideoFileForItemId(itemId).delete()
-        rawAudioFileForItemId(itemId).delete()
-        videoFramesArchiveForItemId(itemId).delete()
-        return metadataFileForItemId(itemId).delete()
+    fun deleteItem(context: Context, itemId: String): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val selection = MediaStore.MediaColumns.RELATIVE_PATH + "=?"
+            val selectionArgs = arrayOf("${Environment.DIRECTORY_DCIM}/VectorCamera/Images/")
+            val cursor = resolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null, selection, selectionArgs, null)
+            var uri: Uri? = null
+
+            cursor?.let {
+                Log.d("PhotoLibrary@it.count", "${it.count}")
+                if (it.count > 0) {
+                    while (it.moveToNext()) {
+                        val itemFileName = it.getString(it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME))
+
+                        if (itemFileName.equals("${itemId}.png")) {
+                            val id = it.getLong(it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+
+                            uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+                            break;
+                        }
+                    }
+                }
+
+                cursor.close()
+            }
+
+            Log.d("PhotoLibrary@imageFileForItemId", uri?.path.toString())
+
+            uri?.let{
+                val result = resolver.delete(it, null, null)
+                if (result > 0) {
+                    Log.d("PhotoLibrary@deleteItem", "${it.path.toString()} deleted!");
+                }
+            }
+
+            // Some or all of these will not exist, which is fine.
+            videoFileForItemId(itemId).delete()
+            rawImageFileForItemId(itemId).delete()
+            rawVideoFileForItemId(itemId).delete()
+            rawAudioFileForItemId(itemId).delete()
+            videoFramesArchiveForItemId(itemId).delete()
+            return metadataFileForItemId(itemId).delete()
+        } else {
+            // Some or all of these will not exist, which is fine.
+            imageFileForItemId(itemId).delete()
+            videoFileForItemId(itemId).delete()
+            rawImageFileForItemId(itemId).delete()
+            rawVideoFileForItemId(itemId).delete()
+            rawAudioFileForItemId(itemId).delete()
+            videoFramesArchiveForItemId(itemId).delete()
+            return metadataFileForItemId(itemId).delete()
+        }
     }
 
     companion object {

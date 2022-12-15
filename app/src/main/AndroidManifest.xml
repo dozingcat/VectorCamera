@@ -21,7 +21,8 @@
         android:requestLegacyExternalStorage="true">
 
         <activity android:name="com.dozingcatsoftware.vectorcamera.MainActivity"
-                  android:configChanges="orientation|screenSize|keyboard|keyboardHidden">
+                  android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -50,7 +51,8 @@
         </activity>
 
         <receiver android:name="com.dozingcatsoftware.vectorcamera.NewPictureReceiver" android:label="NewPictureReceiver"
-            android:enabled="false">
+            android:enabled="false"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.hardware.action.NEW_PICTURE" />
                 <data android:mimeType="image/*" />

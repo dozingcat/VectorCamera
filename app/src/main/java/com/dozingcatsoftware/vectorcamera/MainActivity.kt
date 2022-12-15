@@ -399,7 +399,7 @@ class MainActivity : AppCompatActivity() {
         saveIndicator.show()
         (Thread {
             try {
-                val photoId = photoLibrary.savePhoto(this, pb)
+                val photoId = photoLibrary.savePhoto(applicationContext, pb)
                 saveIndicator.dismiss()
                 handler.post {
                     ViewImageActivity.startActivityWithImageId(this, photoId)
