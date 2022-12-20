@@ -341,6 +341,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(
             requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
             PermissionsChecker.CAMERA_AND_STORAGE_REQUEST_CODE -> {
                 if (PermissionsChecker.hasCameraPermission(this)) {
@@ -757,6 +758,7 @@ class MainActivity : AppCompatActivity() {
                         ViewVideoActivity.startActivityWithVideoId(this, recorder.videoId)
                     }
                 }
+                else -> {}
             }
         }
     }

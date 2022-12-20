@@ -141,7 +141,8 @@ class PhotoLibrary(val rootDirectory: File) {
             resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         })
         val t2 = System.currentTimeMillis()
-        scanSavedMediaFile(context, imageFile.path)
+        // If we weren't using private storage, we'd call scanSavedMediaFile here
+        // so that the video would be visible to other apps.
         Log.i(TAG, "writePngImage: ${t2-t1}")
     }
 

@@ -315,9 +315,8 @@ class ViewVideoActivity: Activity() {
         fun handleEncodingFinished(result: ProcessVideoTask.Result) {
             progressDialog.dismiss()
             if (result.status == ProcessVideoTask.ResultStatus.SUCCEEDED) {
-                if (exportType == ExportType.WEBM) {
-                    scanSavedMediaFile(this, result.outputFile!!.path)
-                }
+                // If we weren't using private storage, we'd call scanSavedMediaFile on .webm files
+                // here so that the video would be visible to other apps.
                 val metadata = photoLibrary.metadataForItemId(videoId)
                 val newMetadata = metadata.withExportedEffectMetadata(
                         videoReader.effect.effectMetadata(), exportType.id)

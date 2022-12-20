@@ -29,13 +29,13 @@ fun getLandscapeDisplaySize(context: Context): Size {
  * that gets assigned.
  */
 fun scanSavedMediaFile(context: Context, path: String,
-                       callback: ((String, Uri) -> Unit)? = null) {
+                       callback: ((String, Uri?) -> Unit)? = null) {
     var scannerConnection: MediaScannerConnection? = null
     val scannerClient = object : MediaScannerConnection.MediaScannerConnectionClient {
         override fun onMediaScannerConnected() {
             scannerConnection!!.scanFile(path, null)
         }
-        override fun onScanCompleted(scanPath: String, scanUri: Uri) {
+        override fun onScanCompleted(scanPath: String, scanUri: Uri?) {
             scannerConnection!!.disconnect()
             callback?.invoke(scanPath, scanUri)
         }
