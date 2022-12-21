@@ -182,7 +182,7 @@ class ViewImageActivity : Activity() {
         val shareIntent = Intent(Intent.ACTION_SEND)
         shareIntent.type = mimeType
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} $imageId.png")
         shareIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
