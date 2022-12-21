@@ -29,13 +29,13 @@ fun getLandscapeDisplaySize(context: Context): Size {
  * that gets assigned.
  */
 fun scanSavedMediaFile(context: Context, path: String,
-                       callback: ((String, Uri) -> Unit)? = null) {
+                       callback: ((String, Uri?) -> Unit)? = null) {
     var scannerConnection: MediaScannerConnection? = null
     val scannerClient = object : MediaScannerConnection.MediaScannerConnectionClient {
         override fun onMediaScannerConnected() {
             scannerConnection!!.scanFile(path, null)
         }
-        override fun onScanCompleted(scanPath: String, scanUri: Uri) {
+        override fun onScanCompleted(scanPath: String, scanUri: Uri?) {
             scannerConnection!!.disconnect()
             callback?.invoke(scanPath, scanUri)
         }
@@ -140,7 +140,7 @@ class YuvImageBuffers(
 
             for (r2 in 0 until height / 2) {
                 bitmap.getPixels(pixBuffer, 0, width, 0, 2 * r2, width, 2)
-                for (i in 0 until pixBuffer.size) {
+                for (i in pixBuffer.indices) {
                     rb[i] = (pixBuffer[i] and 0xff0000) shr 16
                     gb[i] = (pixBuffer[i] and 0x00ff00) shr 8
                     bb[i] = (pixBuffer[i] and 0x0000ff)

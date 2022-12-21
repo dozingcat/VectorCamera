@@ -44,15 +44,11 @@
     <string name="shareVideoFrameArchiveOptionLabel">All frames as ZIP archive</string>
     <string name="shareVideoSingleFrameOptionLabel">Current frame as image</string>
 
-    <string name="webmVideoFormatDescription">WebM video</string>
     <string name="webmExportDialogTitle">Exporting to WebM</string>
     <string name="webmExportDialogMessageVideo">Writing video track</string>
     <string name="webmExportDialogMessageAudio">Writing audio track</string>
-    <string name="webmExportConfirmReplaceMessage">A WebM file already exists for this video. Do you want to export again and replace it?</string>
 
-    <string name="zipVideoFormatDescription">ZIP file of video frames</string>
     <string name="zipExportDialogTitle">Creating ZIP archive</string>
     <string name="zipExportDialogMessageVideo">Writing video frames</string>
     <string name="zipExportDialogMessageAudio">Writing audio data</string>
-    <string name="zipExportConfirmReplaceMessage">A ZIP archive already exists for this video. Do you want to export again and replace it?</string>
 </resources>

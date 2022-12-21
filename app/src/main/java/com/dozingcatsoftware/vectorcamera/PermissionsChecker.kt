@@ -25,8 +25,12 @@ object PermissionsChecker {
     }
 
     fun hasStoragePermission(activity: Activity): Boolean {
+        return true
+        /*
         return hasPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE) &&
                hasPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+         */
     }
 
     fun requestCameraAndStoragePermissions(activity: Activity) {

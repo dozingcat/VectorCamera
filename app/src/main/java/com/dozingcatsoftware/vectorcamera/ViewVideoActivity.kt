@@ -29,26 +29,21 @@ import java.io.File
 internal enum class ExportType private constructor(
         val id: String,
         val mimeType: String,
+        val fileExtension: String,
         val exportedFile: (PhotoLibrary, String) -> File,
-        val formatDescriptionId: Int,
         val exportDialogTitleId: Int,
         val exportDialogMessageVideoId: Int,
-        val exportDialogMessageAudioId: Int,
-        val exportConfirmReplaceMessageId: Int) {
-    WEBM("webm", "video/webm",
+        val exportDialogMessageAudioId: Int) {
+    WEBM("webm", "video/webm", "webm",
             {library: PhotoLibrary, videoId: String -> library.videoFileForItemId(videoId)},
-            R.string.webmVideoFormatDescription,
             R.string.webmExportDialogTitle,
             R.string.webmExportDialogMessageVideo,
-            R.string.webmExportDialogMessageAudio,
-            R.string.webmExportConfirmReplaceMessage),
-    ZIP("zip", "application/zip",
+            R.string.webmExportDialogMessageAudio),
+    ZIP("zip", "application/zip", "zip",
             {library: PhotoLibrary, videoId: String -> library.videoFramesArchiveForItemId(videoId)},
-            R.string.zipVideoFormatDescription,
             R.string.zipExportDialogTitle,
             R.string.zipExportDialogMessageVideo,
-            R.string.zipExportDialogMessageAudio,
-            R.string.zipExportConfirmReplaceMessage)
+            R.string.zipExportDialogMessageAudio),
 }
 
 class ViewVideoActivity: Activity() {
@@ -291,7 +286,7 @@ class ViewVideoActivity: Activity() {
         val shareIntent = Intent(Intent.ACTION_SEND)
         shareIntent.type = exportType.mimeType
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Video")
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} $videoId.${exportType.fileExtension}")
         shareIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
@@ -315,9 +310,8 @@ class ViewVideoActivity: Activity() {
         fun handleEncodingFinished(result: ProcessVideoTask.Result) {
             progressDialog.dismiss()
             if (result.status == ProcessVideoTask.ResultStatus.SUCCEEDED) {
-                if (exportType == ExportType.WEBM) {
-                    scanSavedMediaFile(this, result.outputFile!!.path)
-                }
+                // If we weren't using private storage, we'd call scanSavedMediaFile on .webm files
+                // here so that the video would be visible to other apps.
                 val metadata = photoLibrary.metadataForItemId(videoId)
                 val newMetadata = metadata.withExportedEffectMetadata(
                         videoReader.effect.effectMetadata(), exportType.id)
@@ -377,7 +371,7 @@ class ViewVideoActivity: Activity() {
         val shareIntent = Intent(Intent.ACTION_SEND)
         shareIntent.type = "image/png"
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} Picture")
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} $videoId.png")
         shareIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
