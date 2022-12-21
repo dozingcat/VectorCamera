@@ -183,8 +183,7 @@ class ViewImageActivity : Activity() {
         shareIntent.type = mimeType
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} $imageId.png")
-        shareIntent.addFlags(
-                Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
         val chooser = Intent.createChooser(shareIntent, getString(R.string.shareActionTitle))
         grantUriPermissionForIntent(this, fileUri, chooser)
@@ -221,21 +220,25 @@ class ViewImageActivity : Activity() {
 
         fun exportAndShare() {
             showWaitDialog()
-            Thread({
+            Thread {
                 try {
                     val pb = createProcessedBitmap(effect, metadata)
                     photoLibrary.writePngImage(this, pb, imageId)
-                    handler.post({doShare()})
-                }
-                catch (ex: Exception) {
-                    handler.post({
+                    // Update metadata so we won't need to regenerate the image if we export again
+                    // with the same effect.
+                    val metadata = photoLibrary.metadataForItemId(imageId)
+                    val newMetadata = metadata.withExportedEffectMetadata(
+                        effect.effectMetadata(), "png")
+                    photoLibrary.writeMetadata(newMetadata, imageId)
+                    handler.post { doShare() }
+                } catch (ex: Exception) {
+                    handler.post {
                         Toast.makeText(this, "Error exporting image", Toast.LENGTH_LONG).show()
-                    })
-                }
-                finally {
+                    }
+                } finally {
                     waitDialog?.dismiss()
                 }
-            }).start()
+            }.start()
         }
 
         fun shareIfExists() {
@@ -296,7 +299,7 @@ class ViewImageActivity : Activity() {
         val shareTypes = arrayOf("image", "html", "text")
         var selectedShareType = "image"
         val shareTypeLabels = arrayOf(
-                getString(R.string.sharePictureJpegOptionLabel),
+                getString(R.string.sharePictureImageOptionLabel),
                 getString(R.string.sharePictureHtmlOptionLabel),
                 getString(R.string.sharePictureTextOptionLabel))
         AlertDialog.Builder(this)
