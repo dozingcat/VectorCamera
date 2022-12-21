@@ -1,13 +1,15 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.util.Log
+import android.graphics.ImageFormat
+import android.media.Image
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import com.dozingcatsoftware.util.YuvImageBuffers
+import android.util.Log
 import java.io.File
-import java.nio.ByteBuffer
+
+import com.dozingcatsoftware.util.YuvImageBuffers
 
 /**
  * Encodes a series of video frames to a WebM file using the MedicCodec and MediaMuxer APIs.
@@ -15,13 +17,8 @@ import java.nio.ByteBuffer
 class WebMEncoder(private val videoReader: VideoReader, private val outputPath: String) {
 
     private val numFrames = videoReader.numberOfFrames()
-    // When encoding WebM video, there seems to be a buffer that can be larger than the video
-    // dimensions. If it is larger, then writing image pixel data results in misaligned images
-    // because the encoder is reading more pixels per line than we've provided. There doesn't seem
-    // to be a way to determine the internal buffer size, but it seems to be aligned to a 16 pixel
-    // boundary. So we truncate the dimensions here to make the buffer size match the video size.
-    private val outputWidth = (videoReader.outputVideoWidth() / 16) * 16
-    private val outputHeight = (videoReader.outputVideoHeight() / 16) * 16
+    private val outputWidth = videoReader.outputVideoWidth()
+    private val outputHeight = videoReader.outputVideoHeight()
     // U and V planes each have 1/4 the number of samples as the number of pixels.
     private val bytesPerFrame = outputWidth * outputHeight * 3 / 2
 
@@ -65,23 +62,51 @@ class WebMEncoder(private val videoReader: VideoReader, private val outputPath: 
         if (inputBufferId < 0) {
             throw RuntimeException("Can't dequeue input buffer")
         }
-        val inputBuffer: ByteBuffer = encoder.getInputBuffer(inputBufferId)
+        val inputImage: Image = encoder.getInputImage(inputBufferId)
                 ?: throw NullPointerException("Input buffer is null")
+        if (inputImage.format != ImageFormat.YUV_420_888) {
+            throw RuntimeException("Unexpected encoder image format: ${inputImage.format}")
+        }
 
         // Render a bitmap with the selected effect, extract the pixels, and send to the encoder.
         val bitmap = videoReader.bitmapForFrame(frameIndex).renderBitmap(
                 videoReader.landscapeVideoWidth(), videoReader.landscapeVideoHeight())
 
         val yuvBuffers = YuvImageBuffers.fromBitmap(bitmap, outputWidth, outputHeight)
-        // Assuming the input buffer should be in YUV order.
-        inputBuffer.position(0)
-        inputBuffer.put(yuvBuffers.y)
-        inputBuffer.put(yuvBuffers.u)
-        inputBuffer.put(yuvBuffers.v)
+        fillEncoderImageFromYuvBuffers(inputImage, yuvBuffers)
 
         val offsetMicros = if (frameIndex == 0) 0 else frameRelativeEndTimes[frameIndex - 1] * 1000L
         val flags = if (frameIndex == numFrames - 1) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0
         encoder.queueInputBuffer(inputBufferId, 0, bytesPerFrame, offsetMicros, flags)
+    }
+
+    private fun fillEncoderImageFromYuvBuffers(image: Image, yuv: YuvImageBuffers) {
+        // https://developer.android.com/reference/android/graphics/ImageFormat#YUV_420_888
+        // We can fill the Y plane rows directly because it's guaranteed to not overlap U/V and have
+        // a pixel stride of 1. U and V may be interleaved so we have to fill them a byte at a time.
+        val planes = image.planes
+        val yRowStride = planes[0].rowStride
+        val uvRowStride = planes[1].rowStride
+        val uvPixelStride = planes[1].pixelStride
+
+        val yBuffer = planes[0].buffer
+        for (row in 0 until yuv.height) {
+            yBuffer.position(yRowStride * row)
+            yBuffer.put(yuv.y, yuv.width * row, yuv.width)
+        }
+
+        val uBuffer = planes[1].buffer
+        val vBuffer = planes[2].buffer
+        var uvIndex = 0
+        for (row in 0 until yuv.height / 2) {
+            val rowOffset = uvRowStride * row
+            for (col in 0 until yuv.width / 2) {
+                val offset = rowOffset + col * uvPixelStride
+                uBuffer.put(offset, yuv.u[uvIndex])
+                vBuffer.put(offset, yuv.v[uvIndex])
+                uvIndex += 1
+            }
+        }
     }
 
     private fun writeEncoderOutput() {

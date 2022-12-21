@@ -140,7 +140,7 @@ class YuvImageBuffers(
 
             for (r2 in 0 until height / 2) {
                 bitmap.getPixels(pixBuffer, 0, width, 0, 2 * r2, width, 2)
-                for (i in 0 until pixBuffer.size) {
+                for (i in pixBuffer.indices) {
                     rb[i] = (pixBuffer[i] and 0xff0000) shr 16
                     gb[i] = (pixBuffer[i] and 0x00ff00) shr 8
                     bb[i] = (pixBuffer[i] and 0x0000ff)
