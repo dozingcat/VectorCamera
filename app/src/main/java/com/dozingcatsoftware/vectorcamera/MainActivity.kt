@@ -356,14 +356,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkPermissionAndStartCamera() {
         val hasCamera = PermissionsChecker.hasCameraPermission(this)
-        val hasStorage = PermissionsChecker.hasStoragePermission(this)
         if (hasCamera) {
             restartCameraImageGenerator()
         }
-        if (hasStorage) {
-            migratePhotoLibraryIfNeeded()
-        }
-        if (!askedForPermissions && !(hasCamera && hasStorage)) {
+        if (!askedForPermissions && !hasCamera) {
             askedForPermissions = true
             PermissionsChecker.requestCameraAndStoragePermissions(this)
         }
@@ -619,10 +615,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleShutterClick() {
-        if (!PermissionsChecker.hasStoragePermission(this)) {
-            PermissionsChecker.requestStoragePermissionsToTakePhoto(this)
-            return
-        }
         when (shutterMode) {
             ShutterMode.IMAGE -> takePicture()
             ShutterMode.VIDEO -> toggleVideoRecording()
@@ -678,10 +670,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun gotoLibrary(view: View) {
-        if (!PermissionsChecker.hasStoragePermission(this)) {
-            PermissionsChecker.requestStoragePermissionsToGoToLibrary(this)
-            return
-        }
         ImageListActivity.startIntent(this)
     }
 

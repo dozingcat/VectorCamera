@@ -332,6 +332,11 @@ class PhotoLibrary(val rootDirectory: File) {
             return PhotoLibrary(File(baseDir, "VectorCamera"))
         }
 
+        // The following functions are no longer used now that the app has been fully migrated
+        // to scoped storage (i.e. read/write storage permissions removed,
+        // requestLegacyExternalStorage not set). They're left here for troubleshooting if something
+        // goes wrong with a previous version.
+
         // Checks for the existence of a VectorCamera directory in the root of
         // external storage, and if found moves it to `context.getExternalFilesDir`.
         // Needed to migrate to Android 11, which disallows writing to external
@@ -355,7 +360,7 @@ class PhotoLibrary(val rootDirectory: File) {
         }
 
         private fun copyAndRemoveDir(src: File, dst: File, progressHandler: (fileSize: Long) -> Unit) {
-            src.listFiles().forEach {
+            src.listFiles()?.forEach {
                 if (it.isDirectory) {
                     copyAndRemoveDir(it, File(dst, it.name), progressHandler)
                 } else {
