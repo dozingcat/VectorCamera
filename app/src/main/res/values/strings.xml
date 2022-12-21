@@ -35,7 +35,7 @@
     <string name="shareActionTitle">Share using</string>
 
     <string name="sharePictureDialogTitle">Share picture as</string>
-    <string name="sharePictureJpegOptionLabel">Image</string>
+    <string name="sharePictureImageOptionLabel">Image</string>
     <string name="sharePictureHtmlOptionLabel">HTML</string>
     <string name="sharePictureTextOptionLabel">Text</string>
 

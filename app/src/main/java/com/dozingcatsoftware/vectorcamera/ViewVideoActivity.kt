@@ -287,8 +287,7 @@ class ViewVideoActivity: Activity() {
         shareIntent.type = exportType.mimeType
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} $videoId.${exportType.fileExtension}")
-        shareIntent.addFlags(
-                Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
         val chooser = Intent.createChooser(shareIntent, getString(R.string.shareActionTitle))
         grantUriPermissionForIntent(this, fileUri, chooser)
@@ -312,6 +311,8 @@ class ViewVideoActivity: Activity() {
             if (result.status == ProcessVideoTask.ResultStatus.SUCCEEDED) {
                 // If we weren't using private storage, we'd call scanSavedMediaFile on .webm files
                 // here so that the video would be visible to other apps.
+                // Update metadata so we won't need to regenerate the video if we export again
+                // with the same effect.
                 val metadata = photoLibrary.metadataForItemId(videoId)
                 val newMetadata = metadata.withExportedEffectMetadata(
                         videoReader.effect.effectMetadata(), exportType.id)
@@ -372,8 +373,7 @@ class ViewVideoActivity: Activity() {
         shareIntent.type = "image/png"
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${Constants.APP_NAME} $videoId.png")
-        shareIntent.addFlags(
-                Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
         val chooser = Intent.createChooser(shareIntent, getString(R.string.shareActionTitle))
         grantUriPermissionForIntent(this, fileUri, chooser)
