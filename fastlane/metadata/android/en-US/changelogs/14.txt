@@ -1,0 +1,3 @@
+- Added option to take pictures using the volume button.
+- Fixed bugs with sharing files and exporting WebM videos.
+- Improved support for Android 13.

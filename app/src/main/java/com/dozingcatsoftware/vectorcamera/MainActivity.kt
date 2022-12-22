@@ -52,7 +52,6 @@ class MainActivity : AppCompatActivity() {
     private var audioRecorder: AudioRecorder? = null
     private var audioStartTimestamp = 0L
     private var shutterMode = ShutterMode.IMAGE
-    private var takePictureWithVolumeButtonEnabled = false
 
     private var layoutIsPortrait = false
 

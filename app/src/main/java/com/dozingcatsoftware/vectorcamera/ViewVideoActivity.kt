@@ -352,6 +352,8 @@ class ViewVideoActivity: Activity() {
         val metadata = photoLibrary.metadataForItemId(videoId)
         val exportedEffect = metadata.exportedEffectMetadata[exportType.id]
         val currentEffect = videoReader.effect.effectMetadata()
+        // FIXME: The == check sometimes returns false for effects that are the same.
+        // Possibly due to keys switching from int to float after JSON serialization.
         if (exportedFile.exists() && currentEffect == exportedEffect) {
             runShareActivity(exportType, exportedFile)
         }
