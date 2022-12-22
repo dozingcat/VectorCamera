@@ -55,14 +55,14 @@ public class EBMLUtilities {
 
 	public static int numberOfBytesToEncodeLength(long length) {
 		if (length<0) throw new IllegalArgumentException("Length is negative: " + length);
-		if (length < (1<<7 - 1)) return 1;
-		if (length < (1<<14 - 1)) return 2;
-		if (length < (1<<21 - 1)) return 3;
-		if (length < (1<<28 - 1)) return 4;
-		if (length < (1<<35 - 1)) return 5;
-		if (length < (1<<42 - 1)) return 6;
-		if (length < (1<<49 - 1)) return 7;
-		if (length < (1<<56 - 1)) return 8;
+		if (length < (1L<<7 - 1)) return 1;
+		if (length < (1L<<14 - 1)) return 2;
+		if (length < (1L<<21 - 1)) return 3;
+		if (length < (1L<<28 - 1)) return 4;
+		if (length < (1L<<35 - 1)) return 5;
+		if (length < (1L<<42 - 1)) return 6;
+		if (length < (1L<<49 - 1)) return 7;
+		if (length < (1L<<56 - 1)) return 8;
 		throw new IllegalArgumentException("Length exceeds maximum: " + length);
 	}
 
