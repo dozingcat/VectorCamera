@@ -2,6 +2,9 @@
     <string name="app_name">Vector Camera</string>
     <string name="noImagesFound">No pictures found.</string>
 
+    <string name="takePictureWithVolumeButtonPrefsKey">takePictureWithVolumeButton</string>
+    <string name="takePictureWithVolumeButtonPrefsTitle">Take picture with volume button</string>
+
     <string name="autoConvertPicturesPrefsKey">autoConvertPictures</string>
     <string name="autoConvertPicturesPrefsTitle">Auto-import camera pictures</string>
 

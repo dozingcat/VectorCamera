@@ -87,6 +87,7 @@ public class NewPictureJob extends JobService {
 
     @Override
     public boolean onStartJob(JobParameters params) {
+        Log.i("NewPictureJob", "onStartJob");
         this.jobParams = params;
         final List<String> newImagePaths = new ArrayList<String>();
         if (params.getTriggeredContentAuthorities() != null && params.getTriggeredContentUris() != null) {
@@ -104,6 +105,7 @@ public class NewPictureJob extends JobService {
                     // Oops, there is some general change!
                 }
             }
+            Log.i("NewPictureJob", "ids: " + ids);
 
             if (ids.size() > 0) {
                 // If we found some ids that changed, we want to determine what they are.
@@ -119,6 +121,8 @@ public class NewPictureJob extends JobService {
                     selection.append("'");
                 }
 
+                Log.i("NewPictureJob", "selection: " + selection);
+
                 // Now we iterate through the query, looking at the filenames of
                 // the items to determine if they are ones we are interested in.
                 Cursor cursor = null;
@@ -126,9 +130,11 @@ public class NewPictureJob extends JobService {
                     cursor = getContentResolver().query(
                             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                             PROJECTION, selection.toString(), null, null);
+                    Log.i("NewPictureJob", "cursor: " + cursor + " " + cursor.getCount());
                     while (cursor.moveToNext()) {
                         // We only care about files in the DCIM directory.
                         String dir = cursor.getString(PROJECTION_DATA);
+                        Log.i("NewPictureJob", "dir: " + dir);
                         if (dir.startsWith(DCIM_DIR)) {
                             newImagePaths.add(dir);
                         }
@@ -143,6 +149,7 @@ public class NewPictureJob extends JobService {
                 }
             }
         }
+        Log.i("NewPictureJob", "newImagePaths: " + newImagePaths);
         try {
             if (newImagePaths.size() > 0) {
                 // Use a thread rather than an AsyncTask since AsyncTasks are serialized.
@@ -168,8 +175,10 @@ public class NewPictureJob extends JobService {
     // This is the only app-specific code. It would be better if this were an abstract class with
     // this as a method to override, but there's an ugly mix of static methods and class names.
     private void processImagePaths(List<String> imagePaths) {
+        Log.i("NewPictureJob", "processImagePaths: " + imagePaths);
         boolean scheduled = isScheduled(this);
         if (!scheduled) {
+            Log.i("NewPictureJob", "Not scheduled!");
             return;
         }
         for (String path : imagePaths) {
