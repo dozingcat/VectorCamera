@@ -105,9 +105,14 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
 
     /**
      * Sets whether pictures saved by the camera app (or other apps which broadcast the appropriate
-     * intent) should automatically be imported and processed.
+     * intent) should automatically be imported and processed. If necessary, requests permissions
+     * needed to read the pictures.
      */
     private fun setAutoConvertEnabled(context: Context, enabled: Boolean) {
+        if (enabled && !PermissionsChecker.hasStoragePermissions(requireActivity())) {
+            android.util.Log.i("VCPreferencesActivity", "Requesting storage permissions")
+            PermissionsChecker.requestStoragePermissions(requireActivity())
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             // For N and above, schedule or cancel a JobService.
             if (enabled) {

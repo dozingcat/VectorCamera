@@ -4,6 +4,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory android:title="Preferences" app:iconSpaceReserved="false">
+        <CheckBoxPreference android:key="@string/takePictureWithVolumeButtonPrefsKey"
+            android:enabled="true"
+            android:title="@string/takePictureWithVolumeButtonPrefsTitle" />
         <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
             android:enabled="true"
             android:title="@string/autoConvertPicturesPrefsTitle" />
