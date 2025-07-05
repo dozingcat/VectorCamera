@@ -8,14 +8,17 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import kotlinx.android.synthetic.main.about.*
+// import kotlinx.android.synthetic.main.about.*
 
 class AboutActivity: Activity() {
+
+    lateinit var webview: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.about)
         // https://stackoverflow.com/questions/40576567/on-clicking-the-hyperlink-in-webview-the-app-crashes-i-have-paced-all-the-html/40753538#40753538
+        webview = findViewById(R.id.webview)
         webview.webViewClient = object: WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                 // Go to email for mailto: and default browser for http/https URLs.

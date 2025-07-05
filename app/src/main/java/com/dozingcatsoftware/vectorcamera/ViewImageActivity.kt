@@ -21,7 +21,7 @@ import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
-import kotlinx.android.synthetic.main.view_image.*
+import com.dozingcatsoftware.vectorcamera.databinding.ViewImageBinding
 import java.io.File
 
 
@@ -35,16 +35,19 @@ class ViewImageActivity : Activity() {
     private val preferences = VCPreferences(this)
     private val handler = Handler()
 
+    private lateinit var binding: ViewImageBinding
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        binding = ViewImageBinding.inflate(layoutInflater)
         setContentView(R.layout.view_image)
         rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
-        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
-        shareButton.setOnClickListener(this::shareImage)
-        deleteButton.setOnClickListener(this::deleteImage)
-        overlayView.touchEventHandler = this::handleOverlayViewTouch
+        binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
+        binding.shareButton.setOnClickListener(this::shareImage)
+        binding.deleteButton.setOnClickListener(this::deleteImage)
+        binding.overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         imageId = intent.getStringExtra("imageId")!!
         loadImage()
@@ -71,7 +74,7 @@ class ViewImageActivity : Activity() {
     }
 
     private fun isPortraitOrientation(): Boolean {
-        return overlayView.height > overlayView.width
+        return binding.overlayView.height > binding.overlayView.width
     }
 
     private fun loadImage() {
@@ -89,7 +92,7 @@ class ViewImageActivity : Activity() {
         val gridSize = effectRegistry.gridSizeForDefaultEffects()
         val perCellSize = Size(metadata.width / gridSize, metadata.height / gridSize)
         showImage(comboEffect, metadata, isPortrait, perCellSize)
-        controlBar.visibility = View.GONE
+        binding.controlBar.visibility = View.GONE
         effectSelectionIsPortrait = isPortrait
     }
 
@@ -100,7 +103,7 @@ class ViewImageActivity : Activity() {
         }
         else {
             loadImage()
-            controlBar.visibility = View.VISIBLE
+            binding.controlBar.visibility = View.VISIBLE
         }
     }
 
@@ -130,9 +133,9 @@ class ViewImageActivity : Activity() {
 
     private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null,
                           newSize: Size? = null) {
-        overlayView.processedBitmap =
+        binding.overlayView.processedBitmap =
                 createProcessedBitmap(effect, metadata, forcePortrait, newSize)
-        overlayView.invalidate()
+        binding.overlayView.invalidate()
     }
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
@@ -156,10 +159,10 @@ class ViewImageActivity : Activity() {
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
                 photoLibrary.writeThumbnail(pb, imageId)
-                overlayView.processedBitmap = pb
-                overlayView.invalidate()
+                binding.overlayView.processedBitmap = pb
+                binding.overlayView.invalidate()
                 inEffectSelectionMode = false
-                controlBar.visibility = View.VISIBLE
+                binding.controlBar.visibility = View.VISIBLE
             }
         }
     }

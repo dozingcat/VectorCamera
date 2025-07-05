@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.vectorcamera
 
 import com.dozingcatsoftware.vectorcamera.effect.EffectMetadata
+import java.util.Locale
 
 enum class MediaType {IMAGE, VIDEO}
 
@@ -15,7 +16,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
         val exportedEffectDict =
                 exportedEffectMetadata.mapValues({entry -> entry.value.toJson()})
         return mapOf(
-                "type" to mediaType.name.toLowerCase(),
+                "type" to mediaType.name.lowercase(Locale.getDefault()),
                 "width" to width,
                 "height" to height,
                 "xFlipped" to orientation.xFlipped,
@@ -51,7 +52,7 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
             val frameTimestamps = json.getOrElse("frameTimestamps", {listOf<Long>()})
             val audioStartTimestamp = json.getOrElse("audioStartTimestamp", {0}) as Number
             return MediaMetadata(
-                    MediaType.valueOf((json["type"] as String).toUpperCase()),
+                    MediaType.valueOf((json["type"] as String).uppercase(Locale.getDefault())),
                     EffectMetadata.fromJson(effectDict),
                     (json["width"] as Number).toInt(),
                     (json["height"] as Number).toInt(),

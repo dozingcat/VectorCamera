@@ -12,12 +12,12 @@ import android.util.Size
 import android.util.TypedValue
 import androidx.preference.PreferenceManager
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
-import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.dozingcatsoftware.vectorcamera.databinding.ActivityMainBinding
 import com.dozingcatsoftware.vectorcamera.effect.*
 
 
@@ -58,8 +58,12 @@ class MainActivity : AppCompatActivity() {
     private var askedForPermissions = false
     private var libraryMigrationDone = false
 
+    private lateinit var binding: ActivityMainBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        Log.i(TAG, "*** SDK version: " + applicationContext.applicationInfo.targetSdkVersion)
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
@@ -79,19 +83,19 @@ class MainActivity : AppCompatActivity() {
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
 
-        toggleVideoButton.setOnClickListener(this::toggleVideoMode)
-        switchCameraButton.setOnClickListener(this::switchToNextCamera)
-        switchResolutionButton.setOnClickListener(this::switchResolution)
-        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
-        libraryButton.setOnClickListener(this::gotoLibrary)
-        helpButton.setOnClickListener(this::gotoHelp)
-        settingsButton.setOnClickListener(this::gotoPreferences)
-        convertPictureButton.setOnClickListener(this::convertExistingPicture)
-        overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
-        cameraActionButton.onShutterButtonClick = this::handleShutterClick
-        cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
-        editSchemeView.activity = this
-        editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+        binding.toggleVideoButton.setOnClickListener(this::toggleVideoMode)
+        binding.switchCameraButton.setOnClickListener(this::switchToNextCamera)
+        binding.switchResolutionButton.setOnClickListener(this::switchResolution)
+        binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
+        binding.libraryButton.setOnClickListener(this::gotoLibrary)
+        binding.helpButton.setOnClickListener(this::gotoHelp)
+        binding.settingsButton.setOnClickListener(this::gotoPreferences)
+        binding.convertPictureButton.setOnClickListener(this::convertExistingPicture)
+        binding.overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
+        binding.cameraActionButton.onShutterButtonClick = this::handleShutterClick
+        binding.cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
+        binding.editSchemeView.activity = this
+        binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
 
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
@@ -108,15 +112,15 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         checkPermissionAndStartCamera()
-        overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
+        binding.overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
 
         // View size is zero in onResume, have to wait for layout notification.
         var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
         listener = ViewTreeObserver.OnGlobalLayoutListener {
             updateLayout(isPortraitOrientation())
-            overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+            binding.overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
         }
-        overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        binding.overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
     override fun onPause() {
@@ -173,7 +177,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isCameraKey(keyCode)) {
-            controlLayout.visibility = View.VISIBLE
+            binding.controlLayout.visibility = View.VISIBLE
             handleShutterFocus(pressed = true)
             return true
         }
@@ -195,19 +199,19 @@ class MainActivity : AppCompatActivity() {
             shutterResId = if (videoRecorder == null) R.drawable.btn_video_shutter_holo
                            else R.drawable.btn_video_shutter_recording_holo
         }
-        cameraActionButton.setImageResource(shutterResId)
+        binding.cameraActionButton.setImageResource(shutterResId)
 
-        toggleVideoButton.setImageResource(when(shutterMode) {
+        binding.toggleVideoButton.setImageResource(when(shutterMode) {
             ShutterMode.IMAGE -> R.drawable.ic_photo_camera_white_36dp
             ShutterMode.VIDEO -> R.drawable.ic_videocam_white_36dp
         })
 
-        switchCameraButton.setImageResource(
+        binding.switchCameraButton.setImageResource(
                 if (cameraSelector.isSelectedCameraFrontFacing())
                     R.drawable.ic_camera_front_white_36dp
                 else R.drawable.ic_camera_rear_white_36dp)
 
-        switchResolutionButton.alpha =
+        binding.switchResolutionButton.alpha =
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
     }
 
@@ -226,16 +230,16 @@ class MainActivity : AppCompatActivity() {
         run {
             val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
             params.gravity = if (isPortrait) Gravity.TOP else Gravity.LEFT
-            leftTopControlBar.layoutParams = params
-            leftTopControlBar.orientation = orientation
-            leftTopControlBar.layoutDirection = direction
+            binding.leftTopControlBar.layoutParams = params
+            binding.leftTopControlBar.orientation = orientation
+            binding.leftTopControlBar.layoutDirection = direction
         }
         run {
             val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
             params.gravity = if (isPortrait) Gravity.BOTTOM else Gravity.RIGHT
-            rightBottomControlBar.layoutParams = params
-            rightBottomControlBar.orientation = orientation
-            rightBottomControlBar.layoutDirection = direction
+            binding.rightBottomControlBar.layoutParams = params
+            binding.rightBottomControlBar.orientation = orientation
+            binding.rightBottomControlBar.layoutDirection = direction
         }
         run {
             val params = FrameLayout.LayoutParams(match, match)
@@ -246,12 +250,12 @@ class MainActivity : AppCompatActivity() {
             params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
             params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
             params.rightMargin = if (isPortrait) 0 else shutterMargin.toInt()
-            editSchemeView.layoutParams = params
+            binding.editSchemeView.layoutParams = params
         }
     }
 
     private fun isPortraitOrientation(): Boolean {
-        return overlayView.height > overlayView.width
+        return binding.overlayView.height > binding.overlayView.width
     }
 
     private fun targetCameraImageSize(): Size {
@@ -302,8 +306,8 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             lastBitmapTimestamp = pb.sourceImage.timestamp
-            overlayView.processedBitmap = pb
-            overlayView.invalidate()
+            binding.overlayView.processedBitmap = pb
+            binding.overlayView.invalidate()
             // Save image or video frame if necessary.
             if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 saveImage(pb)
@@ -448,7 +452,7 @@ class MainActivity : AppCompatActivity() {
                     rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
             currentEffect = CombinationEffect(comboEffects, 50)
             preferredImageSize = ImageSize.EFFECT_GRID
-            controlLayout.visibility = View.GONE
+            binding.controlLayout.visibility = View.GONE
             Log.i(TAG, "Showing combo grid")
         }
         else {
@@ -458,8 +462,8 @@ class MainActivity : AppCompatActivity() {
         }
         restartCameraImageGenerator()
         imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-        controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
-        editSchemeView.visibility = View.GONE
+        binding.controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
+        binding.editSchemeView.visibility = View.GONE
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
@@ -486,8 +490,8 @@ class MainActivity : AppCompatActivity() {
                     handleEffectGridTouch(view, event)
                 }
                 else {
-                    controlLayout.visibility =
-                            if (controlLayout.visibility == View.VISIBLE) View.GONE
+                    binding.controlLayout.visibility =
+                            if (binding.controlLayout.visibility == View.VISIBLE) View.GONE
                             else View.VISIBLE
                 }
             }
@@ -517,15 +521,15 @@ class MainActivity : AppCompatActivity() {
             val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
             preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
             inEffectSelectionMode = false
-            overlayView.visibility = View.VISIBLE
-            controlLayout.visibility = View.VISIBLE
+            binding.overlayView.visibility = View.VISIBLE
+            binding.controlLayout.visibility = View.VISIBLE
             preferredImageSize = previewImageSizeFromPrefs()
             restartCameraImageGenerator()
             imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
 
             if (eff is CustomEffect) {
-                editSchemeView.setScheme(eff.colorScheme)
-                editSchemeView.visibility = View.VISIBLE
+                binding.editSchemeView.setScheme(eff.colorScheme)
+                binding.editSchemeView.visibility = View.VISIBLE
                 customSchemeId = eff.customSchemeId
             }
             else {
@@ -560,7 +564,7 @@ class MainActivity : AppCompatActivity() {
                             R.drawable.btn_video_shutter_recording_pressed_holo
                         else R.drawable.btn_video_shutter_pressed_holo
             }
-            cameraActionButton.setImageResource(resId)
+            binding.cameraActionButton.setImageResource(resId)
         }
         else {
             var resId = R.drawable.btn_camera_shutter_holo
@@ -569,7 +573,7 @@ class MainActivity : AppCompatActivity() {
                     R.drawable.btn_video_shutter_recording_holo
                 else R.drawable.btn_video_shutter_holo
             }
-            cameraActionButton.setImageResource(resId)
+            binding.cameraActionButton.setImageResource(resId)
         }
     }
 

@@ -2,14 +2,14 @@ apply plugin: 'com.android.application'
 
 apply plugin: 'kotlin-android'
 
-apply plugin: 'kotlin-android-extensions'
+// apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 36
+    compileSdkVersion 35
     defaultConfig {
         applicationId "com.dozingcatsoftware.vectorcamera"
         minSdkVersion 23
-        targetSdkVersion 36
+        targetSdkVersion 35
         renderscriptTargetApi 23
         versionCode 14
         versionName "1.7.0"
@@ -25,20 +25,28 @@ android {
     buildFeatures {
         renderScript true
     }
+    compileOptions {
+        sourceCompatibility 21
+        targetCompatibility 21
+    }
+    // https://developer.android.com/topic/libraries/view-binding/migration#groovy
+    buildFeatures {
+        viewBinding true
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'androidx.appcompat:appcompat:1.5.1'
-    implementation "androidx.preference:preference-ktx:1.2.0"
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation "androidx.preference:preference-ktx:1.2.1"
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
     // Avoids duplicate class errors: https://stackoverflow.com/questions/69817925/problem-duplicate-class-androidx-lifecycle-viewmodel-found-in-modules
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1'
     implementation 'com.jaredrummler:colorpicker:1.1.0'
     // The xiph.org Vorbis encoding library is included as source, in src/main/java/org/xiph.
     // It was downloaded from https://xiph.org/downloads/

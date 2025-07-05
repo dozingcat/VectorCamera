@@ -21,7 +21,7 @@ import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.util.scanSavedMediaFile
-import kotlinx.android.synthetic.main.view_video.*
+import com.dozingcatsoftware.vectorcamera.databinding.ViewVideoBinding
 import java.io.File
 
 
@@ -64,24 +64,27 @@ class ViewVideoActivity: Activity() {
     private var playbackStartTimestamp = 0L
     private var audioPlayer: AudioPlayer? = null
 
+    private lateinit var binding: ViewVideoBinding
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        binding = ViewVideoBinding.inflate(layoutInflater)
         setContentView(R.layout.view_video)
         rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
-        shareButton.setOnClickListener(this::doShare)
-        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
-        playPauseButton.setOnClickListener(this::togglePlay)
-        deleteButton.setOnClickListener(this::deleteVideo)
-        overlayView.touchEventHandler = this::handleOverlayViewTouch
+        binding.shareButton.setOnClickListener(this::doShare)
+        binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
+        binding.playPauseButton.setOnClickListener(this::togglePlay)
+        binding.deleteButton.setOnClickListener(this::deleteVideo)
+        binding.overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")!!
         videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
 
-        frameSeekBar.max = videoReader.numberOfFrames() - 1
-        frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
+        binding.frameSeekBar.max = videoReader.numberOfFrames() - 1
+        binding.frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     stopPlaying()
@@ -124,21 +127,21 @@ class ViewVideoActivity: Activity() {
     }
 
     private fun updateControls() {
-        frameSeekBar.progress = frameIndex
-        playPauseButton.setImageResource(
+        binding.frameSeekBar.progress = frameIndex
+        binding.playPauseButton.setImageResource(
                 if (isPlaying) R.drawable.ic_pause_white_36dp
                 else R.drawable.ic_play_arrow_white_36dp)
     }
 
     private fun isPortraitOrientation(): Boolean {
-        return overlayView.height > overlayView.width
+        return binding.overlayView.height > binding.overlayView.width
     }
 
     private fun loadFrame(index: Int) {
         frameIndex = index
         val bitmap = videoReader.bitmapForFrame(index)
-        overlayView.processedBitmap = bitmap
-        overlayView.invalidate()
+        binding.overlayView.processedBitmap = bitmap
+        binding.overlayView.invalidate()
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
@@ -148,12 +151,12 @@ class ViewVideoActivity: Activity() {
             videoReader.effect = CombinationEffect(
                     effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
             videoReader.forcePortrait = isPortraitOrientation()
-            controlBar.visibility = View.GONE
+            binding.controlBar.visibility = View.GONE
         }
         else {
             videoReader.effect = originalEffect!!
             videoReader.forcePortrait = null
-            controlBar.visibility = View.VISIBLE
+            binding.controlBar.visibility = View.VISIBLE
         }
         if (!isPlaying) {
             loadFrame(frameIndex)
@@ -214,8 +217,8 @@ class ViewVideoActivity: Activity() {
     private fun showFrame(index: Int, pb: ProcessedBitmap) {
         if (isPlaying) {
             frameIndex = index
-            overlayView.processedBitmap = pb
-            overlayView.invalidate()
+            binding.overlayView.processedBitmap = pb
+            binding.overlayView.invalidate()
             updateControls()
         }
     }
@@ -250,7 +253,7 @@ class ViewVideoActivity: Activity() {
                     loadFrame(frameIndex)
                 }
                 inEffectSelectionMode = false
-                controlBar.visibility = View.VISIBLE
+                binding.controlBar.visibility = View.VISIBLE
             }
         }
     }
