@@ -17,7 +17,6 @@ import com.dozingcatsoftware.util.scaledBitmapFromURIWithMinimumSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.io.FileNotFoundException
 import java.text.DateFormat
 import java.text.DecimalFormat
 import java.text.NumberFormat

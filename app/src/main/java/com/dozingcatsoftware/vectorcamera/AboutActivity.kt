@@ -8,11 +8,10 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
-// import kotlinx.android.synthetic.main.about.*
 
 class AboutActivity: Activity() {
 
-    lateinit var webview: WebView
+    private lateinit var webview: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

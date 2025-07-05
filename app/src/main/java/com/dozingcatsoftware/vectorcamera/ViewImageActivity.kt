@@ -40,7 +40,7 @@ class ViewImageActivity : Activity() {
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ViewImageBinding.inflate(layoutInflater)
-        setContentView(R.layout.view_image)
+        setContentView(binding.root)
         rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 

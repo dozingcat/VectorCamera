@@ -62,13 +62,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestWindowFeature(Window.FEATURE_NO_TITLE)
         binding = ActivityMainBinding.inflate(layoutInflater)
-        Log.i(TAG, "*** SDK version: " + applicationContext.applicationInfo.targetSdkVersion)
+        setContentView(binding.root)
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
-        requestWindowFeature(Window.FEATURE_NO_TITLE)
-        setContentView(R.layout.activity_main)
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
         // Use PROFILE type only on first run?

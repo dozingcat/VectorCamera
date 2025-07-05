@@ -69,7 +69,7 @@ class ViewVideoActivity: Activity() {
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ViewVideoBinding.inflate(layoutInflater)
-        setContentView(R.layout.view_video)
+        setContentView(binding.root)
         rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
