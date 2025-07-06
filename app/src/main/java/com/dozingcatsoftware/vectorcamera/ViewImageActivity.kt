@@ -15,6 +15,8 @@ import android.util.Size
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.vectorcamera.effect.AsciiEffect
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
@@ -25,7 +27,9 @@ import com.dozingcatsoftware.vectorcamera.databinding.ViewImageBinding
 import java.io.File
 
 
-class ViewImageActivity : Activity() {
+class ViewImageActivity : AppCompatActivity() {
+    private lateinit var binding: ViewImageBinding
+
     private lateinit var photoLibrary: PhotoLibrary
     private lateinit var rs : RenderScript
     private lateinit var imageId: String
@@ -35,7 +39,7 @@ class ViewImageActivity : Activity() {
     private val preferences = VCPreferences(this)
     private val handler = Handler()
 
-    private lateinit var binding: ViewImageBinding
+    private lateinit var onBackPressedCallback: OnBackPressedCallback
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,17 +53,17 @@ class ViewImageActivity : Activity() {
         binding.deleteButton.setOnClickListener(this::deleteImage)
         binding.overlayView.touchEventHandler = this::handleOverlayViewTouch
 
+        onBackPressedCallback = object: OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (inEffectSelectionMode) {
+                    toggleEffectSelectionMode(null)
+                }
+            }
+        }
+        onBackPressedDispatcher.addCallback(onBackPressedCallback)
+
         imageId = intent.getStringExtra("imageId")!!
         loadImage()
-    }
-
-    override fun onBackPressed() {
-        if (inEffectSelectionMode) {
-            toggleEffectSelectionMode(null)
-        }
-        else {
-            super.onBackPressed()
-        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -96,8 +100,13 @@ class ViewImageActivity : Activity() {
         effectSelectionIsPortrait = isPortrait
     }
 
+    private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
+        inEffectSelectionMode = inMode
+        onBackPressedCallback.isEnabled = inMode
+    }
+
     private fun toggleEffectSelectionMode(view: View?) {
-        inEffectSelectionMode = !inEffectSelectionMode
+        updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (inEffectSelectionMode) {
             showModeSelectionGrid(isPortraitOrientation())
         }
@@ -140,7 +149,7 @@ class ViewImageActivity : Activity() {
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
         // Mostly duplicated from MainActivity.
-        if (event.action == MotionEvent.ACTION_DOWN) {
+        if (event.action == MotionEvent.ACTION_UP) {
             if (inEffectSelectionMode) {
                 val numEffects = effectRegistry.defaultEffectCount()
                 val gridSize = effectRegistry.gridSizeForDefaultEffects()
@@ -161,7 +170,7 @@ class ViewImageActivity : Activity() {
                 photoLibrary.writeThumbnail(pb, imageId)
                 binding.overlayView.processedBitmap = pb
                 binding.overlayView.invalidate()
-                inEffectSelectionMode = false
+                updateInEffectSelectionModeFlag(false)
                 binding.controlBar.visibility = View.VISIBLE
             }
         }

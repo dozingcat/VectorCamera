@@ -3,7 +3,6 @@ package com.dozingcatsoftware.vectorcamera
 import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.provider.MediaStore
@@ -62,7 +61,7 @@ class MainActivity : AppCompatActivity() {
     private var libraryMigrationDone = false
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var backPressedCallback: OnBackPressedCallback
+    private lateinit var onBackPressedCallback: OnBackPressedCallback
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,9 +69,7 @@ class MainActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowTitleEnabled(false)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            adjustPaddingForSystemUi(binding.layoutWithPadding, WindowInsets.Type.displayCutout())
-        }
+        adjustPaddingForSystemUi(binding.layoutWithPadding)
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
@@ -104,14 +101,14 @@ class MainActivity : AppCompatActivity() {
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
 
-        backPressedCallback = object: OnBackPressedCallback(false) {
+        onBackPressedCallback = object: OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 if (inEffectSelectionMode) {
                     toggleEffectSelectionMode(null)
                 }
             }
         }
-        onBackPressedDispatcher.addCallback(backPressedCallback)
+        onBackPressedDispatcher.addCallback(onBackPressedCallback)
 
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
@@ -455,7 +452,7 @@ class MainActivity : AppCompatActivity() {
     // We want to override back button handling only if the effect grid is visible.
     private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
         inEffectSelectionMode = inMode
-        backPressedCallback.isEnabled = inMode
+        onBackPressedCallback.isEnabled = inMode
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
@@ -517,6 +514,8 @@ class MainActivity : AppCompatActivity() {
         }
         if (event.action == MotionEvent.ACTION_UP) {
             previousFingerSpacing = 0.0
+            // Handle effect selection with ACTION_UP rather than ACTION_DOWN so that
+            // it won't be inadvertently triggered at the start of a back gesture.
             if (inEffectSelectionMode) {
                 handleEffectGridTouch(view, event)
             }

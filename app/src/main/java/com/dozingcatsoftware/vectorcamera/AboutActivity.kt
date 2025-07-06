@@ -1,16 +1,13 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.KeyEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 import com.dozingcatsoftware.vectorcamera.databinding.AboutBinding
 
@@ -22,6 +19,10 @@ class AboutActivity: AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = AboutBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        // Normally we'd add the padding to the webview rather than the root layout,
+        // so that the webview contents would scroll under the system bars and cutouts,
+        // but there's a WebView bug that causes padding to not be applied correctly:
+        // https://stackoverflow.com/questions/9170042/how-to-add-padding-around-a-webview
         adjustPaddingForSystemUi(binding.root)
 
         val onBackPressedCallback = object: OnBackPressedCallback(true) {

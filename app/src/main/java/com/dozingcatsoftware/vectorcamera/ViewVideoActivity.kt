@@ -15,6 +15,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
@@ -46,7 +48,9 @@ internal enum class ExportType private constructor(
             R.string.zipExportDialogMessageAudio),
 }
 
-class ViewVideoActivity: Activity() {
+class ViewVideoActivity: AppCompatActivity() {
+    private lateinit var binding: ViewVideoBinding
+
     private lateinit var photoLibrary: PhotoLibrary
     private lateinit var rs : RenderScript
     private lateinit var videoId: String
@@ -64,7 +68,7 @@ class ViewVideoActivity: Activity() {
     private var playbackStartTimestamp = 0L
     private var audioPlayer: AudioPlayer? = null
 
-    private lateinit var binding: ViewVideoBinding
+    private lateinit var onBackPressedCallback: OnBackPressedCallback
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,6 +100,15 @@ class ViewVideoActivity: Activity() {
         })
         loadFrame(0)
 
+        onBackPressedCallback = object: OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (inEffectSelectionMode) {
+                    toggleEffectSelectionMode(null)
+                }
+            }
+        }
+        onBackPressedDispatcher.addCallback(onBackPressedCallback)
+
         val audioFile = photoLibrary.rawAudioRandomAccessFileForItemId(videoId)
         if (audioFile != null) {
             audioPlayer = AudioPlayer(audioFile)
@@ -105,15 +118,6 @@ class ViewVideoActivity: Activity() {
     public override fun onPause() {
         stopPlaying()
         super.onPause()
-    }
-
-    override fun onBackPressed() {
-        if (inEffectSelectionMode) {
-            toggleEffectSelectionMode(null)
-        }
-        else {
-            super.onBackPressed()
-        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -144,8 +148,13 @@ class ViewVideoActivity: Activity() {
         binding.overlayView.invalidate()
     }
 
+    private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
+        inEffectSelectionMode = inMode
+        onBackPressedCallback.isEnabled = inMode
+    }
+
     private fun toggleEffectSelectionMode(view: View?) {
-        inEffectSelectionMode = !inEffectSelectionMode
+        updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect
             videoReader.effect = CombinationEffect(
@@ -225,7 +234,7 @@ class ViewVideoActivity: Activity() {
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
         // Mostly duplicated from MainActivity.
-        if (event.action == MotionEvent.ACTION_DOWN) {
+        if (event.action == MotionEvent.ACTION_UP) {
             if (inEffectSelectionMode) {
                 val numEffects = effectRegistry.defaultEffectCount()
                 val gridSize = Math.ceil(Math.sqrt(numEffects.toDouble())).toInt()
@@ -252,7 +261,7 @@ class ViewVideoActivity: Activity() {
                 if (!isPlaying) {
                     loadFrame(frameIndex)
                 }
-                inEffectSelectionMode = false
+                updateInEffectSelectionModeFlag(false)
                 binding.controlBar.visibility = View.VISIBLE
             }
         }
