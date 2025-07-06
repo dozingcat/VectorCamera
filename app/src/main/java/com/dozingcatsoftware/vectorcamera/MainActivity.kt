@@ -101,6 +101,8 @@ class MainActivity : AppCompatActivity() {
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
 
+        // If the effect selection grid is visible, a back navigation should hide
+        // the grid without changing the effect, and should remain in this activity.
         onBackPressedCallback = object: OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 if (inEffectSelectionMode) {
@@ -449,7 +451,7 @@ class MainActivity : AppCompatActivity() {
         updateControls()
     }
 
-    // We want to override back button handling only if the effect grid is visible.
+    // Override back navigation handling only if the effect grid is visible.
     private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
         inEffectSelectionMode = inMode
         onBackPressedCallback.isEnabled = inMode

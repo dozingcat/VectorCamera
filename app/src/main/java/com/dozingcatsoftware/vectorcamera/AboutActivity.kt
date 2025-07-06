@@ -56,7 +56,7 @@ class AboutActivity: AppCompatActivity() {
                 return super.shouldOverrideUrlLoading(view, url)
             }
 
-            // We need to selectively enable the back action callback depending on
+            // Selectively enable the back navigation callback depending on
             // whether it should do a "back" action in the browser.
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 onBackPressedCallback.isEnabled = binding.webview.canGoBack()

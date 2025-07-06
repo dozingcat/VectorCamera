@@ -13,6 +13,7 @@ import android.view.WindowInsets
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 
 class VCPreferencesActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,18 +22,7 @@ class VCPreferencesActivity: AppCompatActivity() {
         setContentView(R.layout.preferences_layout)
 
         val rootView: View = findViewById(R.id.prefs_main)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            rootView.setOnApplyWindowInsetsListener { view, insets ->
-                val systemBars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-                view.setPadding(
-                    systemBars.left,
-                    systemBars.top,
-                    systemBars.right,
-                    systemBars.bottom
-                )
-                insets
-            }
-        }
+        adjustPaddingForSystemUi(rootView)
 
         supportFragmentManager
                 .beginTransaction()
