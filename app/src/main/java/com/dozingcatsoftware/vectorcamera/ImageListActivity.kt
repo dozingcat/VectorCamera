@@ -37,7 +37,10 @@ class ImageListActivity : Activity() {
         binding = ImagegridBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adjustPaddingForSystemUi(binding.root)
+        // Apply padding to the grid view directly rather than the root layout.
+        // The grid view has android:clipToPadding set to false, so grid items
+        // initially appear below system bars and cutouts, but can scroll behind them.
+        adjustPaddingForSystemUi(binding.gridview)
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
         val self = this

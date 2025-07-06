@@ -17,6 +17,7 @@ import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 import com.dozingcatsoftware.vectorcamera.databinding.ActivityMainBinding
@@ -61,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private var libraryMigrationDone = false
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var backPressedCallback: OnBackPressedCallback
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,6 +103,15 @@ class MainActivity : AppCompatActivity() {
         binding.cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+
+        backPressedCallback = object: OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (inEffectSelectionMode) {
+                    toggleEffectSelectionMode(null)
+                }
+            }
+        }
+        onBackPressedDispatcher.addCallback(backPressedCallback)
 
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
@@ -441,12 +452,18 @@ class MainActivity : AppCompatActivity() {
         updateControls()
     }
 
+    // We want to override back button handling only if the effect grid is visible.
+    private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
+        inEffectSelectionMode = inMode
+        backPressedCallback.isEnabled = inMode
+    }
+
     private fun toggleEffectSelectionMode(view: View?) {
         if (videoRecorder != null) {
             Log.i(TAG, "Video recording in progress, not toggling effect grid")
             return
         }
-        inEffectSelectionMode = !inEffectSelectionMode
+        updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (!cameraImageGenerator.status.isCapturing()) {
             Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
             return
@@ -491,10 +508,7 @@ class MainActivity : AppCompatActivity() {
         }
         else {
             if (event.action == MotionEvent.ACTION_DOWN) {
-                if (inEffectSelectionMode) {
-                    handleEffectGridTouch(view, event)
-                }
-                else {
+                if (!inEffectSelectionMode) {
                     binding.controlLayout.visibility =
                             if (binding.controlLayout.visibility == View.VISIBLE) View.GONE
                             else View.VISIBLE
@@ -503,54 +517,44 @@ class MainActivity : AppCompatActivity() {
         }
         if (event.action == MotionEvent.ACTION_UP) {
             previousFingerSpacing = 0.0
+            if (inEffectSelectionMode) {
+                handleEffectGridTouch(view, event)
+            }
         }
     }
 
-    private fun handleEffectGridTouch(view: View, event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN) {
-            if (!cameraImageGenerator.status.isCapturing()) {
-                Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
-                return true
-            }
-            val gridSize = Math.ceil(
-                    Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
-            val tileWidth = view.width / gridSize
-            val tileHeight = view.height / gridSize
-            val tileX = (event.x / tileWidth).toInt()
-            val tileY = (event.y / tileHeight).toInt()
-            var index = gridSize * tileY + tileX
-            index = Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
-            effectIndex = index
-            Log.i(TAG, "Selected effect ${index}")
-
-            val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
-            preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
-            inEffectSelectionMode = false
-            binding.overlayView.visibility = View.VISIBLE
-            binding.controlLayout.visibility = View.VISIBLE
-            preferredImageSize = previewImageSizeFromPrefs()
-            restartCameraImageGenerator()
-            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-
-            if (eff is CustomEffect) {
-                binding.editSchemeView.setScheme(eff.colorScheme)
-                binding.editSchemeView.visibility = View.VISIBLE
-                customSchemeId = eff.customSchemeId
-            }
-            else {
-                customSchemeId = ""
-            }
-            return true
+    private fun handleEffectGridTouch(view: View, event: MotionEvent) {
+        if (!cameraImageGenerator.status.isCapturing()) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
+            return
         }
-        return false
-    }
+        val gridSize = Math.ceil(
+                Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
+        val tileWidth = view.width / gridSize
+        val tileHeight = view.height / gridSize
+        val tileX = (event.x / tileWidth).toInt()
+        val tileY = (event.y / tileHeight).toInt()
+        var index = gridSize * tileY + tileX
+        index = Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
+        effectIndex = index
+        Log.i(TAG, "Selected effect ${index}")
 
-    override fun onBackPressed() {
-        if (inEffectSelectionMode) {
-            toggleEffectSelectionMode(null)
+        val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
+        preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
+        updateInEffectSelectionModeFlag(false)
+        binding.overlayView.visibility = View.VISIBLE
+        binding.controlLayout.visibility = View.VISIBLE
+        preferredImageSize = previewImageSizeFromPrefs()
+        restartCameraImageGenerator()
+        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+
+        if (eff is CustomEffect) {
+            binding.editSchemeView.setScheme(eff.colorScheme)
+            binding.editSchemeView.visibility = View.VISIBLE
+            customSchemeId = eff.customSchemeId
         }
         else {
-            super.onBackPressed()
+            customSchemeId = ""
         }
     }
 
