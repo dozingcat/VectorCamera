@@ -3,131 +3,144 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#000000"
     tools:context="com.dozingcatsoftware.vectorcamera.MainActivity">
 
-    <com.dozingcatsoftware.vectorcamera.OverlayView
-        android:id="@+id/overlayView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
+    <!-- In edge to edge mode this layout will have insets applied so that
+         it doesn't cover display cutouts. The root layout's black background
+         will cover the entire display including the cutouts.
+    -->
     <FrameLayout
-        android:id="@+id/controlLayout"
+        android:id="@+id/layoutWithPadding"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <LinearLayout
-            android:id="@+id/leftTopControlBar"
-            android:layout_width="wrap_content"
+        <com.dozingcatsoftware.vectorcamera.OverlayView
+            android:id="@+id/overlayView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <FrameLayout
+            android:id="@+id/controlLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:id="@+id/leftTopControlBar"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="#20000000"
+                android:orientation="vertical"
+                android:layout_gravity="left">
+
+                <ImageButton
+                    android:id="@+id/settingsButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#00000000"
+                    android:padding="8dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_settings_white_36dp" />
+
+                <ImageButton
+                    android:id="@+id/switchResolutionButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#00000000"
+                    android:padding="8dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_high_quality_white_36dp" />
+
+                <ImageButton
+                    android:id="@+id/convertPictureButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#00000000"
+                    android:padding="8dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_library_add_white_36dp" />
+
+                <ImageButton
+                    android:id="@+id/helpButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#00000000"
+                    android:padding="8dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_help_outline_white_36dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rightBottomControlBar"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="#20000000"
+                android:orientation="vertical"
+                android:layout_gravity="right">
+
+                <com.dozingcatsoftware.util.ShutterButton
+                    android:id="@+id/cameraActionButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#00000000"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:paddingTop="16dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:src="@drawable/btn_camera_shutter_holo" />
+
+                <ImageButton
+                    android:id="@+id/toggleVideoButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:background="#00000000"
+                    android:paddingTop="16dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_photo_camera_white_36dp" />
+
+                <ImageButton
+                    android:id="@+id/switchCameraButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:background="#00000000"
+                    android:paddingTop="16dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_camera_rear_white_36dp" />
+
+                <ImageButton
+                    android:id="@+id/switchEffectButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:background="#00000000"
+                    android:paddingTop="16dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_color_lens_white_36dp" />
+
+                <ImageButton
+                    android:id="@+id/libraryButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:background="#00000000"
+                    android:paddingTop="16dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_photo_library_white_36dp" />
+            </LinearLayout>
+
+        </FrameLayout>
+
+        <com.dozingcatsoftware.vectorcamera.EditColorSchemeView
+            android:id="@+id/editSchemeView"
+            android:visibility="gone"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#20000000"
-            android:orientation="vertical"
-            android:layout_gravity="left">
-
-            <ImageButton
-                android:id="@+id/settingsButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:padding="8dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_settings_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/switchResolutionButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:padding="8dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_high_quality_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/convertPictureButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:padding="8dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_library_add_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/helpButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:padding="8dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_help_outline_white_36dp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/rightBottomControlBar"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:background="#20000000"
-            android:orientation="vertical"
-            android:layout_gravity="right">
-
-            <com.dozingcatsoftware.util.ShutterButton
-                android:id="@+id/cameraActionButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#00000000"
-                android:paddingLeft="4dp"
-                android:paddingRight="4dp"
-                android:paddingTop="16dp"
-                android:clickable="true"
-                android:src="@drawable/btn_camera_shutter_holo" />
-
-            <ImageButton
-                android:id="@+id/toggleVideoButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_photo_camera_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/switchCameraButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_camera_rear_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/switchEffectButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_color_lens_white_36dp" />
-
-            <ImageButton
-                android:id="@+id/libraryButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="#00000000"
-                android:paddingTop="16dp"
-                android:layout_weight="1"
-                android:src="@drawable/ic_photo_library_white_36dp" />
-        </LinearLayout>
+            android:layout_marginLeft="54dp"
+            android:layout_marginRight="72dp" />
 
     </FrameLayout>
-
-    <com.dozingcatsoftware.vectorcamera.EditColorSchemeView
-        android:id="@+id/editSchemeView"
-        android:visibility="gone"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginLeft="54dp"
-        android:layout_marginRight="72dp" />
 
 </FrameLayout>

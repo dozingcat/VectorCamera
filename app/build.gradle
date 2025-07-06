@@ -5,11 +5,11 @@ apply plugin: 'kotlin-android'
 // apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 35
+    compileSdkVersion 36
     defaultConfig {
         applicationId "com.dozingcatsoftware.vectorcamera"
         minSdkVersion 23
-        targetSdkVersion 35
+        targetSdkVersion 36
         renderscriptTargetApi 23
         versionCode 14
         versionName "1.7.0"

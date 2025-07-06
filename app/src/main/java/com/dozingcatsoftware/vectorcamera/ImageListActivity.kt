@@ -9,11 +9,12 @@ import android.os.Handler
 import android.util.Log
 import android.view.View
 import android.widget.AdapterView.OnItemClickListener
-import android.widget.GridView
 import android.widget.ImageView
 import android.widget.SimpleAdapter
 import android.widget.TextView
+import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 import com.dozingcatsoftware.util.scaledBitmapFromURIWithMinimumSize
+import com.dozingcatsoftware.vectorcamera.databinding.ImagegridBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -26,17 +27,21 @@ import java.util.Date
 class ImageListActivity : Activity() {
     private lateinit var photoLibrary: PhotoLibrary
 
-    private lateinit var gridView: GridView
     private var gridImageIds: List<String>? = null
     private val handler = Handler()
 
+    private lateinit var binding: ImagegridBinding
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.imagegrid)
+        binding = ImagegridBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        adjustPaddingForSystemUi(binding.root)
+
         photoLibrary = PhotoLibrary.defaultLibrary(this)
         val self = this
-        gridView = findViewById(R.id.gridview)
-        gridView.onItemClickListener = OnItemClickListener { parent, view, position, id ->
+        binding.gridview.onItemClickListener = OnItemClickListener { parent, view, position, id ->
             val itemId = gridImageIds!![position]
             val metadata = photoLibrary.metadataForItemId(itemId)
             when (metadata.mediaType) {
@@ -44,6 +49,8 @@ class ImageListActivity : Activity() {
                 MediaType.VIDEO -> ViewVideoActivity.startActivityWithVideoId(self, itemId)
             }
         }
+
+
     }
 
     public override fun onResume() {
@@ -69,7 +76,7 @@ class ImageListActivity : Activity() {
             }
             true
         }
-        gridView.adapter = adapter
+        binding.gridview.adapter = adapter
 
         // show text message if no images available
         val noImagesView = findViewById<View>(R.id.noImagesTextView)

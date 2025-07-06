@@ -3,6 +3,7 @@ package com.dozingcatsoftware.vectorcamera
 import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.provider.MediaStore
@@ -17,6 +18,7 @@ import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 import com.dozingcatsoftware.vectorcamera.databinding.ActivityMainBinding
 import com.dozingcatsoftware.vectorcamera.effect.*
 
@@ -62,9 +64,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestWindowFeature(Window.FEATURE_NO_TITLE)
+        supportRequestWindowFeature(Window.FEATURE_NO_TITLE)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            adjustPaddingForSystemUi(binding.layoutWithPadding, WindowInsets.Type.displayCutout())
+        }
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 

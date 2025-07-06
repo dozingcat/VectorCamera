@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.view.View
+import android.view.WindowInsets
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
@@ -17,6 +19,21 @@ class VCPreferencesActivity: AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // Use a layout that has only a FrameLayout that we replace with the preferences fragment.
         setContentView(R.layout.preferences_layout)
+
+        val rootView: View = findViewById(R.id.prefs_main)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            rootView.setOnApplyWindowInsetsListener { view, insets ->
+                val systemBars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                view.setPadding(
+                    systemBars.left,
+                    systemBars.top,
+                    systemBars.right,
+                    systemBars.bottom
+                )
+                insets
+            }
+        }
+
         supportFragmentManager
                 .beginTransaction()
                 .replace(R.id.prefs_main, VCPreferencesFragment())
