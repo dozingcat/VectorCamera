@@ -8,15 +8,22 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.view.View
+import android.view.WindowInsets
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 
 class VCPreferencesActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Use a layout that has only a FrameLayout that we replace with the preferences fragment.
         setContentView(R.layout.preferences_layout)
+
+        val rootView: View = findViewById(R.id.prefs_main)
+        adjustPaddingForSystemUi(rootView)
+
         supportFragmentManager
                 .beginTransaction()
                 .replace(R.id.prefs_main, VCPreferencesFragment())

@@ -12,12 +12,14 @@ import android.util.Size
 import android.util.TypedValue
 import androidx.preference.PreferenceManager
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
-import kotlinx.android.synthetic.main.activity_main.*
 import java.io.FileOutputStream
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import com.dozingcatsoftware.util.adjustPaddingForSystemUi
+import com.dozingcatsoftware.vectorcamera.databinding.ActivityMainBinding
 import com.dozingcatsoftware.vectorcamera.effect.*
 
 
@@ -58,13 +60,19 @@ class MainActivity : AppCompatActivity() {
     private var askedForPermissions = false
     private var libraryMigrationDone = false
 
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var onBackPressedCallback: OnBackPressedCallback
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        supportRequestWindowFeature(Window.FEATURE_NO_TITLE)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        adjustPaddingForSystemUi(binding.layoutWithPadding)
 
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
-        requestWindowFeature(Window.FEATURE_NO_TITLE)
-        setContentView(R.layout.activity_main)
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
         // Use PROFILE type only on first run?
@@ -79,19 +87,30 @@ class MainActivity : AppCompatActivity() {
         cameraSelector = CameraSelector(this)
         cameraImageGenerator = cameraSelector.createImageGenerator(rs)
 
-        toggleVideoButton.setOnClickListener(this::toggleVideoMode)
-        switchCameraButton.setOnClickListener(this::switchToNextCamera)
-        switchResolutionButton.setOnClickListener(this::switchResolution)
-        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
-        libraryButton.setOnClickListener(this::gotoLibrary)
-        helpButton.setOnClickListener(this::gotoHelp)
-        settingsButton.setOnClickListener(this::gotoPreferences)
-        convertPictureButton.setOnClickListener(this::convertExistingPicture)
-        overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
-        cameraActionButton.onShutterButtonClick = this::handleShutterClick
-        cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
-        editSchemeView.activity = this
-        editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+        binding.toggleVideoButton.setOnClickListener(this::toggleVideoMode)
+        binding.switchCameraButton.setOnClickListener(this::switchToNextCamera)
+        binding.switchResolutionButton.setOnClickListener(this::switchResolution)
+        binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
+        binding.libraryButton.setOnClickListener(this::gotoLibrary)
+        binding.helpButton.setOnClickListener(this::gotoHelp)
+        binding.settingsButton.setOnClickListener(this::gotoPreferences)
+        binding.convertPictureButton.setOnClickListener(this::convertExistingPicture)
+        binding.overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
+        binding.cameraActionButton.onShutterButtonClick = this::handleShutterClick
+        binding.cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
+        binding.editSchemeView.activity = this
+        binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+
+        // If the effect selection grid is visible, a back navigation should hide
+        // the grid without changing the effect, and should remain in this activity.
+        onBackPressedCallback = object: OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (inEffectSelectionMode) {
+                    toggleEffectSelectionMode(null)
+                }
+            }
+        }
+        onBackPressedDispatcher.addCallback(onBackPressedCallback)
 
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
@@ -108,15 +127,15 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         checkPermissionAndStartCamera()
-        overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
+        binding.overlayView.systemUiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE
 
         // View size is zero in onResume, have to wait for layout notification.
         var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
         listener = ViewTreeObserver.OnGlobalLayoutListener {
             updateLayout(isPortraitOrientation())
-            overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+            binding.overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
         }
-        overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        binding.overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
     override fun onPause() {
@@ -173,7 +192,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isCameraKey(keyCode)) {
-            controlLayout.visibility = View.VISIBLE
+            binding.controlLayout.visibility = View.VISIBLE
             handleShutterFocus(pressed = true)
             return true
         }
@@ -195,19 +214,19 @@ class MainActivity : AppCompatActivity() {
             shutterResId = if (videoRecorder == null) R.drawable.btn_video_shutter_holo
                            else R.drawable.btn_video_shutter_recording_holo
         }
-        cameraActionButton.setImageResource(shutterResId)
+        binding.cameraActionButton.setImageResource(shutterResId)
 
-        toggleVideoButton.setImageResource(when(shutterMode) {
+        binding.toggleVideoButton.setImageResource(when(shutterMode) {
             ShutterMode.IMAGE -> R.drawable.ic_photo_camera_white_36dp
             ShutterMode.VIDEO -> R.drawable.ic_videocam_white_36dp
         })
 
-        switchCameraButton.setImageResource(
+        binding.switchCameraButton.setImageResource(
                 if (cameraSelector.isSelectedCameraFrontFacing())
                     R.drawable.ic_camera_front_white_36dp
                 else R.drawable.ic_camera_rear_white_36dp)
 
-        switchResolutionButton.alpha =
+        binding.switchResolutionButton.alpha =
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
     }
 
@@ -226,16 +245,16 @@ class MainActivity : AppCompatActivity() {
         run {
             val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
             params.gravity = if (isPortrait) Gravity.TOP else Gravity.LEFT
-            leftTopControlBar.layoutParams = params
-            leftTopControlBar.orientation = orientation
-            leftTopControlBar.layoutDirection = direction
+            binding.leftTopControlBar.layoutParams = params
+            binding.leftTopControlBar.orientation = orientation
+            binding.leftTopControlBar.layoutDirection = direction
         }
         run {
             val params = FrameLayout.LayoutParams(layoutWidth, layoutHeight)
             params.gravity = if (isPortrait) Gravity.BOTTOM else Gravity.RIGHT
-            rightBottomControlBar.layoutParams = params
-            rightBottomControlBar.orientation = orientation
-            rightBottomControlBar.layoutDirection = direction
+            binding.rightBottomControlBar.layoutParams = params
+            binding.rightBottomControlBar.orientation = orientation
+            binding.rightBottomControlBar.layoutDirection = direction
         }
         run {
             val params = FrameLayout.LayoutParams(match, match)
@@ -246,12 +265,12 @@ class MainActivity : AppCompatActivity() {
             params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
             params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
             params.rightMargin = if (isPortrait) 0 else shutterMargin.toInt()
-            editSchemeView.layoutParams = params
+            binding.editSchemeView.layoutParams = params
         }
     }
 
     private fun isPortraitOrientation(): Boolean {
-        return overlayView.height > overlayView.width
+        return binding.overlayView.height > binding.overlayView.width
     }
 
     private fun targetCameraImageSize(): Size {
@@ -302,8 +321,8 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             lastBitmapTimestamp = pb.sourceImage.timestamp
-            overlayView.processedBitmap = pb
-            overlayView.invalidate()
+            binding.overlayView.processedBitmap = pb
+            binding.overlayView.invalidate()
             // Save image or video frame if necessary.
             if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 saveImage(pb)
@@ -432,12 +451,18 @@ class MainActivity : AppCompatActivity() {
         updateControls()
     }
 
+    // Override back navigation handling only if the effect grid is visible.
+    private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
+        inEffectSelectionMode = inMode
+        onBackPressedCallback.isEnabled = inMode
+    }
+
     private fun toggleEffectSelectionMode(view: View?) {
         if (videoRecorder != null) {
             Log.i(TAG, "Video recording in progress, not toggling effect grid")
             return
         }
-        inEffectSelectionMode = !inEffectSelectionMode
+        updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (!cameraImageGenerator.status.isCapturing()) {
             Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
             return
@@ -448,7 +473,7 @@ class MainActivity : AppCompatActivity() {
                     rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
             currentEffect = CombinationEffect(comboEffects, 50)
             preferredImageSize = ImageSize.EFFECT_GRID
-            controlLayout.visibility = View.GONE
+            binding.controlLayout.visibility = View.GONE
             Log.i(TAG, "Showing combo grid")
         }
         else {
@@ -458,8 +483,8 @@ class MainActivity : AppCompatActivity() {
         }
         restartCameraImageGenerator()
         imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-        controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
-        editSchemeView.visibility = View.GONE
+        binding.controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
+        binding.editSchemeView.visibility = View.GONE
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
@@ -482,66 +507,55 @@ class MainActivity : AppCompatActivity() {
         }
         else {
             if (event.action == MotionEvent.ACTION_DOWN) {
-                if (inEffectSelectionMode) {
-                    handleEffectGridTouch(view, event)
-                }
-                else {
-                    controlLayout.visibility =
-                            if (controlLayout.visibility == View.VISIBLE) View.GONE
+                if (!inEffectSelectionMode) {
+                    binding.controlLayout.visibility =
+                            if (binding.controlLayout.visibility == View.VISIBLE) View.GONE
                             else View.VISIBLE
                 }
             }
         }
         if (event.action == MotionEvent.ACTION_UP) {
             previousFingerSpacing = 0.0
+            // Handle effect selection with ACTION_UP rather than ACTION_DOWN so that
+            // it won't be inadvertently triggered at the start of a back gesture.
+            if (inEffectSelectionMode) {
+                handleEffectGridTouch(view, event)
+            }
         }
     }
 
-    private fun handleEffectGridTouch(view: View, event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN) {
-            if (!cameraImageGenerator.status.isCapturing()) {
-                Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
-                return true
-            }
-            val gridSize = Math.ceil(
-                    Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
-            val tileWidth = view.width / gridSize
-            val tileHeight = view.height / gridSize
-            val tileX = (event.x / tileWidth).toInt()
-            val tileY = (event.y / tileHeight).toInt()
-            var index = gridSize * tileY + tileX
-            index = Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
-            effectIndex = index
-            Log.i(TAG, "Selected effect ${index}")
-
-            val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
-            preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
-            inEffectSelectionMode = false
-            overlayView.visibility = View.VISIBLE
-            controlLayout.visibility = View.VISIBLE
-            preferredImageSize = previewImageSizeFromPrefs()
-            restartCameraImageGenerator()
-            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-
-            if (eff is CustomEffect) {
-                editSchemeView.setScheme(eff.colorScheme)
-                editSchemeView.visibility = View.VISIBLE
-                customSchemeId = eff.customSchemeId
-            }
-            else {
-                customSchemeId = ""
-            }
-            return true
+    private fun handleEffectGridTouch(view: View, event: MotionEvent) {
+        if (!cameraImageGenerator.status.isCapturing()) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
+            return
         }
-        return false
-    }
+        val gridSize = Math.ceil(
+                Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
+        val tileWidth = view.width / gridSize
+        val tileHeight = view.height / gridSize
+        val tileX = (event.x / tileWidth).toInt()
+        val tileY = (event.y / tileHeight).toInt()
+        var index = gridSize * tileY + tileX
+        index = Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
+        effectIndex = index
+        Log.i(TAG, "Selected effect ${index}")
 
-    override fun onBackPressed() {
-        if (inEffectSelectionMode) {
-            toggleEffectSelectionMode(null)
+        val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
+        preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
+        updateInEffectSelectionModeFlag(false)
+        binding.overlayView.visibility = View.VISIBLE
+        binding.controlLayout.visibility = View.VISIBLE
+        preferredImageSize = previewImageSizeFromPrefs()
+        restartCameraImageGenerator()
+        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+
+        if (eff is CustomEffect) {
+            binding.editSchemeView.setScheme(eff.colorScheme)
+            binding.editSchemeView.visibility = View.VISIBLE
+            customSchemeId = eff.customSchemeId
         }
         else {
-            super.onBackPressed()
+            customSchemeId = ""
         }
     }
 
@@ -560,7 +574,7 @@ class MainActivity : AppCompatActivity() {
                             R.drawable.btn_video_shutter_recording_pressed_holo
                         else R.drawable.btn_video_shutter_pressed_holo
             }
-            cameraActionButton.setImageResource(resId)
+            binding.cameraActionButton.setImageResource(resId)
         }
         else {
             var resId = R.drawable.btn_camera_shutter_holo
@@ -569,7 +583,7 @@ class MainActivity : AppCompatActivity() {
                     R.drawable.btn_video_shutter_recording_holo
                 else R.drawable.btn_video_shutter_holo
             }
-            cameraActionButton.setImageResource(resId)
+            binding.cameraActionButton.setImageResource(resId)
         }
     }
 

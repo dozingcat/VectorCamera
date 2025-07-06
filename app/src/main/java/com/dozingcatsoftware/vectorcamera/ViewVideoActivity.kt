@@ -15,13 +15,15 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.util.scanSavedMediaFile
-import kotlinx.android.synthetic.main.view_video.*
+import com.dozingcatsoftware.vectorcamera.databinding.ViewVideoBinding
 import java.io.File
 
 
@@ -46,7 +48,9 @@ internal enum class ExportType private constructor(
             R.string.zipExportDialogMessageAudio),
 }
 
-class ViewVideoActivity: Activity() {
+class ViewVideoActivity: AppCompatActivity() {
+    private lateinit var binding: ViewVideoBinding
+
     private lateinit var photoLibrary: PhotoLibrary
     private lateinit var rs : RenderScript
     private lateinit var videoId: String
@@ -64,24 +68,27 @@ class ViewVideoActivity: Activity() {
     private var playbackStartTimestamp = 0L
     private var audioPlayer: AudioPlayer? = null
 
+    private lateinit var onBackPressedCallback: OnBackPressedCallback
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.view_video)
+        binding = ViewVideoBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
-        shareButton.setOnClickListener(this::doShare)
-        switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
-        playPauseButton.setOnClickListener(this::togglePlay)
-        deleteButton.setOnClickListener(this::deleteVideo)
-        overlayView.touchEventHandler = this::handleOverlayViewTouch
+        binding.shareButton.setOnClickListener(this::doShare)
+        binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
+        binding.playPauseButton.setOnClickListener(this::togglePlay)
+        binding.deleteButton.setOnClickListener(this::deleteVideo)
+        binding.overlayView.touchEventHandler = this::handleOverlayViewTouch
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")!!
         videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
 
-        frameSeekBar.max = videoReader.numberOfFrames() - 1
-        frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
+        binding.frameSeekBar.max = videoReader.numberOfFrames() - 1
+        binding.frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     stopPlaying()
@@ -93,6 +100,15 @@ class ViewVideoActivity: Activity() {
         })
         loadFrame(0)
 
+        onBackPressedCallback = object: OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (inEffectSelectionMode) {
+                    toggleEffectSelectionMode(null)
+                }
+            }
+        }
+        onBackPressedDispatcher.addCallback(onBackPressedCallback)
+
         val audioFile = photoLibrary.rawAudioRandomAccessFileForItemId(videoId)
         if (audioFile != null) {
             audioPlayer = AudioPlayer(audioFile)
@@ -102,15 +118,6 @@ class ViewVideoActivity: Activity() {
     public override fun onPause() {
         stopPlaying()
         super.onPause()
-    }
-
-    override fun onBackPressed() {
-        if (inEffectSelectionMode) {
-            toggleEffectSelectionMode(null)
-        }
-        else {
-            super.onBackPressed()
-        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -124,36 +131,41 @@ class ViewVideoActivity: Activity() {
     }
 
     private fun updateControls() {
-        frameSeekBar.progress = frameIndex
-        playPauseButton.setImageResource(
+        binding.frameSeekBar.progress = frameIndex
+        binding.playPauseButton.setImageResource(
                 if (isPlaying) R.drawable.ic_pause_white_36dp
                 else R.drawable.ic_play_arrow_white_36dp)
     }
 
     private fun isPortraitOrientation(): Boolean {
-        return overlayView.height > overlayView.width
+        return binding.overlayView.height > binding.overlayView.width
     }
 
     private fun loadFrame(index: Int) {
         frameIndex = index
         val bitmap = videoReader.bitmapForFrame(index)
-        overlayView.processedBitmap = bitmap
-        overlayView.invalidate()
+        binding.overlayView.processedBitmap = bitmap
+        binding.overlayView.invalidate()
+    }
+
+    private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
+        inEffectSelectionMode = inMode
+        onBackPressedCallback.isEnabled = inMode
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
-        inEffectSelectionMode = !inEffectSelectionMode
+        updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect
             videoReader.effect = CombinationEffect(
                     effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
             videoReader.forcePortrait = isPortraitOrientation()
-            controlBar.visibility = View.GONE
+            binding.controlBar.visibility = View.GONE
         }
         else {
             videoReader.effect = originalEffect!!
             videoReader.forcePortrait = null
-            controlBar.visibility = View.VISIBLE
+            binding.controlBar.visibility = View.VISIBLE
         }
         if (!isPlaying) {
             loadFrame(frameIndex)
@@ -214,15 +226,15 @@ class ViewVideoActivity: Activity() {
     private fun showFrame(index: Int, pb: ProcessedBitmap) {
         if (isPlaying) {
             frameIndex = index
-            overlayView.processedBitmap = pb
-            overlayView.invalidate()
+            binding.overlayView.processedBitmap = pb
+            binding.overlayView.invalidate()
             updateControls()
         }
     }
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
         // Mostly duplicated from MainActivity.
-        if (event.action == MotionEvent.ACTION_DOWN) {
+        if (event.action == MotionEvent.ACTION_UP) {
             if (inEffectSelectionMode) {
                 val numEffects = effectRegistry.defaultEffectCount()
                 val gridSize = Math.ceil(Math.sqrt(numEffects.toDouble())).toInt()
@@ -249,8 +261,8 @@ class ViewVideoActivity: Activity() {
                 if (!isPlaying) {
                     loadFrame(frameIndex)
                 }
-                inEffectSelectionMode = false
-                controlBar.visibility = View.VISIBLE
+                updateInEffectSelectionModeFlag(false)
+                binding.controlBar.visibility = View.VISIBLE
             }
         }
     }

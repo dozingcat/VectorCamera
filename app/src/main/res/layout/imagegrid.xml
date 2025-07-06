@@ -14,13 +14,16 @@
         android:verticalSpacing="10dp"
         android:stretchMode="spacingWidthUniform"
         android:gravity="center"
+        android:clipToPadding="false"
         />
 
     <TextView
         android:id="@+id/noImagesTextView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="10dp"
+        android:textAlignment="center"
+        android:gravity="center"
+        android:textSize="24sp"
         android:text="@string/noImagesFound"/>
 
 </FrameLayout>

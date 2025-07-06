@@ -16,8 +16,10 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.NoActionBar"
-        android:requestLegacyExternalStorage="false">
+        android:theme="@style/VCFullscreenTheme"
+        android:requestLegacyExternalStorage="false"
+        android:enableOnBackInvokedCallback="true"
+    >
 
         <activity android:name="com.dozingcatsoftware.vectorcamera.MainActivity"
                   android:exported="true"

@@ -10,6 +10,7 @@ import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.*
 import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.util.Locale
 
 enum class AsciiColorMode(val id: Int) {
     FIXED(0),
@@ -18,7 +19,7 @@ enum class AsciiColorMode(val id: Int) {
 
     companion object {
         fun fromString(s: String): AsciiColorMode {
-            return AsciiColorMode.valueOf(s.toUpperCase())
+            return AsciiColorMode.valueOf(s.uppercase(Locale.getDefault()))
         }
     }
 }
