@@ -29,6 +29,19 @@ class EdgeLuminanceEffectKotlin : Effect {
         pixels: IntArray
     )
     
+    // Optimized native method that handles threading internally
+    private external fun processImageNative(
+        width: Int,
+        height: Int,
+        multiplier: Int,
+        yData: ByteArray,
+        uData: ByteArray,
+        vData: ByteArray,
+        uvWidth: Int,
+        pixels: IntArray,
+        numThreads: Int
+    )
+    
     private external fun isNativeAvailable(): Boolean
 
     // Static block to load native library
@@ -89,35 +102,31 @@ class EdgeLuminanceEffectKotlin : Effect {
 
         val t1 = System.currentTimeMillis()
         
-        if (numThreads == 1) {
-            // Single-threaded fallback for small images
-            if (nativeLibraryLoaded) {
-                processRowsNative(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
-            } else {
-                processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
-            }
+        if (nativeLibraryLoaded) {
+            // Use optimized native implementation that handles threading internally
+            processImageNative(width, height, multiplier, yData, uData, vData, uvWidth, pixels, numThreads)
         } else {
-            // Multi-threaded processing
-            runBlocking {
-                val jobs = mutableListOf<Job>()
-                val rowsPerThread = height / numThreads
-                
-                for (threadIndex in 0 until numThreads) {
-                    val startY = threadIndex * rowsPerThread
-                    val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
+            // Fallback to Kotlin implementation with coroutines
+            if (numThreads == 1) {
+                processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+            } else {
+                runBlocking {
+                    val jobs = mutableListOf<Job>()
+                    val rowsPerThread = height / numThreads
                     
-                    val job = launch(Dispatchers.Default) {
-                        if (nativeLibraryLoaded) {
-                            processRowsNative(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
-                        } else {
+                    for (threadIndex in 0 until numThreads) {
+                        val startY = threadIndex * rowsPerThread
+                        val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
+                        
+                        val job = launch(Dispatchers.Default) {
                             processRows(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
                         }
+                        jobs.add(job)
                     }
-                    jobs.add(job)
+                    
+                    // Wait for all threads to complete
+                    jobs.forEach { it.join() }
                 }
-                
-                // Wait for all threads to complete
-                jobs.forEach { it.join() }
             }
         }
 

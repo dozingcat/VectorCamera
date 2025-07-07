@@ -2,30 +2,35 @@
 #include <android/log.h>
 #include <algorithm>
 #include <cstdint>
+#include <thread>
+#include <vector>
 
 #define LOG_TAG "EdgeLuminanceNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
-// YUV to RGB conversion using ITU-R BT.601 standard
+// Fast YUV to RGB conversion using fixed-point arithmetic
 inline uint32_t yuvToRgb(int y, int u, int v) {
-    const float yValue = static_cast<float>(y);
-    const float uValue = static_cast<float>(u - 128);
-    const float vValue = static_cast<float>(v - 128);
+    // Use fixed-point arithmetic for better performance
+    // Multiply by 256 to avoid floating-point operations
+    const int yValue = y;
+    const int uValue = u - 128;
+    const int vValue = v - 128;
 
-    int red = static_cast<int>(yValue + 1.370705f * vValue);
-    int green = static_cast<int>(yValue - 0.698001f * vValue - 0.337633f * uValue);
-    int blue = static_cast<int>(yValue + 1.732446f * uValue);
+    // Fixed-point coefficients (multiplied by 256)
+    int red = yValue + ((351 * vValue) >> 8);           // 1.370705 * 256 ≈ 351
+    int green = yValue - ((179 * vValue + 86 * uValue) >> 8); // -0.698001 * 256 ≈ -179, -0.337633 * 256 ≈ -86
+    int blue = yValue + ((443 * uValue) >> 8);          // 1.732446 * 256 ≈ 443
 
-    // Clamp values to 0-255 range
-    red = std::max(0, std::min(255, red));
-    green = std::max(0, std::min(255, green));
-    blue = std::max(0, std::min(255, blue));
+    // Fast clamp using bitwise operations
+    red = (red & ~255) ? (red < 0 ? 0 : 255) : red;
+    green = (green & ~255) ? (green < 0 ? 0 : 255) : green;
+    blue = (blue & ~255) ? (blue < 0 ? 0 : 255) : blue;
 
     // Return ARGB format (0xFF for alpha, then RGB)
-    return (0xFF << 24) | (red << 16) | (green << 8) | blue;
+    return 0xFF000000 | (red << 16) | (green << 8) | blue;
 }
 
-// Fast edge detection using Laplacian operator
+// Fast edge detection using Laplacian operator - optimized for cache efficiency
 inline int calculateEdgeStrength(
     const uint8_t* yData, 
     int x, int y, 
@@ -36,22 +41,23 @@ inline int calculateEdgeStrength(
         return 0;
     }
 
-    const int pixelIndex = y * width + x;
-    const int center = yData[pixelIndex];
+    // Pre-calculate row offsets for better cache access
+    const uint8_t* prevRow = yData + (y - 1) * width;
+    const uint8_t* currRow = yData + y * width;
+    const uint8_t* nextRow = yData + (y + 1) * width;
+    
+    const int center = currRow[x];
     
     // Get surrounding 8 pixels for Laplacian operator
     const int surroundingSum = 
-        yData[(y - 1) * width + (x - 1)] +
-        yData[(y - 1) * width + x] +
-        yData[(y - 1) * width + (x + 1)] +
-        yData[y * width + (x - 1)] +
-        yData[y * width + (x + 1)] +
-        yData[(y + 1) * width + (x - 1)] +
-        yData[(y + 1) * width + x] +
-        yData[(y + 1) * width + (x + 1)];
+        prevRow[x - 1] + prevRow[x] + prevRow[x + 1] +
+        currRow[x - 1] + currRow[x + 1] +
+        nextRow[x - 1] + nextRow[x] + nextRow[x + 1];
 
     const int edge = 8 * center - surroundingSum;
-    return std::max(0, std::min(255, multiplier * edge));
+    // Fast clamp using conditional
+    const int result = multiplier * edge;
+    return (result < 0) ? 0 : (result > 255) ? 255 : result;
 }
 
 // Native implementation of processRows
@@ -70,11 +76,11 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
     jint uvWidth,
     jintArray pixels
 ) {
-    // Get direct access to byte arrays
-    jbyte* yBytes = env->GetByteArrayElements(yData, nullptr);
-    jbyte* uBytes = env->GetByteArrayElements(uData, nullptr);
-    jbyte* vBytes = env->GetByteArrayElements(vData, nullptr);
-    jint* pixelArray = env->GetIntArrayElements(pixels, nullptr);
+    // Use GetPrimitiveArrayCritical for better performance (no copying)
+    jbyte* yBytes = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(yData, nullptr));
+    jbyte* uBytes = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(uData, nullptr));
+    jbyte* vBytes = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(vData, nullptr));
+    jint* pixelArray = static_cast<jint*>(env->GetPrimitiveArrayCritical(pixels, nullptr));
 
     if (!yBytes || !uBytes || !vBytes || !pixelArray) {
         LOGI("Failed to get array elements");
@@ -108,10 +114,93 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
     }
 
     // Release array elements
-    env->ReleaseByteArrayElements(yData, yBytes, JNI_ABORT);
-    env->ReleaseByteArrayElements(uData, uBytes, JNI_ABORT);
-    env->ReleaseByteArrayElements(vData, vBytes, JNI_ABORT);
-    env->ReleaseIntArrayElements(pixels, pixelArray, 0);
+    env->ReleasePrimitiveArrayCritical(yData, yBytes, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(uData, uBytes, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(vData, vBytes, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(pixels, pixelArray, 0);
+}
+
+// Optimized version that handles all threading internally in C++
+extern "C" JNIEXPORT void JNICALL
+Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_processImageNative(
+    JNIEnv* env,
+    jobject /* this */,
+    jint width,
+    jint height,
+    jint multiplier,
+    jbyteArray yData,
+    jbyteArray uData,
+    jbyteArray vData,
+    jint uvWidth,
+    jintArray pixels,
+    jint numThreads
+) {
+    // Use GetPrimitiveArrayCritical for better performance
+    jbyte* yBytes = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(yData, nullptr));
+    jbyte* uBytes = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(uData, nullptr));
+    jbyte* vBytes = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(vData, nullptr));
+    jint* pixelArray = static_cast<jint*>(env->GetPrimitiveArrayCritical(pixels, nullptr));
+
+    if (!yBytes || !uBytes || !vBytes || !pixelArray) {
+        LOGI("Failed to get array elements");
+        return;
+    }
+
+    // Cast to unsigned for easier arithmetic
+    const uint8_t* yPtr = reinterpret_cast<const uint8_t*>(yBytes);
+    const uint8_t* uPtr = reinterpret_cast<const uint8_t*>(uBytes);
+    const uint8_t* vPtr = reinterpret_cast<const uint8_t*>(vBytes);
+
+    if (numThreads <= 1) {
+        // Single-threaded processing
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                const int pixelIndex = y * width + x;
+                const int edgeStrength = calculateEdgeStrength(yPtr, x, y, width, height, multiplier);
+                const int uvX = x / 2;
+                const int uvY = y / 2;
+                const int uvIndex = uvY * uvWidth + uvX;
+                const int u = uPtr[uvIndex];
+                const int v = vPtr[uvIndex];
+                pixelArray[pixelIndex] = static_cast<jint>(yuvToRgb(edgeStrength, u, v));
+            }
+        }
+    } else {
+        // Multi-threaded processing in C++
+        std::vector<std::thread> threads;
+        const int rowsPerThread = height / numThreads;
+        
+        for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
+            const int startY = threadIndex * rowsPerThread;
+            const int endY = (threadIndex == numThreads - 1) ? height : (threadIndex + 1) * rowsPerThread;
+            
+            threads.emplace_back([=]() {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        const int pixelIndex = y * width + x;
+                        const int edgeStrength = calculateEdgeStrength(yPtr, x, y, width, height, multiplier);
+                        const int uvX = x / 2;
+                        const int uvY = y / 2;
+                        const int uvIndex = uvY * uvWidth + uvX;
+                        const int u = uPtr[uvIndex];
+                        const int v = vPtr[uvIndex];
+                        pixelArray[pixelIndex] = static_cast<jint>(yuvToRgb(edgeStrength, u, v));
+                    }
+                }
+            });
+        }
+        
+        // Wait for all threads to complete
+        for (auto& thread : threads) {
+            thread.join();
+        }
+    }
+
+    // Release array elements
+    env->ReleasePrimitiveArrayCritical(yData, yBytes, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(uData, uBytes, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(vData, vBytes, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(pixels, pixelArray, 0);
 }
 
 // Function to check if native implementation is available

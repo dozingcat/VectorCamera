@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
 import android.renderscript.*
+import android.util.Log
 import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
@@ -16,7 +17,10 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
 
     override fun effectName() = EFFECT_NAME
 
+    var numFrames = 0
+
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
+        val t1 = System.currentTimeMillis()
         outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
                 rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
         script._gWidth = cameraImage.width()
@@ -32,6 +36,11 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
         outputAllocation!!.copyTo(resultBitmap)
+
+        val elapsed = System.currentTimeMillis() - t1
+        if (++numFrames % 30 == 0) {
+            Log.i(EFFECT_NAME, "Generated ${cameraImage.width()}x${cameraImage.height()} image in $elapsed ms (RenderScript)")
+        }
 
         return resultBitmap
     }
