@@ -120,7 +120,7 @@ class ViewImageActivity : AppCompatActivity() {
         val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
             PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
         }
-        return CameraImage(rs, null, planarYuv, metadata.orientation,
+        return CameraImage(rs, null, planarYuv, null, metadata.orientation,
                 CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getLandscapeDisplaySize(this))
     }
 

@@ -29,16 +29,16 @@ class CartoonEffect(val rs: RenderScript): Effect {
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         rgbAllocation = reuseOrCreate2dAllocation(rgbAllocation,
                 rs, Element::U8_4, cameraImage.width(), cameraImage.height())
-        if (cameraImage.hasSingleYuv()) {
-            yuvToRgbScript.setInput(cameraImage.getSingleYuvAllocation())
-            yuvToRgbScript.forEach(rgbAllocation)
-        }
-        else {
+        if (cameraImage.hasPlanarYuv()) {
             val planarAllocs = cameraImage.getPlanarYuvAllocations()!!
             planarYuvToRgbScript._yInputAlloc = planarAllocs.y
             planarYuvToRgbScript._uInputAlloc = planarAllocs.u
             planarYuvToRgbScript._vInputAlloc = planarAllocs.v
             planarYuvToRgbScript.forEach_convertToRgba(rgbAllocation)
+        }
+        else {
+            yuvToRgbScript.setInput(cameraImage.getSingleYuvAllocation())
+            yuvToRgbScript.forEach(rgbAllocation)
         }
 
         blurredAllocation = reuseOrCreate2dAllocation(blurredAllocation,

@@ -4,6 +4,7 @@ import android.graphics.*
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
+import android.util.Log
 import com.dozingcatsoftware.vectorcamera.*
 import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
 
@@ -34,13 +35,16 @@ class EdgeEffect(private val rs: RenderScript,
         outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
                 rs, Element::RGBA_8888,  cameraImage.width(), cameraImage.height())
 
-        if (cameraImage.hasSingleYuv()) {
-            script._gYuvInput = cameraImage.getSingleYuvAllocation()
-        }
-        else {
+        Log.i(EFFECT_NAME, "Getting allocations")
+        if (cameraImage.hasPlanarYuv()) {
             script._gYuvInput = cameraImage.getPlanarYuvAllocations()!!.y
         }
+        else {
+            script._gYuvInput = cameraImage.getSingleYuvAllocation()
+        }
+        Log.i(EFFECT_NAME, "Got allocations, computing edges")
         script.forEach_computeEdgeWithColorMap(outputAllocation)
+        Log.i(EFFECT_NAME, "Done")
 
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)

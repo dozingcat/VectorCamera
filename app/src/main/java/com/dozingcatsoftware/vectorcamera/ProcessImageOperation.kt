@@ -19,7 +19,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         val inputImage = run {
             val bitmap = scaledBitmapFromURIWithMaximumSize(context, imageUri, 2560, 1600)
             val planarYuv = PlanarYuvAllocations.fromBitmap(rs, bitmap)
-            CameraImage(rs, null, planarYuv, ImageOrientation.NORMAL,
+            CameraImage(rs, null, planarYuv, null, ImageOrientation.NORMAL,
                     CameraStatus.CAPTURING_PHOTO, timeFn(), Size(bitmap.width, bitmap.height))
         }
         val prefs = VCPreferences(context)

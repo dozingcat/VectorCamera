@@ -91,6 +91,7 @@ class CombinationEffect(
             effectIndex = (effectIndex + 1) % effectFactories.size
             val t = timeFn()
             numUpdated += 1
+            break
             if (numUpdated >= effectFactories.size || t - t0 > maxMillisPerFrame) {
                 break
             }
