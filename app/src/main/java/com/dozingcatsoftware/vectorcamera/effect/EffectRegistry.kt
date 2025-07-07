@@ -21,6 +21,7 @@ class EffectRegistry {
             // Row 1, edges on black.
             // Edge strength->brightness, preserve colors.
             {rs, prefsFn, context -> EdgeLuminanceEffect(rs) },
+        {rs, prefsFn, context -> EdgeLuminanceEffectKotlin() },
 
             // White
             {rs, prefsFn, context ->
@@ -419,6 +420,7 @@ class EffectRegistry {
             AsciiEffect.EFFECT_NAME -> AsciiEffect.fromParameters(rs, params)
             EdgeEffect.EFFECT_NAME -> EdgeEffect.fromParameters(rs, params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
+            EdgeLuminanceEffectKotlin.EFFECT_NAME -> EdgeLuminanceEffectKotlin.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
