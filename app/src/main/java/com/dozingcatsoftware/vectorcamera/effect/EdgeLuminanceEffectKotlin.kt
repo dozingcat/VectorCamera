@@ -1,8 +1,12 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
+import android.util.Log
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import kotlin.math.roundToInt
+import kotlinx.coroutines.*
+import java.util.concurrent.Executors
+import kotlin.math.min
 
 /**
  * Pure Kotlin implementation of EdgeLuminanceEffect.
@@ -19,16 +23,11 @@ class EdgeLuminanceEffectKotlin : Effect {
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
         // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()
-        if (yuvBytes != null) {
-            // Use direct YUV bytes from ImageData
-            return createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
-        } else {
-            // Fallback to RenderScript allocations if needed
-            val planarYuv = cameraImage.getPlanarYuvAllocations()!!
-            return createBitmapFromAllocations(planarYuv, width, height, multiplier)
-        }
+        val yuvBytes = cameraImage.getYuvBytes()!!
+        return createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
     }
+
+    var numFrames: Int = 0
 
     private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int): Bitmap {
         val ySize = width * height
@@ -43,14 +42,70 @@ class EdgeLuminanceEffectKotlin : Effect {
 
         val pixels = IntArray(width * height)
 
-        for (y in 0 until height) {
+        // Determine optimal number of threads based on CPU cores and image size.
+        // On a Pixel 8a, using 9 threads renders in ~110ms and 1 thread takes ~330ms.
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = min(numCores, height / minRowsPerThread)
+        val numThreads = maxOf(1, maxThreads)
+
+        val t1 = System.currentTimeMillis()
+        
+        if (numThreads == 1) {
+            // Single-threaded fallback for small images
+            processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+        } else {
+            // Multi-threaded processing
+            runBlocking {
+                val jobs = mutableListOf<Job>()
+                val rowsPerThread = height / numThreads
+                
+                for (threadIndex in 0 until numThreads) {
+                    val startY = threadIndex * rowsPerThread
+                    val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
+                    
+                    val job = launch(Dispatchers.Default) {
+                        processRows(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+                    }
+                    jobs.add(job)
+                }
+                
+                // Wait for all threads to complete
+                jobs.forEach { it.join() }
+            }
+        }
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+
+        val elapsed = System.currentTimeMillis() - t1
+        if (++numFrames % 30 == 0) {
+            // Log.i(EFFECT_NAME, "Generated image in $elapsed ms with $numThreads threads")
+        }
+        return bitmap
+    }
+
+    private fun processRows(
+        startY: Int, 
+        endY: Int, 
+        width: Int, 
+        height: Int, 
+        multiplier: Int,
+        yData: ByteArray, 
+        uData: ByteArray, 
+        vData: ByteArray, 
+        uvWidth: Int, 
+        pixels: IntArray
+    ) {
+        for (y in startY until endY) {
             for (x in 0 until width) {
                 val pixelIndex = y * width + x
 
                 // Calculate edge strength using Laplacian operator
                 val edgeStrength = if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
                     val center = yData[pixelIndex].toInt() and 0xFF
-                    val surroundingSum = 
+                    // Trying to optimize this by reducing multiplications doesn't help.
+                    val surroundingSum =
                         (yData[(y - 1) * width + (x - 1)].toInt() and 0xFF) +
                         (yData[(y - 1) * width + x].toInt() and 0xFF) +
                         (yData[(y - 1) * width + (x + 1)].toInt() and 0xFF) +
@@ -59,7 +114,7 @@ class EdgeLuminanceEffectKotlin : Effect {
                         (yData[(y + 1) * width + (x - 1)].toInt() and 0xFF) +
                         (yData[(y + 1) * width + x].toInt() and 0xFF) +
                         (yData[(y + 1) * width + (x + 1)].toInt() and 0xFF)
-                    
+
                     val edge = 8 * center - surroundingSum
                     (multiplier * edge).coerceIn(0, 255)
                 } else {
@@ -78,71 +133,8 @@ class EdgeLuminanceEffectKotlin : Effect {
                 pixels[pixelIndex] = rgb
             }
         }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
     }
-
-    private fun createBitmapFromAllocations(planarYuv: com.dozingcatsoftware.vectorcamera.PlanarYuvAllocations, 
-                                           width: Int, height: Int, multiplier: Int): Bitmap {
-        // Extract data from RenderScript allocations
-        val ySize = width * height
-        val uvWidth = width / 2
-        val uvHeight = height / 2
-        val uvSize = uvWidth * uvHeight
-
-        val yData = ByteArray(ySize)
-        val uData = ByteArray(uvSize)
-        val vData = ByteArray(uvSize)
-
-        planarYuv.y.copyTo(yData)
-        planarYuv.u.copyTo(uData)
-        planarYuv.v.copyTo(vData)
-
-        val pixels = IntArray(width * height)
-
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val pixelIndex = y * width + x
-
-                // Calculate edge strength using Laplacian operator
-                val edgeStrength = if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
-                    val center = yData[pixelIndex].toInt() and 0xFF
-                    val surroundingSum = 
-                        (yData[(y - 1) * width + (x - 1)].toInt() and 0xFF) +
-                        (yData[(y - 1) * width + x].toInt() and 0xFF) +
-                        (yData[(y - 1) * width + (x + 1)].toInt() and 0xFF) +
-                        (yData[y * width + (x - 1)].toInt() and 0xFF) +
-                        (yData[y * width + (x + 1)].toInt() and 0xFF) +
-                        (yData[(y + 1) * width + (x - 1)].toInt() and 0xFF) +
-                        (yData[(y + 1) * width + x].toInt() and 0xFF) +
-                        (yData[(y + 1) * width + (x + 1)].toInt() and 0xFF)
-                    
-                    val edge = 8 * center - surroundingSum
-                    (multiplier * edge).coerceIn(0, 255)
-                } else {
-                    0
-                }
-
-                // Get U and V values (subsampled)
-                val uvX = x / 2
-                val uvY = y / 2
-                val uvIndex = uvY * uvWidth + uvX
-                val u = uData[uvIndex].toInt() and 0xFF
-                val v = vData[uvIndex].toInt() and 0xFF
-
-                // Convert YUV to RGB using edge strength as Y value
-                val rgb = yuvToRgb(edgeStrength, u, v)
-                pixels[pixelIndex] = rgb
-            }
-        }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
-    }
-
+    
     /**
      * Convert YUV to RGB using standard conversion formulas.
      * Based on ITU-R BT.601 conversion equations.
