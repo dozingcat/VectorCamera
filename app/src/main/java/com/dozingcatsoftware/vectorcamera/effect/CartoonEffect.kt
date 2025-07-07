@@ -16,6 +16,7 @@ class CartoonEffect(val rs: RenderScript): Effect {
     // private val script = ScriptC_edge_color(rs)
     private var blurredAllocation: Allocation? = null
     private var blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs))
+    private val blurRadius = 4f
 
     private var rgbAllocation: Allocation? = null
     private var yuvToRgbScript = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs))
@@ -29,21 +30,16 @@ class CartoonEffect(val rs: RenderScript): Effect {
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
         rgbAllocation = reuseOrCreate2dAllocation(rgbAllocation,
                 rs, Element::U8_4, cameraImage.width(), cameraImage.height())
-        if (cameraImage.hasPlanarYuv()) {
-            val planarAllocs = cameraImage.getPlanarYuvAllocations()!!
-            planarYuvToRgbScript._yInputAlloc = planarAllocs.y
-            planarYuvToRgbScript._uInputAlloc = planarAllocs.u
-            planarYuvToRgbScript._vInputAlloc = planarAllocs.v
-            planarYuvToRgbScript.forEach_convertToRgba(rgbAllocation)
-        }
-        else {
-            yuvToRgbScript.setInput(cameraImage.getSingleYuvAllocation())
-            yuvToRgbScript.forEach(rgbAllocation)
-        }
+        
+        val planarAllocs = cameraImage.getPlanarYuvAllocations()!!
+        planarYuvToRgbScript._yInputAlloc = planarAllocs.y
+        planarYuvToRgbScript._uInputAlloc = planarAllocs.u
+        planarYuvToRgbScript._vInputAlloc = planarAllocs.v
+        planarYuvToRgbScript.forEach_convertToRgba(rgbAllocation)
 
         blurredAllocation = reuseOrCreate2dAllocation(blurredAllocation,
                 rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
-        blurScript.setRadius(4f)
+        blurScript.setRadius(blurRadius)
         blurScript.setInput(rgbAllocation)
         blurScript.forEach(blurredAllocation)
 

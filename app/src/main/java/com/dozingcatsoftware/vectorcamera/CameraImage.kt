@@ -109,27 +109,14 @@ data class CameraImage(val rs: RenderScript,
 
     /**
      * Returns the primary YUV allocation for RenderScript effects.
-     * For single YUV allocations, returns the allocation directly.
-     * For planar allocations, returns the Y (luminance) plane.
-     * For ImageData, creates and caches a single YUV allocation.
+     * Always returns the Y (luminance) plane from planar allocations.
      */
     fun getPrimaryYuvAllocation(): Allocation {
         return when {
-            _singleYuvAllocation != null -> _singleYuvAllocation
             _planarYuvAllocations != null -> _planarYuvAllocations.y
-            else -> getSingleYuvAllocation()!!
+            _singleYuvAllocation != null -> _singleYuvAllocation
+            else -> getPlanarYuvAllocations()!!.y
         }
-    }
-
-    /**
-     * Returns the single YUV allocation if available.
-     * For ImageData, returns null as we don't create single YUV allocations.
-     */
-    fun getSingleYuvAllocation(): Allocation? {
-        // Return existing allocation if available
-        if (_singleYuvAllocation != null) return _singleYuvAllocation
-
-        throw Exception("Creating single YUV allocation from image data not supported")
     }
 
     /**
@@ -194,22 +181,6 @@ data class CameraImage(val rs: RenderScript,
         }
         
         return null
-    }
-
-    /**
-     * Returns true if this image uses planar YUV allocations (separate Y, U, V).
-     */
-    fun hasPlanarYuv(): Boolean {
-        return _planarYuvAllocations != null || 
-               (_imageData != null && _singleYuvAllocation == null)
-    }
-
-    /**
-     * Returns true if this image uses a single YUV allocation.
-     */
-    fun hasSingleYuv(): Boolean {
-        return _singleYuvAllocation != null || 
-               (_imageData != null && _planarYuvAllocations == null)
     }
 
     /**

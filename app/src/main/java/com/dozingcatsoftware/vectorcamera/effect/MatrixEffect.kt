@@ -210,17 +210,12 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
         textScript._flipVertical = false
         textScript._portrait = metrics.isPortrait
         textScript._colorMode = 0
-        if (cameraImage.hasPlanarYuv()) {
-            textScript._hasSingleYuvAllocation = false
-            val planarYuv = cameraImage.getPlanarYuvAllocations()!!
-            textScript._yInput = planarYuv.y
-            textScript._uInput = planarYuv.u
-            textScript._vInput = planarYuv.v
-        }
-        else {
-            textScript._hasSingleYuvAllocation = true
-            textScript._yuvInput = cameraImage.getSingleYuvAllocation()
-        }
+        
+        textScript._hasSingleYuvAllocation = false
+        val planarYuv = cameraImage.getPlanarYuvAllocations()!!
+        textScript._yInput = planarYuv.y
+        textScript._uInput = planarYuv.u
+        textScript._vInput = planarYuv.v
 
         averageBrightnessAllocation = reuseOrCreate2dAllocation(averageBrightnessAllocation,
                 rs, Element::U8, metrics.numCharacterColumns, metrics.numCharacterRows)

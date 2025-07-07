@@ -35,16 +35,9 @@ class EdgeEffect(private val rs: RenderScript,
         outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
                 rs, Element::RGBA_8888,  cameraImage.width(), cameraImage.height())
 
-        Log.i(EFFECT_NAME, "Getting allocations")
-        if (cameraImage.hasPlanarYuv()) {
-            script._gYuvInput = cameraImage.getPlanarYuvAllocations()!!.y
-        }
-        else {
-            script._gYuvInput = cameraImage.getSingleYuvAllocation()
-        }
-        Log.i(EFFECT_NAME, "Got allocations, computing edges")
+        val planarYuv = cameraImage.getPlanarYuvAllocations()!!
+        script._gYuvInput = planarYuv.y
         script.forEach_computeEdgeWithColorMap(outputAllocation)
-        Log.i(EFFECT_NAME, "Done")
 
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)

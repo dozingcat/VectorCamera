@@ -23,18 +23,11 @@ class EdgeLuminanceEffect(val rs: RenderScript): Effect {
         script._gHeight = cameraImage.height()
         script._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
 
-        if (cameraImage.hasPlanarYuv()) {
-            val planarYuv = cameraImage.getPlanarYuvAllocations()!!
-            script._gYInput = planarYuv.y
-            script._gUInput = planarYuv.u
-            script._gVInput = planarYuv.v
-            script.forEach_setBrightnessToEdgeStrength_planar(outputAllocation)
-        }
-        else {
-            script._gYuvInput = cameraImage.getSingleYuvAllocation()!!
-            script.forEach_setBrightnessToEdgeStrength(outputAllocation)
-        }
-
+        val planarYuv = cameraImage.getPlanarYuvAllocations()!!
+        script._gYInput = planarYuv.y
+        script._gUInput = planarYuv.u
+        script._gVInput = planarYuv.v
+        script.forEach_setBrightnessToEdgeStrength_planar(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)

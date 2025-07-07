@@ -61,10 +61,6 @@ class PhotoLibrary(val rootDirectory: File) {
      */
     fun savePhoto(context: Context, processedBitmap: ProcessedBitmap): String {
         val t1 = System.currentTimeMillis()
-        if (processedBitmap.yuvBytes == null &&
-                !processedBitmap.sourceImage.hasPlanarYuv()) {
-            throw IllegalArgumentException("YUV bytes not set in ProcessedBitmap")
-        }
         Log.i(TAG, "savePhoto start")
         val sourceImage = processedBitmap.sourceImage
         val width = sourceImage.width()
