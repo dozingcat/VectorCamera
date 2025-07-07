@@ -15,6 +15,44 @@ import kotlin.math.min
  */
 class EdgeLuminanceEffectKotlin : Effect {
 
+    // Native method declarations
+    private external fun processRowsNative(
+        startY: Int, 
+        endY: Int, 
+        width: Int, 
+        height: Int, 
+        multiplier: Int,
+        yData: ByteArray, 
+        uData: ByteArray, 
+        vData: ByteArray, 
+        uvWidth: Int, 
+        pixels: IntArray
+    )
+    
+    private external fun isNativeAvailable(): Boolean
+
+    // Static block to load native library
+    companion object {
+        const val EFFECT_NAME = "edge_luminance_kotlin"
+        
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("edge_luminance_native")
+                nativeLibraryLoaded = true
+                Log.i(EFFECT_NAME, "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(EFFECT_NAME, "Native library not available, using Kotlin implementation", e)
+                nativeLibraryLoaded = false
+            }
+        }
+
+        fun fromParameters(params: Map<String, Any>): EdgeLuminanceEffectKotlin {
+            return EdgeLuminanceEffectKotlin()
+        }
+    }
+
     override fun effectName() = EFFECT_NAME
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
@@ -53,7 +91,11 @@ class EdgeLuminanceEffectKotlin : Effect {
         
         if (numThreads == 1) {
             // Single-threaded fallback for small images
-            processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+            if (nativeLibraryLoaded) {
+                processRowsNative(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+            } else {
+                processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+            }
         } else {
             // Multi-threaded processing
             runBlocking {
@@ -65,7 +107,11 @@ class EdgeLuminanceEffectKotlin : Effect {
                     val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
                     
                     val job = launch(Dispatchers.Default) {
-                        processRows(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+                        if (nativeLibraryLoaded) {
+                            processRowsNative(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+                        } else {
+                            processRows(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+                        }
                     }
                     jobs.add(job)
                 }
@@ -80,7 +126,8 @@ class EdgeLuminanceEffectKotlin : Effect {
 
         val elapsed = System.currentTimeMillis() - t1
         if (++numFrames % 30 == 0) {
-            // Log.i(EFFECT_NAME, "Generated image in $elapsed ms with $numThreads threads")
+            val impl = if (nativeLibraryLoaded) "native" else "Kotlin"
+            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads ($impl)")
         }
         return bitmap
     }
@@ -151,11 +198,5 @@ class EdgeLuminanceEffectKotlin : Effect {
         return (0xFF shl 24) or (red shl 16) or (green shl 8) or blue
     }
 
-    companion object {
-        const val EFFECT_NAME = "edge_luminance_kotlin"
 
-        fun fromParameters(params: Map<String, Any>): EdgeLuminanceEffectKotlin {
-            return EdgeLuminanceEffectKotlin()
-        }
-    }
 } 
