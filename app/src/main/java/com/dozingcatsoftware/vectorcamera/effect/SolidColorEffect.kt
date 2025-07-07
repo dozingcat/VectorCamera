@@ -26,11 +26,11 @@ class SolidColorEffect(val rs: RenderScript,
     }
 
     override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        if (cameraImage.planarYuvAllocations != null) {
-            script._yuvInput = cameraImage.planarYuvAllocations.y
+        if (cameraImage.hasPlanarYuv()) {
+            script._yuvInput = cameraImage.getPlanarYuvAllocations()!!.y
         }
         else {
-            script._yuvInput = cameraImage.singleYuvAllocation
+            script._yuvInput = cameraImage.getSingleYuvAllocation()
         }
         script._colorMap = colorScheme.colorMap
 

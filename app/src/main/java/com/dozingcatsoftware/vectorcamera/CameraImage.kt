@@ -13,22 +13,59 @@ import com.dozingcatsoftware.util.create2dAllocation
  * in `planarYuvAllocations`.
  */
 data class CameraImage(val rs: RenderScript,
-                       val singleYuvAllocation: Allocation?,
-                       val planarYuvAllocations: PlanarYuvAllocations?,
+                       private val _singleYuvAllocation: Allocation?,
+                       private val _planarYuvAllocations: PlanarYuvAllocations?,
                        val orientation: ImageOrientation, val status: CameraStatus,
                        val timestamp: Long, val displaySize: Size = zeroSize) {
 
     // width() and height() return the dimensions of the actual camera input, which is always
     // landscape. In portrait orientation the rendered image will have the dimensioned swapped.
     fun width(): Int {
-        return singleYuvAllocation?.type?.x ?: planarYuvAllocations!!.y.type.x
+        return _singleYuvAllocation?.type?.x ?: _planarYuvAllocations!!.y.type.x
     }
 
     fun height(): Int {
-        return singleYuvAllocation?.type?.y ?: planarYuvAllocations!!.y.type.y
+        return _singleYuvAllocation?.type?.y ?: _planarYuvAllocations!!.y.type.y
     }
 
     fun size() = Size(width(), height())
+
+    /**
+     * Returns the primary YUV allocation for RenderScript effects.
+     * For single YUV allocations, returns the allocation directly.
+     * For planar allocations, returns the Y (luminance) plane.
+     */
+    fun getPrimaryYuvAllocation(): Allocation {
+        return _singleYuvAllocation ?: _planarYuvAllocations!!.y
+    }
+
+    /**
+     * Returns the single YUV allocation if available, null otherwise.
+     */
+    fun getSingleYuvAllocation(): Allocation? {
+        return _singleYuvAllocation
+    }
+
+    /**
+     * Returns the planar YUV allocations if available, null otherwise.
+     */
+    fun getPlanarYuvAllocations(): PlanarYuvAllocations? {
+        return _planarYuvAllocations
+    }
+
+    /**
+     * Returns true if this image uses planar YUV allocations (separate Y, U, V).
+     */
+    fun hasPlanarYuv(): Boolean {
+        return _planarYuvAllocations != null
+    }
+
+    /**
+     * Returns true if this image uses a single YUV allocation.
+     */
+    fun hasSingleYuv(): Boolean {
+        return _singleYuvAllocation != null
+    }
 
     fun resizedTo(size: Size): CameraImage {
         val resizeScript = ScriptIntrinsicResize.create(rs)
@@ -40,16 +77,16 @@ data class CameraImage(val rs: RenderScript,
             return outputAlloc
         }
 
-        return if (singleYuvAllocation != null) {
-            val outputAlloc = doResize(singleYuvAllocation, size.width, size.height)
-            copy(singleYuvAllocation = outputAlloc)
+        return if (_singleYuvAllocation != null) {
+            val outputAlloc = doResize(_singleYuvAllocation, size.width, size.height)
+            copy(_singleYuvAllocation = outputAlloc)
         }
         else {
-            val planes = planarYuvAllocations!!
+            val planes = _planarYuvAllocations!!
             val yOutput = doResize(planes.y, size.width, size.height)
             val uOutput = doResize(planes.u, size.width / 2, size.height / 2)
             val vOutput = doResize(planes.v, size.width / 2, size.height / 2)
-            copy(planarYuvAllocations = PlanarYuvAllocations(yOutput, uOutput, vOutput))
+            copy(_planarYuvAllocations = PlanarYuvAllocations(yOutput, uOutput, vOutput))
         }
     }
 

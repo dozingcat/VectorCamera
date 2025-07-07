@@ -50,13 +50,13 @@ class CameraImageProcessor(val rs: RenderScript) {
     fun queueCameraImage(cameraImage: CameraImage) {
         threadLock.withLock({
             if (consumerThread == null) {
-                ioReceiveIfInput(cameraImage.singleYuvAllocation)
+                ioReceiveIfInput(cameraImage.getSingleYuvAllocation())
                 return
             }
         })
 
         allocationLock.withLock({
-            val allocation = cameraImage.singleYuvAllocation!!
+            val allocation = cameraImage.getSingleYuvAllocation()!!
             if (lastAllocationRef != null) {
                 val prevAllocation = lastAllocationRef!!.get()
                 if (prevAllocation == allocation) {
@@ -101,7 +101,7 @@ class CameraImageProcessor(val rs: RenderScript) {
                     else {
                         debugLog("Calling ioReceive, count=${allocationUpdateCount}")
                         for (i in 0 until allocationUpdateCount) {
-                            ioReceiveIfInput(currentCamAllocation!!.singleYuvAllocation)
+                            ioReceiveIfInput(currentCamAllocation!!.getSingleYuvAllocation())
                         }
                         allocationUpdateCount = 0
                         receivedCameraImage = null
@@ -114,7 +114,7 @@ class CameraImageProcessor(val rs: RenderScript) {
             // threads, so we don't want to try to parallelize this.
             val yuvBytes =
                     if (currentCamAllocation!!.status.isSavingImage())
-                        flattenedYuvImageBytes(rs, currentCamAllocation!!.singleYuvAllocation!!)
+                        flattenedYuvImageBytes(rs, currentCamAllocation!!.getSingleYuvAllocation()!!)
                     else null
             callback(ProcessedBitmap(
                     effect, currentCamAllocation!!, bitmap, yuvBytes))

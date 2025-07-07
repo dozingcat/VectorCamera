@@ -37,11 +37,11 @@ class Convolve3x3Effect(private val rs: RenderScript,
                 rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
 
         convolveScript.setCoefficients(coefficients)
-        if (cameraImage.singleYuvAllocation != null) {
-            convolveScript.setInput(cameraImage.singleYuvAllocation)
+        if (cameraImage.hasSingleYuv()) {
+            convolveScript.setInput(cameraImage.getSingleYuvAllocation())
         }
         else {
-            convolveScript.setInput(cameraImage.planarYuvAllocations!!.y)
+            convolveScript.setInput(cameraImage.getPlanarYuvAllocations()!!.y)
         }
         convolveScript.forEach(convolveOutputAlloc)
 
