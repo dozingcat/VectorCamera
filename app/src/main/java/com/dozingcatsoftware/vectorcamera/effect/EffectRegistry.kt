@@ -5,6 +5,7 @@ import android.renderscript.RenderScript
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
 import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
+import com.dozingcatsoftware.vectorcamera.effect.EdgeEffectKotlin
 
 enum class EffectContext {
     NORMAL,
@@ -21,7 +22,16 @@ class EffectRegistry {
             // Row 1, edges on black.
             // Edge strength->brightness, preserve colors.
             {rs, prefsFn, context -> EdgeLuminanceEffect(rs) },
-        {rs, prefsFn, context -> EdgeLuminanceEffectKotlin() },
+            {rs, prefsFn, context -> EdgeLuminanceEffectKotlin() },
+
+            // Edge strength->color map (Kotlin implementation)
+            {rs, prefsFn, context -> EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                            "type" to "fixed",
+                            "minColor" to listOf(0, 0, 0),
+                            "maxColor" to listOf(255, 255, 255)
+                    )
+            )) },
 
             // White
             {rs, prefsFn, context ->
@@ -419,6 +429,7 @@ class EffectRegistry {
         return when (name) {
             AsciiEffect.EFFECT_NAME -> AsciiEffect.fromParameters(rs, params)
             EdgeEffect.EFFECT_NAME -> EdgeEffect.fromParameters(rs, params)
+            EdgeEffectKotlin.EFFECT_NAME -> EdgeEffectKotlin.fromParameters(params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
             EdgeLuminanceEffectKotlin.EFFECT_NAME -> EdgeLuminanceEffectKotlin.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)

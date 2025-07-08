@@ -52,7 +52,7 @@ class EdgeLuminanceEffectKotlin : Effect {
         
         init {
             try {
-                System.loadLibrary("edge_luminance_native")
+                System.loadLibrary("vectorcamera_native")
                 nativeLibraryLoaded = true
                 Log.i(EFFECT_NAME, "Native library loaded successfully")
             } catch (e: UnsatisfiedLinkError) {
