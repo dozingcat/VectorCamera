@@ -77,7 +77,8 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeEffectKotlin_00024Companion_p
     jint height,
     jint multiplier,
     jintArray colorMap,
-    jintArray outputPixels
+    jintArray outputPixels,
+    jint numThreads
 ) {
     // Get native arrays
     jbyte* yDataPtr = env->GetByteArrayElements(yData, nullptr);
@@ -91,12 +92,6 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeEffectKotlin_00024Companion_p
     
     // For YUV bytes, row stride equals width (no padding)
     int yRowStride = width;
-    
-    // Determine optimal number of threads
-    int numCores = 1; // std::thread::hardware_concurrency();
-    int minRowsPerThread = 32;
-    int maxThreads = std::min(numCores, height / minRowsPerThread);
-    int numThreads = std::max(1, maxThreads);
     
     if (numThreads == 1) {
         // Single-threaded processing

@@ -25,6 +25,3 @@ target_compile_options(vectorcamera_native PRIVATE
 # Link against the log library (for Android logging)
 find_library(log-lib log)
 target_link_libraries(vectorcamera_native ${log-lib})
-
-# For backwards compatibility, create an alias
-add_library(edge_luminance_native ALIAS vectorcamera_native) 

@@ -52,7 +52,7 @@ class EdgeEffectKotlin(
         
         if (nativeLibraryLoaded) {
             // Use optimized native implementation
-            processImageNativeFromYuvBytes(yData, width, height, multiplier, colorMap, pixels)
+            processImageNativeFromYuvBytes(yData, width, height, multiplier, colorMap, pixels, numThreads)
         } else {
             // Fallback to Kotlin implementation with coroutines
             if (numThreads == 1) {
@@ -159,7 +159,8 @@ class EdgeEffectKotlin(
             height: Int,
             multiplier: Int,
             colorMap: IntArray,
-            outputPixels: IntArray
+            outputPixels: IntArray,
+            numThreads: Int
         )
         
         // Load native library
