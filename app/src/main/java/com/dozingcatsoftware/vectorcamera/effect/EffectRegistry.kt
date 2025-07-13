@@ -6,6 +6,7 @@ import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
 import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
 import com.dozingcatsoftware.vectorcamera.effect.EdgeEffectKotlin
+import com.dozingcatsoftware.vectorcamera.effect.PermuteColorEffectKotlin
 
 enum class EffectContext {
     NORMAL,
@@ -306,6 +307,9 @@ class EffectRegistry {
             {rs, prefsFn, context -> PermuteColorEffect.rgbToGbr(rs) },
             {rs, prefsFn, context -> PermuteColorEffect.flipUV(rs) },
 
+            // Kotlin versions for comparison
+            {rs, prefsFn, context -> PermuteColorEffectKotlin.rgbToBrg() },
+
             // Row 5. Text effects.
             {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
@@ -432,11 +436,13 @@ class EffectRegistry {
             EdgeEffectKotlin.EFFECT_NAME -> EdgeEffectKotlin.fromParameters(params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
             EdgeLuminanceEffectKotlin.EFFECT_NAME -> EdgeLuminanceEffectKotlin.fromParameters(params)
-            PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
+            PermuteColorEffectKotlin.EFFECT_NAME -> PermuteColorEffectKotlin.fromParameters(params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)
+            PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
+            PermuteColorEffectKotlin.EFFECT_NAME -> PermuteColorEffectKotlin.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
