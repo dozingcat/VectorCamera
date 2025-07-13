@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
 import android.util.Log
+import com.dozingcatsoftware.util.YuvUtils
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import kotlin.math.roundToInt
 import kotlinx.coroutines.*
@@ -185,27 +186,13 @@ class EdgeLuminanceEffectKotlin : Effect {
                 val v = vData[uvIndex].toInt() and 0xFF
 
                 // Convert YUV to RGB using edge strength as Y value
-                val rgb = yuvToRgb(edgeStrength, u, v)
+                val rgb = YuvUtils.yuvToRgb(edgeStrength, u, v, includeAlpha = true)
                 pixels[pixelIndex] = rgb
             }
         }
     }
     
-    /**
-     * Convert YUV to RGB using standard conversion formulas.
-     * Based on ITU-R BT.601 conversion equations.
-     */
-    private fun yuvToRgb(y: Int, u: Int, v: Int): Int {
-        val yValue = y.toFloat()
-        val uValue = (u - 128).toFloat()
-        val vValue = (v - 128).toFloat()
 
-        val red = (yValue + 1.370705f * vValue).roundToInt().coerceIn(0, 255)
-        val green = (yValue - 0.698001f * vValue - 0.337633f * uValue).roundToInt().coerceIn(0, 255)
-        val blue = (yValue + 1.732446f * uValue).roundToInt().coerceIn(0, 255)
-
-        return (0xFF shl 24) or (red shl 16) or (green shl 8) or blue
-    }
 
 
 } 

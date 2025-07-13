@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.*
 import android.util.Log
+import com.dozingcatsoftware.util.YuvUtils
 import com.dozingcatsoftware.vectorcamera.*
 import kotlinx.coroutines.*
 import kotlin.math.*
@@ -33,6 +34,44 @@ class PermuteColorEffectKotlin(
     var numFrames: Int = 0
 
     private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Bitmap {
+        // Determine optimal number of threads based on CPU cores and image size
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread)
+        val numThreads = maxOf(1, maxThreads)
+
+        val t1 = System.currentTimeMillis()
+        
+        // Try native implementation first
+        if (nativeLibraryLoaded) {
+            try {
+                val nativePixels = processImageNativeFromYuvBytes(
+                    yuvBytes, width, height,
+                    redSource.rsCode,  // Use rsCode values that match C++ expectations
+                    greenSource.rsCode,
+                    blueSource.rsCode,
+                    flipUV,
+                    numThreads
+                )
+                if (nativePixels != null) {
+                    val elapsed = System.currentTimeMillis() - t1
+                    if (++numFrames % 30 == 0) {
+                        Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Native)")
+                    }
+                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
+                    return bitmap
+                }
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
+            }
+        }
+        
+        // Fall back to Kotlin implementation if native failed or not available
+        return createBitmapFromYuvBytesKotlin(yuvBytes, width, height, numThreads, t1)
+    }
+    
+    private fun createBitmapFromYuvBytesKotlin(yuvBytes: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {
         val ySize = width * height
         val uvWidth = (width + 1) / 2
         val uvHeight = (height + 1) / 2
@@ -44,14 +83,6 @@ class PermuteColorEffectKotlin(
         val vData = yuvBytes.sliceArray(ySize + uvSize until ySize + 2 * uvSize)
 
         val pixels = IntArray(width * height)
-
-        // Determine optimal number of threads based on CPU cores and image size
-        val numCores = Runtime.getRuntime().availableProcessors()
-        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = minOf(numCores, height / minRowsPerThread)
-        val numThreads = maxOf(1, maxThreads)
-
-        val t1 = System.currentTimeMillis()
         
         // Use Kotlin implementation with coroutines
         if (numThreads == 1) {
@@ -79,7 +110,7 @@ class PermuteColorEffectKotlin(
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
 
-        val elapsed = System.currentTimeMillis() - t1
+        val elapsed = System.currentTimeMillis() - startTime
         if (++numFrames % 30 == 0) {
             Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Kotlin)")
         }
@@ -116,7 +147,7 @@ class PermuteColorEffectKotlin(
                 val vv = if (flipUV) u else v
 
                 // Convert YUV to RGB
-                val rgb = yuvToRgb(yy, uu, vv)
+                val rgb = YuvUtils.yuvToRgb(yy, uu, vv, includeAlpha = false)
                 val r = (rgb shr 16) and 0xFF
                 val g = (rgb shr 8) and 0xFF
                 val b = rgb and 0xFF
@@ -145,24 +176,35 @@ class PermuteColorEffectKotlin(
         }
     }
     
-    /**
-     * Convert YUV to RGB using standard conversion formulas.
-     * Based on ITU-R BT.601 conversion equations.
-     */
-    private fun yuvToRgb(y: Int, u: Int, v: Int): Int {
-        val yValue = y.toFloat()
-        val uValue = (u - 128).toFloat()
-        val vValue = (v - 128).toFloat()
 
-        val red = (yValue + 1.370705f * vValue).roundToInt().coerceIn(0, 255)
-        val green = (yValue - 0.698001f * vValue - 0.337633f * uValue).roundToInt().coerceIn(0, 255)
-        val blue = (yValue + 1.732446f * uValue).roundToInt().coerceIn(0, 255)
-
-        return (red shl 16) or (green shl 8) or blue
-    }
 
     companion object {
         const val EFFECT_NAME = "permute_colors_kotlin"
+        
+        // Load native library
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                Log.i(EFFECT_NAME, "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(EFFECT_NAME, "Failed to load native library, using Kotlin implementation: ${e.message}")
+                nativeLibraryLoaded = false
+            }
+        }
+        
+        private external fun processImageNativeFromYuvBytes(
+            yuvBytes: ByteArray,
+            width: Int,
+            height: Int,
+            redSource: Int,
+            greenSource: Int,
+            blueSource: Int,
+            flipUV: Boolean,
+            numThreads: Int
+        ): IntArray?
         
         fun fromParameters(effectParams: Map<String, Any>): PermuteColorEffectKotlin {
             val redSource = ColorComponentSource.valueOf(effectParams["red"] as String)

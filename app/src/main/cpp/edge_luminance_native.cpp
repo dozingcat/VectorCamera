@@ -4,31 +4,12 @@
 #include <cstdint>
 #include <thread>
 #include <vector>
+#include "yuv.h"
 
 #define LOG_TAG "EdgeLuminanceNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
-// Fast YUV to RGB conversion using fixed-point arithmetic
-inline uint32_t yuvToRgb(int y, int u, int v) {
-    // Use fixed-point arithmetic for better performance
-    // Multiply by 256 to avoid floating-point operations
-    const int yValue = y;
-    const int uValue = u - 128;
-    const int vValue = v - 128;
 
-    // Fixed-point coefficients (multiplied by 256)
-    int red = yValue + ((351 * vValue) >> 8);           // 1.370705 * 256 ≈ 351
-    int green = yValue - ((179 * vValue + 86 * uValue) >> 8); // -0.698001 * 256 ≈ -179, -0.337633 * 256 ≈ -86
-    int blue = yValue + ((443 * uValue) >> 8);          // 1.732446 * 256 ≈ 443
-
-    // Fast clamp using bitwise operations
-    red = (red & ~255) ? (red < 0 ? 0 : 255) : red;
-    green = (green & ~255) ? (green < 0 ? 0 : 255) : green;
-    blue = (blue & ~255) ? (blue < 0 ? 0 : 255) : blue;
-
-    // Return ARGB format (0xFF for alpha, then RGB)
-    return 0xFF000000 | (red << 16) | (green << 8) | blue;
-}
 
 // Fast edge detection using Laplacian operator - optimized for cache efficiency
 inline int calculateEdgeStrength(
@@ -109,7 +90,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
             const int v = vPtr[uvIndex];
 
             // Convert YUV to RGB using edge strength as Y value
-            pixelArray[pixelIndex] = static_cast<jint>(yuvToRgb(edgeStrength, u, v));
+            pixelArray[pixelIndex] = static_cast<jint>(YuvUtils::yuvToRgbFixed(edgeStrength, u, v, true));
         }
     }
 
@@ -162,7 +143,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
                 const int uvIndex = uvY * uvWidth + uvX;
                 const int u = uPtr[uvIndex];
                 const int v = vPtr[uvIndex];
-                pixelArray[pixelIndex] = static_cast<jint>(yuvToRgb(edgeStrength, u, v));
+                pixelArray[pixelIndex] = static_cast<jint>(YuvUtils::yuvToRgbFixed(edgeStrength, u, v, true));
             }
         }
     } else {
@@ -184,7 +165,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
                         const int uvIndex = uvY * uvWidth + uvX;
                         const int u = uPtr[uvIndex];
                         const int v = vPtr[uvIndex];
-                        pixelArray[pixelIndex] = static_cast<jint>(yuvToRgb(edgeStrength, u, v));
+                        pixelArray[pixelIndex] = static_cast<jint>(YuvUtils::yuvToRgbFixed(edgeStrength, u, v, true));
                     }
                 }
             });
