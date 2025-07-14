@@ -10,7 +10,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O2 -g")
 add_library(vectorcamera_native SHARED
     edge_luminance_native.cpp
     edge_effect_native.cpp
-    permute_color_effect_native.cpp)
+    permute_color_effect_native.cpp
+    cartoon_effect_native.cpp)
 
 # Set C++17 standard
 set_property(TARGET vectorcamera_native PROPERTY CXX_STANDARD 17)

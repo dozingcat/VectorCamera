@@ -379,6 +379,7 @@ class EffectRegistry {
             },
 
             {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) },
+            {rs, prefsFn, context -> CartoonEffectKotlin.fromParameters(mapOf()) },
 
             // Emboss grayscale.
             {rs, prefsFn, context ->
@@ -440,6 +441,7 @@ class EffectRegistry {
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
+            CartoonEffectKotlin.EFFECT_NAME -> CartoonEffectKotlin.fromParameters(params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             PermuteColorEffectKotlin.EFFECT_NAME -> PermuteColorEffectKotlin.fromParameters(params)
