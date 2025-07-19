@@ -7,6 +7,7 @@ import com.dozingcatsoftware.vectorcamera.CustomColorScheme
 import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
 import com.dozingcatsoftware.vectorcamera.effect.EdgeEffectKotlin
 import com.dozingcatsoftware.vectorcamera.effect.PermuteColorEffectKotlin
+import com.dozingcatsoftware.vectorcamera.effect.MatrixEffectKotlin
 
 enum class EffectContext {
     NORMAL,
@@ -363,6 +364,14 @@ class EffectRegistry {
                         "edges" to false
                 ))
             },
+            // Kotlin Matrix implementation
+            {rs, prefsFn, context ->
+                MatrixEffectKotlin.fromParameters(mapOf(
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "textColor" to matrixTextColor(prefsFn, 0x00ff00),
+                        "edges" to true
+                ))
+            },
 
             // Row 6
             {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
@@ -447,6 +456,7 @@ class EffectRegistry {
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
             CartoonEffectKotlin.EFFECT_NAME -> CartoonEffectKotlin.fromParameters(params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)
+            MatrixEffectKotlin.EFFECT_NAME -> MatrixEffectKotlin.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(rs, params)
             PermuteColorEffectKotlin.EFFECT_NAME -> PermuteColorEffectKotlin.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
