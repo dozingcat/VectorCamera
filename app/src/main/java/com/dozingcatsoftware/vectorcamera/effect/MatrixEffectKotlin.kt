@@ -90,6 +90,61 @@ class MatrixEffectKotlin(
     private var characterTemplate: Bitmap? = null
     private var lastCharPixelSize: Size? = null
 
+    // Native method declarations
+    private external fun computeBlockBrightnessNative(
+        yData: ByteArray,
+        imageWidth: Int,
+        imageHeight: Int,
+        numCharColumns: Int,
+        numCharRows: Int,
+        isPortrait: Boolean,
+        blockAverages: ByteArray,
+        numThreads: Int
+    )
+    
+    private external fun applyEdgeDetectionNative(
+        input: ByteArray,
+        output: ByteArray,
+        width: Int,
+        height: Int,
+        multiplier: Int,
+        numThreads: Int
+    )
+    
+
+    
+    private external fun isNativeAvailable(): Boolean
+
+    // Static block to load native library
+    companion object {
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                Log.i("MatrixEffectKotlin", "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w("MatrixEffectKotlin", "Native library not available, using Kotlin implementation")
+                nativeLibraryLoaded = false
+            }
+        }
+        
+        const val EFFECT_NAME = "matrixKotlin"
+        const val DEFAULT_CHARACTER_COLUMNS = 120
+
+        // Japanese hiragana and katakana characters, and (reversed) English letters and numbers
+        const val MATRIX_NORMAL_CHARS =
+            "ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕ" +
+            "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ"
+        const val MATRIX_REVERSED_CHARS = "QWERTYUIOPASDFGHJKLZXCVBNM1234567890"
+        const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
+
+        fun fromParameters(params: Map<String, Any>): MatrixEffectKotlin {
+            return MatrixEffectKotlin(params)
+        }
+    }
+
     override fun effectName() = EFFECT_NAME
     override fun effectParameters() = effectParams
 
@@ -116,7 +171,8 @@ class MatrixEffectKotlin(
         
         val elapsed = System.currentTimeMillis() - t1
         if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} Matrix image in $elapsed ms")
+            val impl = if (nativeLibraryLoaded) "native" else "Kotlin"
+            Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} Matrix image in $elapsed ms ($impl)")
         }
         
         return resultBitmap
@@ -135,6 +191,49 @@ class MatrixEffectKotlin(
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val blockAverages = ByteArray(numCells)
         
+        // Use native implementation if available for better performance
+        if (nativeLibraryLoaded) {
+            try {
+                val numCores = Runtime.getRuntime().availableProcessors()
+                // Use threading only for larger grids to avoid overhead
+                val minRowsForThreading = 16
+                val numThreads = if (metrics.numCharacterRows >= minRowsForThreading) {
+                    minOf(numCores, metrics.numCharacterRows / 8).coerceAtLeast(1)
+                } else {
+                    1 // Single thread for small grids
+                }
+                
+                computeBlockBrightnessNative(
+                    yData, width, height,
+                    metrics.numCharacterColumns, metrics.numCharacterRows,
+                    metrics.isPortrait, blockAverages, numThreads
+                )
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native block brightness computation failed, falling back to Kotlin", e)
+                computeBlockAveragesKotlin(yData, width, height, metrics, blockAverages)
+            }
+        } else {
+            computeBlockAveragesKotlin(yData, width, height, metrics, blockAverages)
+        }
+        
+        // Apply edge detection if enabled
+        return if (computeEdges) {
+            applyEdgeDetection(blockAverages, metrics.numCharacterColumns, metrics.numCharacterRows)
+        } else {
+            blockAverages
+        }
+    }
+    
+    /**
+     * Kotlin fallback for block brightness computation.
+     */
+    private fun computeBlockAveragesKotlin(
+        yData: ByteArray, 
+        width: Int, 
+        height: Int, 
+        metrics: TextMetricsKotlin, 
+        blockAverages: ByteArray
+    ) {
         // Compute brightness for each character cell
         for (blockY in 0 until metrics.numCharacterRows) {
             for (blockX in 0 until metrics.numCharacterColumns) {
@@ -180,13 +279,6 @@ class MatrixEffectKotlin(
                     0.toByte()
             }
         }
-        
-        // Apply edge detection if enabled
-        return if (computeEdges) {
-            applyEdgeDetection(blockAverages, metrics.numCharacterColumns, metrics.numCharacterRows)
-        } else {
-            blockAverages
-        }
     }
     
     /**
@@ -196,6 +288,34 @@ class MatrixEffectKotlin(
         val result = ByteArray(input.size)
         val multiplier = 4 // Edge strength multiplier
         
+        // Use native implementation if available for better performance
+        if (nativeLibraryLoaded) {
+            try {
+                val numCores = Runtime.getRuntime().availableProcessors()
+                // Use threading only for larger grids to avoid overhead
+                val minRowsForThreading = 32
+                val numThreads = if (height >= minRowsForThreading) {
+                    minOf(numCores, height / 16).coerceAtLeast(1)
+                } else {
+                    1 // Single thread for small grids
+                }
+                
+                applyEdgeDetectionNative(input, result, width, height, multiplier, numThreads)
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native edge detection failed, falling back to Kotlin", e)
+                applyEdgeDetectionKotlin(input, result, width, height, multiplier)
+            }
+        } else {
+            applyEdgeDetectionKotlin(input, result, width, height, multiplier)
+        }
+        
+        return result
+    }
+    
+    /**
+     * Kotlin fallback for edge detection.
+     */
+    private fun applyEdgeDetectionKotlin(input: ByteArray, result: ByteArray, width: Int, height: Int, multiplier: Int) {
         for (y in 0 until height) {
             for (x in 0 until width) {
                 val index = y * width + x
@@ -219,8 +339,6 @@ class MatrixEffectKotlin(
                 }
             }
         }
-        
-        return result
     }
 
     /**
@@ -389,10 +507,24 @@ class MatrixEffectKotlin(
     /**
      * Create a colored character bitmap by replacing non-black pixels with the desired color.
      * This mimics the RenderScript logic: if (pixel is non-black) use textColor else use original
+     * 
+     * NOTE: Character coloring is kept in Kotlin due to high JNI overhead when called 3600+ times per frame
      */
     private fun createColoredCharBitmap(template: Bitmap, srcRect: Rect, color: Int, width: Int, height: Int): Bitmap {
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val pixels = IntArray(width * height)
+        
+        // Always use Kotlin for character coloring to avoid JNI overhead on frequent calls
+        createColoredCharBitmapKotlin(template, srcRect, color, width, height, pixels)
+        
+        result.setPixels(pixels, 0, width, 0, 0, width, height)
+        return result
+    }
+    
+    /**
+     * Kotlin fallback for character coloring.
+     */
+    private fun createColoredCharBitmapKotlin(template: Bitmap, srcRect: Rect, color: Int, width: Int, height: Int, pixels: IntArray) {
         val templatePixels = IntArray(srcRect.width() * srcRect.height())
         
         // Extract pixels from the template character
@@ -423,9 +555,6 @@ class MatrixEffectKotlin(
                 }
             }
         }
-        
-        result.setPixels(pixels, 0, width, 0, 0, width, height)
-        return result
     }
 
     /**
@@ -506,19 +635,4 @@ class MatrixEffectKotlin(
         return resultBitmap
     }
 
-    companion object {
-        const val EFFECT_NAME = "matrixKotlin"
-        const val DEFAULT_CHARACTER_COLUMNS = 120
-
-        // Japanese hiragana and katakana characters, and (reversed) English letters and numbers
-        const val MATRIX_NORMAL_CHARS =
-            "ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕ" +
-            "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ"
-        const val MATRIX_REVERSED_CHARS = "QWERTYUIOPASDFGHJKLZXCVBNM1234567890"
-        const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
-
-        fun fromParameters(params: Map<String, Any>): MatrixEffectKotlin {
-            return MatrixEffectKotlin(params)
-        }
-    }
 } 
