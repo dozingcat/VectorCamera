@@ -11,18 +11,31 @@ add_library(vectorcamera_native SHARED
     edge_luminance_native.cpp
     edge_effect_native.cpp
     permute_color_effect_native.cpp
-    cartoon_effect_native.cpp)
+    cartoon_effect_native.cpp
+    convolve3x3_effect_native.cpp)
 
 # Set C++17 standard
 set_property(TARGET vectorcamera_native PROPERTY CXX_STANDARD 17)
 
-# Add optimization and architecture-specific flags
+# Add aggressive optimization and architecture-specific flags
 target_compile_options(vectorcamera_native PRIVATE
     -O3
     -ffast-math
     -funroll-loops
     -fomit-frame-pointer
+    -ftree-vectorize
+    -fno-signed-zeros
+    -fno-trapping-math
+    -fassociative-math
+    -freciprocal-math
 )
+
+# Add ARM-specific optimizations when targeting ARM
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    target_compile_options(vectorcamera_native PRIVATE -mcpu=cortex-a53)
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    target_compile_options(vectorcamera_native PRIVATE -mcpu=cortex-a9 -mfpu=neon)
+endif()
 
 # Link against the log library (for Android logging)
 find_library(log-lib log)

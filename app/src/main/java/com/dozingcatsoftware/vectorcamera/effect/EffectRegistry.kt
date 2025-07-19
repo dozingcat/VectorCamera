@@ -393,6 +393,7 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context -> Convolve3x3EffectKotlin.emboss() },
 
             // Custom edge.
             {rs, prefsFn, context ->
@@ -442,6 +443,7 @@ class EffectRegistry {
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             SolidColorEffectKotlin.EFFECT_NAME -> SolidColorEffectKotlin.fromParameters(params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
+            Convolve3x3EffectKotlin.EFFECT_NAME -> Convolve3x3EffectKotlin.fromParameters(params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
             CartoonEffectKotlin.EFFECT_NAME -> CartoonEffectKotlin.fromParameters(params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(rs, params)

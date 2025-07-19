@@ -245,5 +245,22 @@ class SolidColorEffectKotlin(
                 "maxColor" to listOf(0, 0, 0)
             )
         ))
+        
+        /**
+         * Test method to verify the color mapping functionality
+         */
+        fun testColorMap() {
+            val effect = blackToWhite()
+            val colorMap = effect.colorMap
+            
+            // Test key values
+            assert(colorMap[0] == Color.BLACK) { "colorMap[0] should be black, got ${colorMap[0]}" }
+            assert(colorMap[255] == Color.WHITE) { "colorMap[255] should be white, got ${colorMap[255]}" }
+            assert(Color.red(colorMap[128]) == 128) { "colorMap[128] red should be ~128, got ${Color.red(colorMap[128])}" }
+            assert(Color.green(colorMap[128]) == 128) { "colorMap[128] green should be ~128, got ${Color.green(colorMap[128])}" }
+            assert(Color.blue(colorMap[128]) == 128) { "colorMap[128] blue should be ~128, got ${Color.blue(colorMap[128])}" }
+            
+            Log.i(EFFECT_NAME, "Color map test passed - brightness to color mapping is working correctly")
+        }
     }
 } 
