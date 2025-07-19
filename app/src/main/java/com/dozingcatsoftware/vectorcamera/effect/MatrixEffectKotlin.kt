@@ -1,16 +1,18 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.util.Log
 import android.util.Size
-import com.dozingcatsoftware.util.YuvUtils
+
 import com.dozingcatsoftware.util.scaleToTargetSize
 import com.dozingcatsoftware.vectorcamera.*
-import kotlinx.coroutines.*
+
 import java.util.*
 import kotlin.math.*
-import androidx.core.graphics.withScale
-import androidx.core.graphics.withTranslation
+
 
 /**
  * Kotlin-based raindrop animation state.
@@ -112,6 +114,25 @@ class MatrixEffectKotlin(
     )
     
 
+    
+    private external fun renderCharacterGridNative(
+        templatePixels: IntArray,
+        templateWidth: Int,
+        templateHeight: Int,
+        charWidth: Int,
+        charHeight: Int,
+        characterIndices: IntArray,
+        characterColors: IntArray,
+        numCharColumns: Int,
+        numCharRows: Int,
+        isPortrait: Boolean,
+        xFlipped: Boolean,
+        yFlipped: Boolean,
+        outputWidth: Int,
+        outputHeight: Int,
+        outputPixels: IntArray,
+        numThreads: Int
+    )
     
     private external fun isNativeAvailable(): Boolean
 
@@ -491,74 +512,23 @@ class MatrixEffectKotlin(
         }
         
         // Draw reversed characters (mirrored horizontally)
-        canvas.withScale(-1f, 1f) {
-            val reversedChars = MATRIX_REVERSED_CHARS
-            for (i in reversedChars.indices) {
-                drawText(
-                    reversedChars[i].toString(),
-                    -((normalChars.length + i + 1) * charPixelSize.width).toFloat(),
-                    charPixelSize.height - 1f,
-                    paint
-                )
-            }
+        canvas.save()
+        canvas.scale(-1f, 1f)
+        val reversedChars = MATRIX_REVERSED_CHARS
+        for (i in reversedChars.indices) {
+            canvas.drawText(
+                reversedChars[i].toString(),
+                -((normalChars.length + i + 1) * charPixelSize.width).toFloat(),
+                charPixelSize.height - 1f,
+                paint
+            )
         }
+        canvas.restore()
     }
 
     /**
-     * Create a colored character bitmap by replacing non-black pixels with the desired color.
-     * This mimics the RenderScript logic: if (pixel is non-black) use textColor else use original
-     * 
-     * NOTE: Character coloring is kept in Kotlin due to high JNI overhead when called 3600+ times per frame
-     */
-    private fun createColoredCharBitmap(template: Bitmap, srcRect: Rect, color: Int, width: Int, height: Int): Bitmap {
-        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val pixels = IntArray(width * height)
-        
-        // Always use Kotlin for character coloring to avoid JNI overhead on frequent calls
-        createColoredCharBitmapKotlin(template, srcRect, color, width, height, pixels)
-        
-        result.setPixels(pixels, 0, width, 0, 0, width, height)
-        return result
-    }
-    
-    /**
-     * Kotlin fallback for character coloring.
-     */
-    private fun createColoredCharBitmapKotlin(template: Bitmap, srcRect: Rect, color: Int, width: Int, height: Int, pixels: IntArray) {
-        val templatePixels = IntArray(srcRect.width() * srcRect.height())
-        
-        // Extract pixels from the template character
-        template.getPixels(templatePixels, 0, srcRect.width(), srcRect.left, srcRect.top, srcRect.width(), srcRect.height())
-        
-        // Scale to target size if needed and apply color replacement
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val srcX = (x * srcRect.width()) / width
-                val srcY = (y * srcRect.height()) / height
-                val srcIndex = srcY * srcRect.width() + srcX
-                
-                if (srcIndex < templatePixels.size) {
-                    val templatePixel = templatePixels[srcIndex]
-                    val red = Color.red(templatePixel)
-                    val green = Color.green(templatePixel)
-                    val blue = Color.blue(templatePixel)
-                    
-                    // RenderScript logic: if non-black, use textColor, else use original (black)
-                    val resultPixel = if (red > 0 || green > 0 || blue > 0) {
-                        color
-                    } else {
-                        Color.BLACK
-                    }
-                    pixels[y * width + x] = resultPixel
-                } else {
-                    pixels[y * width + x] = Color.BLACK
-                }
-            }
-        }
-    }
-
-    /**
-     * Render the final bitmap by drawing characters into a grid.
+     * Render the final bitmap using native bulk character rendering.
+     * This replaces thousands of individual character operations with one multi-threaded C++ call.
      */
     private fun renderFinalBitmap(cameraImage: CameraImage, metrics: TextMetricsKotlin): Bitmap {
         val resultBitmap = Bitmap.createBitmap(
@@ -566,12 +536,68 @@ class MatrixEffectKotlin(
             metrics.outputSize.height, 
             Bitmap.Config.ARGB_8888
         )
-        val canvas = Canvas(resultBitmap)
-        canvas.drawColor(Color.BLACK)
         
         val template = characterTemplate!!
         val charWidth = metrics.charPixelSize.width
         val charHeight = metrics.charPixelSize.height
+        val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
+        
+        // Use native bulk rendering if available for massive performance improvement
+        if (nativeLibraryLoaded) {
+            try {
+                // Get template bitmap pixels once
+                val templatePixels = IntArray(template.width * template.height)
+                template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
+                
+                // Determine optimal threading for character rendering
+                val numCores = Runtime.getRuntime().availableProcessors()
+                val minRowsForThreading = 8
+                val numThreads = if (metrics.numCharacterRows >= minRowsForThreading) {
+                    minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
+                } else {
+                    1
+                }
+                
+                // Render entire character grid in native code with multi-threading
+                renderCharacterGridNative(
+                    templatePixels, template.width, template.height,
+                    charWidth, charHeight,
+                    characterIndices!!, characterColors!!,
+                    metrics.numCharacterColumns, metrics.numCharacterRows,
+                    metrics.isPortrait, cameraImage.orientation.xFlipped, cameraImage.orientation.yFlipped,
+                    metrics.outputSize.width, metrics.outputSize.height,
+                    outputPixels, numThreads
+                )
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
+                renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
+            }
+        } else {
+            renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
+        }
+        
+        // Create bitmap from rendered pixels
+        resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0, 
+                              metrics.outputSize.width, metrics.outputSize.height)
+        return resultBitmap
+    }
+    
+    /**
+     * Kotlin fallback for character grid rendering.
+     */
+    private fun renderFinalBitmapKotlin(
+        cameraImage: CameraImage, 
+        metrics: TextMetricsKotlin, 
+        template: Bitmap, 
+        charWidth: Int, 
+        charHeight: Int, 
+        outputPixels: IntArray
+    ) {
+        // Fill with black background
+        outputPixels.fill(Color.BLACK)
+        
+        val templatePixels = IntArray(template.width * template.height)
+        template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
         
         for (blockY in 0 until metrics.numCharacterRows) {
             for (blockX in 0 until metrics.numCharacterColumns) {
@@ -581,18 +607,15 @@ class MatrixEffectKotlin(
                 val charIndex = characterIndices!![cellIndex]
                 val color = characterColors!![cellIndex]
                 
-                // Calculate source rectangle in character template
+                // Calculate source and destination rectangles
                 val srcLeft = charIndex * charWidth
-                val srcRect = Rect(srcLeft, 0, srcLeft + charWidth, charHeight)
                 
-                // Calculate destination rectangle in output
                 val dstLeft: Int
                 val dstTop: Int
                 val dstWidth: Int
                 val dstHeight: Int
                 
                 if (metrics.isPortrait) {
-                    // In portrait mode, characters are rotated
                     dstLeft = blockY * charHeight
                     dstTop = (metrics.numCharacterColumns - 1 - blockX) * charWidth
                     dstWidth = charHeight
@@ -604,35 +627,41 @@ class MatrixEffectKotlin(
                     dstHeight = charHeight
                 }
                 
-                val dstRect = Rect(dstLeft, dstTop, dstLeft + dstWidth, dstTop + dstHeight)
-                
-                // Create a colored character bitmap by replacing white pixels with the desired color
-                val coloredChar = createColoredCharBitmap(template, srcRect, color, charWidth, charHeight)
-                
-                if (metrics.isPortrait) {
-                    // Portrait mode: rotate character 90 degrees
-                    canvas.withTranslation(
-                        (dstLeft + dstWidth / 2).toFloat(),
-                        (dstTop + dstHeight / 2).toFloat()
-                    ) {
-                        rotate(-90f)
-                        if (cameraImage.orientation.xFlipped) scale(-1f, 1f)
-                        if (cameraImage.orientation.yFlipped) scale(1f, -1f)
-                        translate(-charWidth / 2f, -charHeight / 2f)
-                        drawBitmap(coloredChar, null, Rect(0, 0, charWidth, charHeight), null)
-                    }
-                } else {
-                    // Landscape mode: draw character normally with flipping
-                    canvas.withTranslation(dstLeft.toFloat(), dstTop.toFloat()) {
-                        if (cameraImage.orientation.xFlipped) scale(-1f, 1f)
-                        if (cameraImage.orientation.yFlipped) scale(1f, -1f)
-                        drawBitmap(coloredChar, null, Rect(0, 0, charWidth, charHeight), null)
+                // Render character pixels directly to output buffer
+                for (dy in 0 until dstHeight) {
+                    for (dx in 0 until dstWidth) {
+                        var srcX: Int
+                        var srcY: Int
+                        
+                        if (metrics.isPortrait) {
+                            // Portrait transformation
+                            srcX = srcLeft + (if (cameraImage.orientation.yFlipped) dy else charWidth - 1 - dy)
+                            srcY = if (cameraImage.orientation.xFlipped) charHeight - 1 - dx else dx
+                        } else {
+                            // Landscape transformation
+                            srcX = srcLeft + (if (cameraImage.orientation.xFlipped) charWidth - 1 - dx else dx)
+                            srcY = if (cameraImage.orientation.yFlipped) charHeight - 1 - dy else dy
+                        }
+                        
+                        // Bounds check
+                        if (srcX >= srcLeft && srcX < srcLeft + charWidth && srcY >= 0 && srcY < charHeight) {
+                            val templatePixel = templatePixels[srcY * template.width + srcX]
+                            val red = Color.red(templatePixel)
+                            val green = Color.green(templatePixel)
+                            val blue = Color.blue(templatePixel)
+                            
+                            val outputColor = if (red > 0 || green > 0 || blue > 0) color else Color.BLACK
+                            
+                            val outX = dstLeft + dx
+                            val outY = dstTop + dy
+                            if (outX >= 0 && outX < metrics.outputSize.width && outY >= 0 && outY < metrics.outputSize.height) {
+                                outputPixels[outY * metrics.outputSize.width + outX] = outputColor
+                            }
+                        }
                     }
                 }
             }
         }
-        
-        return resultBitmap
     }
 
 } 

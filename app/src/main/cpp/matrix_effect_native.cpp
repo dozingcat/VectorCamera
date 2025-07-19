@@ -237,4 +237,172 @@ Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_isNativeAvaila
     return JNI_TRUE;
 }
 
+/**
+ * Render the entire character grid to a pixel buffer in parallel.
+ * This replaces thousands of individual character rendering calls with one bulk operation.
+ */
+void renderCharacterGrid(
+    const uint32_t* __restrict__ templatePixels,
+    int templateWidth,
+    int templateHeight,
+    int charWidth,
+    int charHeight,
+    const int* __restrict__ characterIndices,
+    const uint32_t* __restrict__ characterColors,
+    int numCharColumns,
+    int numCharRows,
+    bool isPortrait,
+    bool xFlipped,
+    bool yFlipped,
+    int outputWidth,
+    int outputHeight,
+    uint32_t* __restrict__ outputPixels,
+    int startRow,
+    int endRow
+) {
+    const uint32_t BLACK = 0xFF000000;
+    
+    for (int blockY = startRow; blockY < endRow; blockY++) {
+        for (int blockX = 0; blockX < numCharColumns; blockX++) {
+            const int cellIndex = blockY * numCharColumns + blockX;
+            const int charIndex = characterIndices[cellIndex];
+            const uint32_t color = characterColors[cellIndex];
+            
+            // Calculate source rectangle in character template
+            const int srcLeft = charIndex * charWidth;
+            const int srcRight = srcLeft + charWidth;
+            
+            // Calculate destination rectangle in output
+            int dstLeft, dstTop, dstWidth, dstHeight;
+            
+            if (isPortrait) {
+                // Portrait mode: characters are rotated
+                dstLeft = blockY * charHeight;
+                dstTop = (numCharColumns - 1 - blockX) * charWidth;
+                dstWidth = charHeight;
+                dstHeight = charWidth;
+            } else {
+                dstLeft = blockX * charWidth;
+                dstTop = blockY * charHeight;
+                dstWidth = charWidth;
+                dstHeight = charHeight;
+            }
+            
+            // Render character pixels
+            for (int dy = 0; dy < dstHeight; dy++) {
+                for (int dx = 0; dx < dstWidth; dx++) {
+                    int srcX, srcY;
+                    
+                    if (isPortrait) {
+                        // Portrait transformation: rotate -90 degrees
+                        srcX = srcLeft + (yFlipped ? dy : charWidth - 1 - dy);
+                        srcY = xFlipped ? charHeight - 1 - dx : dx;
+                    } else {
+                        // Landscape transformation: apply flipping
+                        srcX = srcLeft + (xFlipped ? charWidth - 1 - dx : dx);
+                        srcY = yFlipped ? charHeight - 1 - dy : dy;
+                    }
+                    
+                    // Bounds check for template
+                    if (srcX >= srcLeft && srcX < srcRight && srcY >= 0 && srcY < templateHeight) {
+                        const uint32_t templatePixel = templatePixels[srcY * templateWidth + srcX];
+                        
+                        // Check if template pixel is non-black
+                        const uint8_t red = (templatePixel >> 16) & 0xFF;
+                        const uint8_t green = (templatePixel >> 8) & 0xFF;
+                        const uint8_t blue = templatePixel & 0xFF;
+                        
+                        // Determine output pixel color
+                        const uint32_t outputColor = (red > 0 || green > 0 || blue > 0) ? color : BLACK;
+                        
+                        // Write to output buffer
+                        const int outX = dstLeft + dx;
+                        const int outY = dstTop + dy;
+                        if (outX >= 0 && outX < outputWidth && outY >= 0 && outY < outputHeight) {
+                            outputPixels[outY * outputWidth + outX] = outputColor;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Render all characters to output buffer with multi-threading.
+ */
+JNIEXPORT void JNICALL
+Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_renderCharacterGridNative(
+    JNIEnv *env,
+    jobject /* this */,
+    jintArray templatePixels,
+    jint templateWidth,
+    jint templateHeight,
+    jint charWidth,
+    jint charHeight,
+    jintArray characterIndices,
+    jintArray characterColors,
+    jint numCharColumns,
+    jint numCharRows,
+    jboolean isPortrait,
+    jboolean xFlipped,
+    jboolean yFlipped,
+    jint outputWidth,
+    jint outputHeight,
+    jintArray outputPixels,
+    jint numThreads
+) {
+    // Get native array pointers
+    jint* templateInts = env->GetIntArrayElements(templatePixels, nullptr);
+    jint* charIndices = env->GetIntArrayElements(characterIndices, nullptr);
+    jint* charColors = env->GetIntArrayElements(characterColors, nullptr);
+    jint* outputInts = env->GetIntArrayElements(outputPixels, nullptr);
+    
+    if (!templateInts || !charIndices || !charColors || !outputInts) {
+        LOGE("Failed to get array elements for character grid rendering");
+        return;
+    }
+    
+    const uint32_t* templatePtr = reinterpret_cast<const uint32_t*>(templateInts);
+    const int* indicesPtr = reinterpret_cast<const int*>(charIndices);
+    const uint32_t* colorsPtr = reinterpret_cast<const uint32_t*>(charColors);
+    uint32_t* outputPtr = reinterpret_cast<uint32_t*>(outputInts);
+    
+    // Clear output buffer to black
+    const int totalPixels = outputWidth * outputHeight;
+    std::fill(outputPtr, outputPtr + totalPixels, 0xFF000000);
+    
+    if (numThreads == 1) {
+        renderCharacterGrid(templatePtr, templateWidth, templateHeight, charWidth, charHeight,
+                           indicesPtr, colorsPtr, numCharColumns, numCharRows,
+                           isPortrait, xFlipped, yFlipped, outputWidth, outputHeight,
+                           outputPtr, 0, numCharRows);
+    } else {
+        std::vector<std::thread> threads;
+        const int rowsPerThread = numCharRows / numThreads;
+        
+        for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
+            const int startRow = threadIndex * rowsPerThread;
+            const int endRow = (threadIndex == numThreads - 1) ? 
+                numCharRows : (threadIndex + 1) * rowsPerThread;
+            
+            threads.emplace_back(renderCharacterGrid, templatePtr, templateWidth, templateHeight,
+                               charWidth, charHeight, indicesPtr, colorsPtr, numCharColumns, numCharRows,
+                               isPortrait, xFlipped, yFlipped, outputWidth, outputHeight,
+                               outputPtr, startRow, endRow);
+        }
+        
+        // Wait for all threads to complete
+        for (auto& thread : threads) {
+            thread.join();
+        }
+    }
+    
+    // Release arrays
+    env->ReleaseIntArrayElements(templatePixels, templateInts, JNI_ABORT);
+    env->ReleaseIntArrayElements(characterIndices, charIndices, JNI_ABORT);
+    env->ReleaseIntArrayElements(characterColors, charColors, JNI_ABORT);
+    env->ReleaseIntArrayElements(outputPixels, outputInts, 0);
+}
+
 } // extern "C" 

@@ -372,6 +372,13 @@ class EffectRegistry {
                         "edges" to true
                 ))
             },
+        {rs, prefsFn, context ->
+            MatrixEffectKotlin.fromParameters(mapOf(
+                "numColumns" to numAsciiColumns(prefsFn),
+                "textColor" to matrixTextColor(prefsFn, 0x00ff00),
+                "edges" to false
+            ))
+        },
 
             // Row 6
             {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
