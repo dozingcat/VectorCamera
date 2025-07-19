@@ -377,6 +377,7 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context -> SolidColorEffectKotlin.whiteToBlack() },
 
             {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) },
             {rs, prefsFn, context -> CartoonEffectKotlin.fromParameters(mapOf()) },
@@ -439,6 +440,7 @@ class EffectRegistry {
             EdgeLuminanceEffectKotlin.EFFECT_NAME -> EdgeLuminanceEffectKotlin.fromParameters(params)
             PermuteColorEffectKotlin.EFFECT_NAME -> PermuteColorEffectKotlin.fromParameters(params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
+            SolidColorEffectKotlin.EFFECT_NAME -> SolidColorEffectKotlin.fromParameters(params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(rs, params)
             CartoonEffectKotlin.EFFECT_NAME -> CartoonEffectKotlin.fromParameters(params)
