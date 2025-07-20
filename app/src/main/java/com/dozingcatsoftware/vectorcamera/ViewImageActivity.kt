@@ -117,10 +117,11 @@ class ViewImageActivity : AppCompatActivity() {
     }
 
     private fun createCameraImage(metadata: MediaMetadata): CameraImage {
-        val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
-            PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
-        }
-        return CameraImage(rs, null, planarYuv, null, metadata.orientation,
+        val yuvBytes = photoLibrary.rawImageFileInputStreamForItemId(imageId).readBytes()
+        val imageData = ImageData.fromYuvBytes(
+            yuvBytes, metadata.width, metadata.height
+        )
+        return CameraImage(rs, null, null, imageData, metadata.orientation,
                 CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getLandscapeDisplaySize(this))
     }
 

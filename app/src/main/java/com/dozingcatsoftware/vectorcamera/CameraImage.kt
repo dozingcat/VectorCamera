@@ -8,6 +8,7 @@ import android.renderscript.ScriptIntrinsicResize
 import android.util.Size
 import com.dozingcatsoftware.util.create2dAllocation
 import java.nio.ByteBuffer
+import kotlin.math.ceil
 
 /**
  * Stores YUV image data extracted from an Android Image.
@@ -62,6 +63,25 @@ data class ImageData(
                 yRowStride = yPlane.rowStride,
                 uvPixelStride = uPlane.pixelStride,
                 uvRowStride = uPlane.rowStride
+            )
+        }
+
+        fun fromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): ImageData {
+            val uvWidth = ceil(width / 2.0).toInt()
+            val uvHeight = ceil(height / 2.0).toInt()
+            val uStart = width * height
+            val vStart = uStart + (uvWidth * uvHeight)
+
+            return ImageData(
+                width = width,
+                height = height,
+                yData = yuvBytes.copyOfRange(0, uStart),
+                uData = yuvBytes.copyOfRange(uStart, vStart),
+                vData = yuvBytes.copyOfRange(vStart, yuvBytes.size),
+                yPixelStride = 1,
+                yRowStride = width,
+                uvPixelStride = 1,
+                uvRowStride = uvWidth
             )
         }
     }
