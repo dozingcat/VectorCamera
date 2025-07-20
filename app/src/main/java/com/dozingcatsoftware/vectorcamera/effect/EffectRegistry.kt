@@ -8,6 +8,7 @@ import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
 import com.dozingcatsoftware.vectorcamera.effect.EdgeEffectKotlin
 import com.dozingcatsoftware.vectorcamera.effect.PermuteColorEffectKotlin
 import com.dozingcatsoftware.vectorcamera.effect.MatrixEffectKotlin
+import com.dozingcatsoftware.vectorcamera.effect.AsciiEffectKotlin
 
 enum class EffectContext {
     NORMAL,
@@ -19,6 +20,9 @@ class EffectRegistry {
 
     // 36 effects, shown in 6x6 grid.
     // See Animated2dGradient.kt for description of gradient grids.
+
+    // This checkpoint duplicates each effect using both RenderScript and Kotlin/C++ implementations.
+    
     val baseEffects = listOf<(RenderScript, (String, Any) -> Any, EffectContext) -> Effect>(
 
             // Row 1, edges on black.
@@ -26,18 +30,18 @@ class EffectRegistry {
             {rs, prefsFn, context -> EdgeLuminanceEffect(rs) },
             {rs, prefsFn, context -> EdgeLuminanceEffectKotlin() },
 
-            // Edge strength->color map (Kotlin implementation)
-            {rs, prefsFn, context -> EdgeEffectKotlin.fromParameters(mapOf(
-                    "colors" to mapOf(
-                            "type" to "fixed",
-                            "minColor" to listOf(0, 0, 0),
-                            "maxColor" to listOf(255, 255, 255)
-                    )
-            )) },
-
             // White
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 255)
+                        )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(0, 0, 0),
@@ -55,6 +59,15 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(0, 0, 0),
+                        "maxColor" to listOf(0, 255, 0)
+                    )
+                ))
+            },
             // Red
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -65,9 +78,27 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(0, 0, 0),
+                        "maxColor" to listOf(255, 0, 0)
+                    )
+                ))
+            },
             // Blue
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(0, 0, 255)
+                        )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(0, 0, 0),
@@ -85,7 +116,15 @@ class EffectRegistry {
                         )
                 ))
             },
-
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(0, 0, 0),
+                        "maxColor" to listOf(0, 255, 255)
+                    )
+                ))
+            },
             // Row 2
             // Purple
             {rs, prefsFn, context ->
@@ -95,6 +134,15 @@ class EffectRegistry {
                                 "minColor" to listOf(0, 0, 0),
                                 "maxColor" to listOf(255, 0, 255)
                         )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(0, 0, 0),
+                        "maxColor" to listOf(255, 0, 255)
+                    )
                 ))
             },
             // Yellow
@@ -118,6 +166,15 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(255, 255, 255),
+                        "maxColor" to listOf(0, 0, 0)
+                    )
+                ))
+            },
             // Green on white.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -126,6 +183,15 @@ class EffectRegistry {
                                 "minColor" to listOf(255, 255, 255),
                                 "maxColor" to listOf(0, 160, 0)
                         )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(255, 255, 255),
+                        "maxColor" to listOf(0, 160, 0)
+                    )
                 ))
             },
             // Red on white.
@@ -138,6 +204,15 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(255, 255, 255),
+                        "maxColor" to listOf(255, 0, 0)
+                    )
+                ))
+            },
             // Blue on white.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -148,7 +223,15 @@ class EffectRegistry {
                         )
                 ))
             },
-
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(255, 255, 255),
+                        "maxColor" to listOf(0, 0, 255)
+                    )
+                ))
+            },
             // Row 3
             // Yellow background, 2d gradient colors.
             {rs, prefsFn, context ->
@@ -163,6 +246,20 @@ class EffectRegistry {
                                 ),
                                 "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(255, 255, 192),
+                        "grid" to listOf(
+                            listOf(
+                                listOf(255,0,0, 0,192,0, 0,0,255, 0,0,0)
+                            )
+                        ),
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
                 ))
             },
             // Pink background, 2d gradient colors.
@@ -180,7 +277,20 @@ class EffectRegistry {
                         )
                 ))
             },
-
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(255,182,193),
+                        "grid" to listOf(
+                            listOf(
+                                listOf(0,128,0, 128,0,0, 0,128,128, 128,0,128)
+                            )
+                        ),
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
+                ))
+            },
             // Animated colors.
             // Blue-green edges on black.
             {rs, prefsFn, context ->
@@ -191,6 +301,16 @@ class EffectRegistry {
                                 "gradientStartColor" to listOf(0, 255, 0),
                                 "gradientEndColor" to listOf(0, 0, 255)
                         )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "linear_gradient",
+                        "minColor" to listOf(0, 0, 0),
+                        "gradientStartColor" to listOf(0, 255, 0),
+                        "gradientEndColor" to listOf(0, 0, 255)
+                    )
                 ))
             },
             // Radial gradient background.
@@ -204,9 +324,36 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "radial_gradient",
+                        "minColor" to listOf(25, 25, 112),
+                        "centerColor" to listOf(255, 255, 0),
+                        "outerColor" to listOf(255, 70, 0),
+                    )
+                ))
+            },
+
             // Red-green horizontally animated colors.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
+                        "colors" to mapOf(
+                                "type" to "grid_gradient",
+                                "minColor" to listOf(0, 0, 0),
+                                "grid" to listOf(
+                                        listOf(
+                                                listOf(255,0,0, 0,255,0, 255,0,0, 0,255,0),
+                                                listOf(0,255,0, 255,0,0, 0,255,0, 255,0,0)
+                                        )
+                                ),
+                                "speedX" to 250,
+                                "pixelsPerCell" to gradientPixelsPerCell(context)
+                        )
+                ))
+            },
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
                                 "minColor" to listOf(0, 0, 0),
@@ -245,7 +392,25 @@ class EffectRegistry {
                         )
                 ))
             },
-
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(0, 0, 0),
+                        "grid" to listOf(
+                            listOf(
+                                listOf(255,0,0, 0,255,0, 0,0,255, 255,255,255), 
+                                listOf(0,255,0, 255,0,0, 255,255,255, 0,0,255)
+                            )
+                        ),
+                        "sizeX" to 0.5,
+                        "sizeY" to 0.5,
+                        "speedX" to 300,
+                        "speedY" to 200,
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
+                ))
+            },
             // Row 4
             // Rainbow, animated vertically on white background.
             {rs, prefsFn, context ->
@@ -267,7 +432,25 @@ class EffectRegistry {
                         )
                 ))
             },
-
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(255, 255, 255),
+                        "grid" to listOf(
+                            listOf(listOf(128,0,0, 128,0,0, 96,96,0, 96,96,0)),
+                            listOf(listOf(96,96,0, 96,96,0, 0,128,0, 0,128,0)),
+                            listOf(listOf(0,128,0, 0,128,0, 0,96,96, 0,96,96)),
+                            listOf(listOf(0,96,96, 0,96,96, 0,0,128, 0,0,128)),
+                            listOf(listOf(0,0,128, 0,0,128, 96,0,96, 96,0,96)),
+                            listOf(listOf(96,0,96, 96,0,96, 128,0,0, 128,0,0))
+                        ),
+                        "sizeY" to 3.0, 
+                        "speedY" to 500,
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
+                ))
+            },
             // Solid effects
             // Rainbow 2d gradient.
             {rs, prefsFn, context ->
@@ -282,6 +465,18 @@ class EffectRegistry {
                                 ),
                                 "pixelsPerCell" to gradientPixelsPerCell(context)
                         )
+                ))
+            },
+            {rs, prefsFn, context ->
+                SolidColorEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(0, 0, 0),
+                        "grid" to listOf(
+                            listOf(listOf(255,255,255, 255,0,0, 0,255,0, 0,0,255))
+                        ),
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
                 ))
             },
             // Cyan background, purple/red/yellow foreground.
@@ -303,15 +498,34 @@ class EffectRegistry {
                         )
                 ))
             },
+            {rs, prefsFn, context ->
+                SolidColorEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(0, 255, 255),
+                        "grid" to listOf(
+                            listOf(
+                                listOf(255,0,255, 255,0,0, 255,0,255, 255,0,0),
+                                listOf(255,0,0, 255,128,0, 255,0,0, 255,128,0),
+                                listOf(255,128,0, 255,0,0, 255,128,0, 255,0,0),
+                                listOf(255,0,0, 255,0,255, 255,0,0, 255,0,255)
+                            )
+                        ),
+                        "speedX" to 500,
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
+                ))
+            },
 
             {rs, prefsFn, context -> PermuteColorEffect.rgbToBrg(rs) },
-            {rs, prefsFn, context -> PermuteColorEffect.rgbToGbr(rs) },
-            {rs, prefsFn, context -> PermuteColorEffect.flipUV(rs) },
-
-            // Kotlin versions for comparison
             {rs, prefsFn, context -> PermuteColorEffectKotlin.rgbToBrg() },
+            {rs, prefsFn, context -> PermuteColorEffect.rgbToGbr(rs) },
+            {rs, prefsFn, context -> PermuteColorEffectKotlin.rgbToGbr() },
+            {rs, prefsFn, context -> PermuteColorEffect.flipUV(rs) },
+            {rs, prefsFn, context -> PermuteColorEffectKotlin.flipUV() },
 
             // Row 5. Text effects.
+            // White text on black background.
             {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
@@ -324,6 +538,18 @@ class EffectRegistry {
                 ))
             },
             {rs, prefsFn, context ->
+                AsciiEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "text" to listOf(255, 255, 255),
+                        "background" to listOf(0, 0, 0)
+                    ),
+                    "pixelChars" to asciiChars(prefsFn, "pixelChars.WHITE_ON_BLACK", " .:oO8#"),
+                    "numColumns" to numAsciiColumns(prefsFn),
+                    "prefId" to "pixelChars.WHITE_ON_BLACK"
+                ))
+            },
+            // Black text on white background.
+            {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colors" to mapOf(
                                 "text" to listOf(0, 0, 0),
@@ -335,6 +561,18 @@ class EffectRegistry {
                 ))
             },
             {rs, prefsFn, context ->
+                AsciiEffectKotlin.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "text" to listOf(0, 0, 0),
+                        "background" to listOf(255, 255, 255)
+                    ),
+                    "pixelChars" to asciiChars(prefsFn, "pixelChars.BLACK_ON_WHITE", "#o:..  "),
+                    "numColumns" to numAsciiColumns(prefsFn),
+                    "prefId" to "pixelChars.BLACK_ON_WHITE"
+                ))
+            },
+            // ANSI color mode.
+            {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "primary",
                         "pixelChars" to asciiChars(prefsFn, "pixelChars.ANSI_COLOR", " .:oO8#"),
@@ -342,6 +580,15 @@ class EffectRegistry {
                         "prefId" to "pixelChars.ANSI_COLOR"
                 ))
             },
+            {rs, prefsFn, context ->
+                AsciiEffectKotlin.fromParameters(mapOf(
+                        "colorMode" to "primary",
+                        "pixelChars" to asciiChars(prefsFn, "pixelChars.ANSI_COLOR", " .:oO8#"),
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "prefId" to "pixelChars.ANSI_COLOR"
+                ))
+            },
+            // Full color mode.
             {rs, prefsFn, context ->
                 AsciiEffect.fromParameters(rs, mapOf(
                         "colorMode" to "full",
@@ -351,20 +598,21 @@ class EffectRegistry {
                 ))
             },
             {rs, prefsFn, context ->
+                AsciiEffectKotlin.fromParameters(mapOf(
+                        "colorMode" to "full",
+                        "pixelChars" to asciiChars(prefsFn, "pixelChars.FULL_COLOR", "O8#"),
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "prefId" to "pixelChars.FULL_COLOR"
+                ))
+            },
+            // Matrix with edges.
+            {rs, prefsFn, context ->
                 MatrixEffect.fromParameters(rs, mapOf(
                         "numColumns" to numAsciiColumns(prefsFn),
                         "textColor" to matrixTextColor(prefsFn, 0x00ff00),
                         "edges" to true
                 ))
             },
-            {rs, prefsFn, context ->
-                MatrixEffect.fromParameters(rs, mapOf(
-                        "numColumns" to numAsciiColumns(prefsFn),
-                        "textColor" to matrixTextColor(prefsFn, 0x00ff00),
-                        "edges" to false
-                ))
-            },
-            // Kotlin Matrix implementation
             {rs, prefsFn, context ->
                 MatrixEffectKotlin.fromParameters(mapOf(
                         "numColumns" to numAsciiColumns(prefsFn),
@@ -372,17 +620,24 @@ class EffectRegistry {
                         "edges" to true
                 ))
             },
-        {rs, prefsFn, context ->
-            MatrixEffectKotlin.fromParameters(mapOf(
-                "numColumns" to numAsciiColumns(prefsFn),
-                "textColor" to matrixTextColor(prefsFn, 0x00ff00),
-                "edges" to false
-            ))
-        },
-
+            // Solid Matrix.
+            {rs, prefsFn, context ->
+                MatrixEffect.fromParameters(rs, mapOf(
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "textColor" to matrixTextColor(prefsFn, 0x00ff00),
+                        "edges" to false
+                ))
+            },
+            {rs, prefsFn, context ->
+                MatrixEffectKotlin.fromParameters(mapOf(
+                        "numColumns" to numAsciiColumns(prefsFn),
+                        "textColor" to matrixTextColor(prefsFn, 0x00ff00),
+                        "edges" to false
+                ))
+            },
             // Row 6
             {rs, prefsFn, context -> PermuteColorEffect.noOp(rs) },
-
+            {rs, prefsFn, context -> PermuteColorEffectKotlin.noOp() },
             // Grayscale negative.
             {rs, prefsFn, context ->
                 SolidColorEffect.fromParameters(rs, mapOf(
@@ -393,11 +648,18 @@ class EffectRegistry {
                         )
                 ))
             },
-            {rs, prefsFn, context -> SolidColorEffectKotlin.whiteToBlack() },
-
+            {rs, prefsFn, context ->
+                SolidColorEffectKotlin.fromParameters(mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(255, 255, 255),
+                                "maxColor" to listOf(0, 0, 0)
+                        )
+                ))
+            },
+            // Cartoon effect.
             {rs, prefsFn, context -> CartoonEffect.fromParameters(rs, mapOf()) },
             {rs, prefsFn, context -> CartoonEffectKotlin.fromParameters(mapOf()) },
-
             // Emboss grayscale.
             {rs, prefsFn, context ->
                 Convolve3x3Effect.fromParameters(rs, mapOf(
@@ -409,21 +671,38 @@ class EffectRegistry {
                         )
                 ))
             },
-            {rs, prefsFn, context -> Convolve3x3EffectKotlin.emboss() },
-
+            {rs, prefsFn, context ->
+                Convolve3x3EffectKotlin.fromParameters(mapOf(
+                        "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 255)
+                        )
+                ))
+            },
             // Custom edge.
             {rs, prefsFn, context ->
                 createCustomEffect(rs, prefsFn, context, "custom1",
                         CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
-
+            {rs, prefsFn, context ->
+                createCustomEffect(rs, prefsFn, context, "custom1",
+                        CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
+                                Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
+            },
             // Custom solid.
             {rs, prefsFn, context ->
                 createCustomEffect(rs, prefsFn, context, "custom2",
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
-            }
+            },
+            {rs, prefsFn, context ->
+                createCustomEffect(rs, prefsFn, context, "custom2",
+                        CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
+                                Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
+            },
 
     // TODO: Customizable edge/solid effects.
     )
@@ -451,6 +730,7 @@ class EffectRegistry {
             rs: RenderScript, name: String, params: Map<String, Any>): Effect {
         return when (name) {
             AsciiEffect.EFFECT_NAME -> AsciiEffect.fromParameters(rs, params)
+            AsciiEffectKotlin.EFFECT_NAME -> AsciiEffectKotlin.fromParameters(params)
             EdgeEffect.EFFECT_NAME -> EdgeEffect.fromParameters(rs, params)
             EdgeEffectKotlin.EFFECT_NAME -> EdgeEffectKotlin.fromParameters(params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
@@ -535,6 +815,31 @@ private fun createCustomEffect(
     val baseEffect = when (scheme.type) {
         CustomColorSchemeType.EDGE -> EdgeEffect.fromParameters(rs, params)
         CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(rs, params)
+    }
+    return CustomEffect(baseEffect, ctx, scheme, customEffectId)
+}
+
+private fun createCustomEffectKotlin(
+    prefsFn: (String, Any) -> Any,
+    ctx: EffectContext,
+    customEffectId: String,
+    defaultScheme: CustomColorScheme): Effect {
+    val schemeJson =
+        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+        catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomColorScheme.fromMap(schemeJson, defaultScheme)
+    // Construct a gradient grid from the CustomColorScheme colors.
+    val params = mapOf(
+        "type" to "grid_gradient",
+        "minColor" to rgbComponents(scheme.backgroundColor),
+        "grid" to listOf(listOf(rgbComponents(
+            scheme.topLeftColor, scheme.topRightColor,
+            scheme.bottomLeftColor, scheme.bottomRightColor))),
+        "pixelsPerCell" to gradientPixelsPerCell(ctx)
+    )
+    val baseEffect = when (scheme.type) {
+        CustomColorSchemeType.EDGE -> EdgeEffectKotlin.fromParameters(params)
+        CustomColorSchemeType.SOLID -> SolidColorEffectKotlin.fromParameters(params)
     }
     return CustomEffect(baseEffect, ctx, scheme, customEffectId)
 }
