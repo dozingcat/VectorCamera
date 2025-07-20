@@ -17,14 +17,13 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import com.dozingcatsoftware.vectorcamera.effect.AsciiEffect
+import com.dozingcatsoftware.vectorcamera.effect.AsciiEffectKotlin
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.vectorcamera.databinding.ViewImageBinding
-import com.dozingcatsoftware.vectorcamera.effect.AsciiEffectKotlin
 import java.io.File
 
 
@@ -84,13 +83,13 @@ class ViewImageActivity : AppCompatActivity() {
 
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
+        val effect = effectRegistry.effectForMetadata(metadata.effectMetadata)
         showImage(effect, metadata)
     }
 
     private fun showModeSelectionGrid(isPortrait: Boolean) {
         val comboEffect = CombinationEffect(
-                effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
+                effectRegistry.defaultEffectFunctions(preferences.lookupFunction))
         // Shrink the image so each combo grid cell doesn't have to process the full size.
         // May want to incrementally show the grid as cells are rendered, like for the live view.
         val metadata = photoLibrary.metadataForItemId(imageId)
@@ -163,7 +162,7 @@ class ViewImageActivity : AppCompatActivity() {
 
                 val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
                 val effect = effectRegistry.defaultEffectAtIndex(
-                        effectIndex, rs, preferences.lookupFunction)
+                        effectIndex, preferences.lookupFunction)
                 // Update metadata and thumbnail, *not* the full size image because that's slow.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
                         .withEffectMetadata(effect.effectMetadata())
@@ -181,8 +180,8 @@ class ViewImageActivity : AppCompatActivity() {
     private fun shareImage(view: View) {
         // Stop reading metadata so often?
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
-        if (effect is AsciiEffect || effect is AsciiEffectKotlin) {
+        val effect = effectRegistry.effectForMetadata(metadata.effectMetadata)
+        if (effect is AsciiEffectKotlin) {
             showAsciiTypeShareDialog(metadata, effect)
         }
         else {
@@ -291,33 +290,25 @@ class ViewImageActivity : AppCompatActivity() {
         shareIfExists()
     }
 
-    private fun shareText(metadata: MediaMetadata, effect: Effect) {
+    private fun shareText(metadata: MediaMetadata, effect: AsciiEffectKotlin) {
         val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
         val inputImage = createCameraImage(metadata)
         photoLibrary.createTempFileOutputStream(textFile).use {
-            when (effect) {
-                is AsciiEffect -> effect.writeText(inputImage, it)
-                is AsciiEffectKotlin -> effect.writeText(inputImage, it)
-                else -> throw AssertionError("Unexpected effect type: " + effect.effectName())
-            }
+            effect.writeText(inputImage, it)
         }
         shareFile(textFile.path, "text/plain")
     }
 
-    private fun shareHtml(metadata: MediaMetadata, effect: Effect) {
+    private fun shareHtml(metadata: MediaMetadata, effect: AsciiEffectKotlin) {
         val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
         val inputImage = createCameraImage(metadata)
         photoLibrary.createTempFileOutputStream(htmlFile).use {
-            when (effect) {
-                is AsciiEffect -> effect.writeHtml(inputImage, it)
-                is AsciiEffectKotlin -> effect.writeHtml(inputImage, it)
-                else -> throw AssertionError("Unexpected effect type: " + effect.effectName())
-            }
+            effect.writeHtml(inputImage, it)
         }
         shareFile(htmlFile.path, "text/html")
     }
 
-    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: Effect) {
+    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: AsciiEffectKotlin) {
         val shareTypes = arrayOf("image", "html", "text")
         var selectedShareType = "image"
         val shareTypeLabels = arrayOf(

@@ -24,7 +24,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
         }
         val prefs = VCPreferences(context)
         val effect = prefs.effect(rs, {
-            EffectRegistry().defaultEffectAtIndex(0, rs, prefs.lookupFunction)
+            EffectRegistry().defaultEffectAtIndex(0, prefs.lookupFunction)
         })
         val t2 = timeFn()
         val outputBitmap = effect.createBitmap(inputImage)

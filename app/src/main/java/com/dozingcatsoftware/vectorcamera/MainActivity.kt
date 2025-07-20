@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
             Log.i(TAG, "Starting effect loading thread")
             for (i in 0 until effectRegistry.defaultEffectCount()) {
                 effectRegistry.defaultEffectAtIndex(
-                    i, rs, preferences.lookupFunction, EffectContext.PRELOAD)
+                    i, preferences.lookupFunction, EffectContext.PRELOAD)
             }
             Log.i(TAG, "Done loading effects")
         }).start()
@@ -391,7 +391,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun effectFromPreferences(): Effect {
         return preferences.effect(rs,
-                {effectRegistry.defaultEffectAtIndex(0, rs, preferences.lookupFunction)})
+                {effectRegistry.defaultEffectAtIndex(0, preferences.lookupFunction)})
     }
 
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
@@ -477,7 +477,7 @@ class MainActivity : AppCompatActivity() {
         if (inEffectSelectionMode) {
             previousEffect = currentEffect
             val comboEffects = effectRegistry.defaultEffectFunctions(
-                    rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
+                    preferences.lookupFunction, EffectContext.COMBO_GRID)
             currentEffect = CombinationEffect(comboEffects, 50)
             preferredImageSize = ImageSize.EFFECT_GRID
             binding.controlLayout.visibility = View.GONE
@@ -547,7 +547,7 @@ class MainActivity : AppCompatActivity() {
         effectIndex = index
         Log.i(TAG, "Selected effect ${index}")
 
-        val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
+        val eff = effectRegistry.defaultEffectAtIndex(index, preferences.lookupFunction)
         preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
         updateInEffectSelectionModeFlag(false)
         binding.overlayView.visibility = View.VISIBLE
@@ -604,7 +604,7 @@ class MainActivity : AppCompatActivity() {
         // when the user selects a custom effect, `currentEffect` gets set to the underlying effect
         // rather than the "wrapper" CustomEffect.
         val newEffect = effectRegistry.defaultEffectAtIndex(
-                effectIndex, rs, preferences.lookupFunction)
+                effectIndex, preferences.lookupFunction)
         // Save the resulting effect so that it will restore correctly.
         preferences.saveEffectInfo(newEffect.effectName(), newEffect.effectParameters())
         restartCameraImageGenerator()

@@ -158,7 +158,7 @@ class ViewVideoActivity: AppCompatActivity() {
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect
             videoReader.effect = CombinationEffect(
-                    effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
+                    effectRegistry.defaultEffectFunctions(preferences.lookupFunction))
             videoReader.forcePortrait = isPortraitOrientation()
             binding.controlBar.visibility = View.GONE
         }
@@ -246,7 +246,7 @@ class ViewVideoActivity: AppCompatActivity() {
 
                 val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
                 val effect = effectRegistry.defaultEffectAtIndex(
-                        effectIndex, rs, preferences.lookupFunction)
+                        effectIndex, preferences.lookupFunction)
                 originalEffect = effect
                 videoReader.effect = effect
                 videoReader.forcePortrait = null

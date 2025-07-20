@@ -8,6 +8,13 @@ import kotlinx.coroutines.*
 import kotlin.math.*
 
 /**
+ * Enum for color component sources used in color permutation.
+ */
+enum class ColorComponentSource(val rsCode: Int) {
+    MIN(0), RED(1), GREEN(2), BLUE(3), MAX(-1)
+}
+
+/**
  * Pure Kotlin implementation of PermuteColorEffect that swaps RGB and/or UV components.
  */
 class PermuteColorEffectKotlin(

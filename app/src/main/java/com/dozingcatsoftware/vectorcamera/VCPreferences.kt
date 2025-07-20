@@ -58,7 +58,7 @@ class VCPreferences(val context: Context) {
         val params = effectParameters()
         if (name.isNotEmpty()) {
             try {
-                return effectRegistry.effectForNameAndParameters(rs, name, params)
+                return effectRegistry.effectForNameAndParameters(name, params)
             }
             catch (ex: Exception) {
                 Log.w(TAG, "Error reading effect from preferences", ex)

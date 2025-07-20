@@ -21,7 +21,7 @@ class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, vide
 
     init {
         // It would be better to pass in the EffectRegistry.
-        effect = EffectRegistry().effectForMetadata(rs, metadata.effectMetadata)
+        effect = EffectRegistry().effectForMetadata(metadata.effectMetadata)
         frameBuffer = ByteArray(bytesPerFrame())
     }
 
