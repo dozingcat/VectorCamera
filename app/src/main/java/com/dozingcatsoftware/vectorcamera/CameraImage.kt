@@ -7,7 +7,6 @@ import android.renderscript.RenderScript
 import android.renderscript.ScriptIntrinsicResize
 import android.util.Size
 import com.dozingcatsoftware.util.create2dAllocation
-import java.nio.ByteBuffer
 import kotlin.math.ceil
 
 /**
@@ -331,26 +330,124 @@ data class CameraImage(val rs: RenderScript,
     }
 
     fun resizedTo(size: Size): CameraImage {
-        val resizeScript = ScriptIntrinsicResize.create(rs)
+        // If no resizing needed, return copy
+        if (size.width == width() && size.height == height()) {
+            return this
+        }
+        
+        // For RenderScript-only images that don't have ImageData, we need to preserve the old behavior
+        // until RenderScript is completely removed
+        if (_imageData == null) {
+            val resizeScript = ScriptIntrinsicResize.create(rs)
 
-        fun doResize(inputAlloc: Allocation, w: Int, h: Int): Allocation {
-            val outputAlloc = create2dAllocation(rs, Element::U8, w, h)
-            resizeScript.setInput(inputAlloc)
-            resizeScript.forEach_bicubic(outputAlloc)
-            return outputAlloc
-        }
+            fun doResize(inputAlloc: Allocation, w: Int, h: Int): Allocation {
+                val outputAlloc = create2dAllocation(rs, Element::U8, w, h)
+                resizeScript.setInput(inputAlloc)
+                resizeScript.forEach_bicubic(outputAlloc)
+                return outputAlloc
+            }
 
-        return if (_singleYuvAllocation != null) {
-            val outputAlloc = doResize(_singleYuvAllocation, size.width, size.height)
-            copy(_singleYuvAllocation = outputAlloc, _imageData = null)
+            return if (_singleYuvAllocation != null) {
+                val outputAlloc = doResize(_singleYuvAllocation, size.width, size.height)
+                copy(_singleYuvAllocation = outputAlloc, _imageData = null)
+            }
+            else {
+                val planes = getPlanarYuvAllocations()!!
+                val yOutput = doResize(planes.y, size.width, size.height)
+                val uOutput = doResize(planes.u, size.width / 2, size.height / 2)
+                val vOutput = doResize(planes.v, size.width / 2, size.height / 2)
+                copy(_planarYuvAllocations = PlanarYuvAllocations(yOutput, uOutput, vOutput), _imageData = null)
+            }
         }
-        else {
-            val planes = getPlanarYuvAllocations()!!
-            val yOutput = doResize(planes.y, size.width, size.height)
-            val uOutput = doResize(planes.u, size.width / 2, size.height / 2)
-            val vOutput = doResize(planes.v, size.width / 2, size.height / 2)
-            copy(_planarYuvAllocations = PlanarYuvAllocations(yOutput, uOutput, vOutput), _imageData = null)
+        
+        // For ImageData, resize the YUV byte arrays directly (RenderScript-free)
+        val currentImageData = _imageData!!
+        val newImageData = resizeImageData(currentImageData, size.width, size.height)
+
+        return copy(_imageData = newImageData, _singleYuvAllocation = null, _planarYuvAllocations = null)
+    }
+
+    /**
+     * Resize ImageData using direct YUV byte array manipulation (no RenderScript).
+     * Uses bilinear interpolation for smooth resizing.
+     */
+    private fun resizeImageData(imageData: ImageData, newWidth: Int, newHeight: Int): ImageData {
+        val srcWidth = imageData.width
+        val srcHeight = imageData.height
+        
+        // Extract source Y/U/V planes
+        val srcYBytes = extractYPlaneBytes(imageData)
+        val srcUBytes = extractUvPlaneBytes(imageData.uData, imageData.uvPixelStride, 
+                                           imageData.uvRowStride, srcWidth / 2, srcHeight / 2)
+        val srcVBytes = extractUvPlaneBytes(imageData.vData, imageData.uvPixelStride, 
+                                           imageData.uvRowStride, srcWidth / 2, srcHeight / 2)
+        
+        // Resize Y plane
+        val newYBytes = resizeByteArray(srcYBytes, srcWidth, srcHeight, newWidth, newHeight)
+        
+        // Resize U and V planes (half resolution, round up for odd dimensions)
+        val newUvWidth = (newWidth + 1) / 2
+        val newUvHeight = (newHeight + 1) / 2
+        val srcUvWidth = (srcWidth + 1) / 2
+        val srcUvHeight = (srcHeight + 1) / 2
+        
+        val newUBytes = resizeByteArray(srcUBytes, srcUvWidth, srcUvHeight, newUvWidth, newUvHeight)
+        val newVBytes = resizeByteArray(srcVBytes, srcUvWidth, srcUvHeight, newUvWidth, newUvHeight)
+        
+        return ImageData(
+            width = newWidth,
+            height = newHeight,
+            yData = newYBytes,
+            uData = newUBytes,
+            vData = newVBytes,
+            yPixelStride = 1,
+            yRowStride = newWidth,
+            uvPixelStride = 1,
+            uvRowStride = newUvWidth
+        )
+    }
+
+    /**
+     * Resize a byte array representing a 2D image plane using bilinear interpolation.
+     */
+    private fun resizeByteArray(srcData: ByteArray, srcWidth: Int, srcHeight: Int, 
+                               dstWidth: Int, dstHeight: Int): ByteArray {
+        val dstData = ByteArray(dstWidth * dstHeight)
+        
+        val xScale = srcWidth.toFloat() / dstWidth
+        val yScale = srcHeight.toFloat() / dstHeight
+        
+        for (dstY in 0 until dstHeight) {
+            for (dstX in 0 until dstWidth) {
+                // Calculate source coordinates
+                val srcXf = dstX * xScale
+                val srcYf = dstY * yScale
+                
+                // Get integer and fractional parts
+                val srcX0 = srcXf.toInt().coerceIn(0, srcWidth - 1)
+                val srcY0 = srcYf.toInt().coerceIn(0, srcHeight - 1)
+                val srcX1 = (srcX0 + 1).coerceIn(0, srcWidth - 1)
+                val srcY1 = (srcY0 + 1).coerceIn(0, srcHeight - 1)
+                
+                val fracX = srcXf - srcX0
+                val fracY = srcYf - srcY0
+                
+                // Get four surrounding pixels
+                val p00 = (srcData[srcY0 * srcWidth + srcX0].toInt() and 0xFF).toFloat()
+                val p10 = (srcData[srcY0 * srcWidth + srcX1].toInt() and 0xFF).toFloat()
+                val p01 = (srcData[srcY1 * srcWidth + srcX0].toInt() and 0xFF).toFloat()
+                val p11 = (srcData[srcY1 * srcWidth + srcX1].toInt() and 0xFF).toFloat()
+                
+                // Bilinear interpolation
+                val top = p00 + (p10 - p00) * fracX
+                val bottom = p01 + (p11 - p01) * fracX
+                val result = top + (bottom - top) * fracY
+                
+                dstData[dstY * dstWidth + dstX] = result.toInt().coerceIn(0, 255).toByte()
+            }
         }
+        
+        return dstData
     }
 
     companion object {
