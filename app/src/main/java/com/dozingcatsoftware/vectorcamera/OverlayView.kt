@@ -32,7 +32,7 @@ class OverlayView(context: Context, attrs: AttributeSet) : View(context, attrs) 
             val x = 16 * density
             val y = 16 * density
             val ms = (generationTimeAverageNanos / 1e6).roundToInt()
-            val msg = "${pb.bitmap.width}x${pb.bitmap.height} ${ms}ms"
+            val msg = "${pb.effect.effectName()} ${pb.bitmap.width}x${pb.bitmap.height} ${ms}ms"
             canvas.drawText(msg, x, y, statsPaint)
         }
     }

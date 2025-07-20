@@ -155,7 +155,15 @@ class EffectRegistry {
                         )
                 ))
             },
-
+            {rs, prefsFn, context ->
+                EdgeEffectKotlin.fromParameters(mapOf(
+                        "colors" to mapOf(
+                                "type" to "fixed",
+                                "minColor" to listOf(0, 0, 0),
+                                "maxColor" to listOf(255, 255, 0)
+                        )
+                ))
+            },
             // Black on white.
             {rs, prefsFn, context ->
                 EdgeEffect.fromParameters(rs, mapOf(
@@ -735,7 +743,6 @@ class EffectRegistry {
             EdgeEffectKotlin.EFFECT_NAME -> EdgeEffectKotlin.fromParameters(params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(rs, params)
             EdgeLuminanceEffectKotlin.EFFECT_NAME -> EdgeLuminanceEffectKotlin.fromParameters(params)
-            PermuteColorEffectKotlin.EFFECT_NAME -> PermuteColorEffectKotlin.fromParameters(params)
             SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(rs, params)
             SolidColorEffectKotlin.EFFECT_NAME -> SolidColorEffectKotlin.fromParameters(params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(rs, params)
