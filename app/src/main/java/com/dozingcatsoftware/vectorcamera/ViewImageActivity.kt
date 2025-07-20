@@ -24,6 +24,7 @@ import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.vectorcamera.databinding.ViewImageBinding
+import com.dozingcatsoftware.vectorcamera.effect.AsciiEffectKotlin
 import java.io.File
 
 
@@ -181,7 +182,7 @@ class ViewImageActivity : AppCompatActivity() {
         // Stop reading metadata so often?
         val metadata = photoLibrary.metadataForItemId(imageId)
         val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
-        if (effect is AsciiEffect) {
+        if (effect is AsciiEffect || effect is AsciiEffectKotlin) {
             showAsciiTypeShareDialog(metadata, effect)
         }
         else {
@@ -290,25 +291,33 @@ class ViewImageActivity : AppCompatActivity() {
         shareIfExists()
     }
 
-    private fun shareText(metadata: MediaMetadata, effect: AsciiEffect) {
+    private fun shareText(metadata: MediaMetadata, effect: Effect) {
         val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
         val inputImage = createCameraImage(metadata)
         photoLibrary.createTempFileOutputStream(textFile).use {
-            effect.writeText(inputImage, it)
+            when (effect) {
+                is AsciiEffect -> effect.writeText(inputImage, it)
+                is AsciiEffectKotlin -> effect.writeText(inputImage, it)
+                else -> throw AssertionError("Unexpected effect type: " + effect.effectName())
+            }
         }
         shareFile(textFile.path, "text/plain")
     }
 
-    private fun shareHtml(metadata: MediaMetadata, effect: AsciiEffect) {
+    private fun shareHtml(metadata: MediaMetadata, effect: Effect) {
         val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
         val inputImage = createCameraImage(metadata)
         photoLibrary.createTempFileOutputStream(htmlFile).use {
-            effect.writeHtml(inputImage, it)
+            when (effect) {
+                is AsciiEffect -> effect.writeHtml(inputImage, it)
+                is AsciiEffectKotlin -> effect.writeHtml(inputImage, it)
+                else -> throw AssertionError("Unexpected effect type: " + effect.effectName())
+            }
         }
         shareFile(htmlFile.path, "text/html")
     }
 
-    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: AsciiEffect) {
+    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: Effect) {
         val shareTypes = arrayOf("image", "html", "text")
         var selectedShareType = "image"
         val shareTypeLabels = arrayOf(
