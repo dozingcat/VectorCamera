@@ -287,6 +287,7 @@ class EffectRegistry {
             // White text on black background.
             {prefsFn, context ->
                 AsciiEffectKotlin.fromParameters(mapOf(
+                    "colorMode" to "fixed",
                     "colors" to mapOf(
                         "text" to listOf(255, 255, 255),
                         "background" to listOf(0, 0, 0)
@@ -299,6 +300,7 @@ class EffectRegistry {
             // Black text on white background.
             {prefsFn, context ->
                 AsciiEffectKotlin.fromParameters(mapOf(
+                    "colorMode" to "fixed",
                     "colors" to mapOf(
                         "text" to listOf(0, 0, 0),
                         "background" to listOf(255, 255, 255)

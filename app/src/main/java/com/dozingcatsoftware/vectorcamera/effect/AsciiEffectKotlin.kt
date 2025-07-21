@@ -68,6 +68,47 @@ class AsciiEffectKotlin(
         
         val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
         
+        // Use native C++ implementation for intensive computations
+        val yuvBytes = cameraImage.getYuvBytes()
+        val nativeResult = Companion.computeAsciiDataNative(
+            yuvBytes,
+            cameraImage.width(),
+            cameraImage.height(),
+            metrics.numCharacterColumns,
+            metrics.numCharacterRows,
+            metrics.isPortrait,
+            colorMode.id,
+            pixelChars.length,
+            textColor
+        )
+        
+        if (nativeResult == null || nativeResult.size != metrics.numCharacterColumns * metrics.numCharacterRows * 2) {
+            Log.e(EFFECT_NAME, "Native ASCII computation failed, falling back to Kotlin")
+            return createBitmapFallback(cameraImage, metrics)
+        }
+        
+        val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
+        val characterIndices = nativeResult.sliceArray(0 until numCells)
+        val characterColors = nativeResult.sliceArray(numCells until nativeResult.size)
+        
+        // Create character template bitmap if needed
+        updateCharTemplateBitmap(metrics.charPixelSize)
+        
+        // Render final bitmap using bulk character rendering
+        val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors)
+        
+        val elapsed = System.currentTimeMillis() - t1
+        if (++numFrames % 30 == 0) {
+            Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} ASCII image in $elapsed ms (native)")
+        }
+        
+        return resultBitmap
+    }
+    
+    /**
+     * Fallback implementation using original Kotlin code if native fails.
+     */
+    private fun createBitmapFallback(cameraImage: CameraImage, metrics: TextMetricsKotlin): Bitmap {
         // Compute brightness averages for each character cell
         val blockAverages = computeBlockAverages(cameraImage, metrics)
         
@@ -78,14 +119,7 @@ class AsciiEffectKotlin(
         updateCharTemplateBitmap(metrics.charPixelSize)
         
         // Render final bitmap using bulk character rendering
-        val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors)
-        
-        val elapsed = System.currentTimeMillis() - t1
-        if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} ASCII image in $elapsed ms")
-        }
-        
-        return resultBitmap
+        return renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors)
     }
 
     /**
@@ -324,6 +358,7 @@ class AsciiEffectKotlin(
 
     /**
      * Render the final bitmap by drawing ASCII characters into a grid.
+     * Uses high-performance native C++ implementation with threading.
      */
     private fun renderFinalBitmap(
         cameraImage: CameraImage, 
@@ -342,11 +377,46 @@ class AsciiEffectKotlin(
         val charHeight = metrics.charPixelSize.height
         val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
         
-        // Render character grid directly to pixel buffer (similar to MatrixEffect approach)
-        renderCharacterGridKotlin(
-            cameraImage, metrics, template, charWidth, charHeight, 
-            characterIndices, characterColors, outputPixels
-        )
+        // Try native C++ rendering first for maximum performance
+        try {
+            val templatePixels = IntArray(template.width * template.height)
+            template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
+            
+            // Determine optimal thread count
+            val numCores = Runtime.getRuntime().availableProcessors()
+            val minRowsForThreading = 8
+            val numThreads = if (metrics.numCharacterRows >= minRowsForThreading) {
+                minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
+            } else {
+                1 // Single thread for small grids
+            }
+            
+            Companion.renderCharacterGridNative(
+                templatePixels,
+                template.width,
+                template.height,
+                charWidth,
+                charHeight,
+                characterIndices,
+                characterColors,
+                metrics.numCharacterColumns,
+                metrics.numCharacterRows,
+                metrics.isPortrait,
+                metrics.outputSize.width,
+                metrics.outputSize.height,
+                outputPixels,
+                backgroundColor,
+                numThreads
+            )
+            
+        } catch (e: Exception) {
+            Log.e(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
+            // Fallback to Kotlin implementation
+            renderCharacterGridKotlin(
+                cameraImage, metrics, template, charWidth, charHeight, 
+                characterIndices, characterColors, outputPixels
+            )
+        }
         
         // Create bitmap from rendered pixels
         resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0, 
@@ -590,6 +660,63 @@ class AsciiEffectKotlin(
         const val EFFECT_NAME = "asciiKotlin"
         const val DEFAULT_CHARACTER_COLUMNS = 120
         val EFFECTIVE_SIZE_FOR_TEXT_OUTPUT = Size(2560, 1600)
+        
+        init {
+            System.loadLibrary("vectorcamera_native")
+        }
+        
+        /**
+         * Native method to compute ASCII character data (indices and colors) from YUV image.
+         * Returns an IntArray with [characterIndices..., characterColors...]
+         */
+        @JvmStatic
+        external fun computeAsciiDataNative(
+            yuvBytes: ByteArray,
+            width: Int,
+            height: Int,
+            numCharCols: Int,
+            numCharRows: Int,
+            isPortrait: Boolean,
+            colorMode: Int,
+            pixelCharsLength: Int,
+            textColor: Int
+        ): IntArray?
+        
+        /**
+         * Native method to compute brightness averages for each character cell.
+         */
+        @JvmStatic
+        external fun computeBlockBrightnessNative(
+            yuvBytes: ByteArray,
+            width: Int,
+            height: Int,
+            numCharCols: Int,
+            numCharRows: Int,
+            isPortrait: Boolean
+        ): ByteArray?
+        
+        /**
+         * Native method to render the character grid directly to pixels.
+         * This replaces thousands of Canvas drawing operations with one fast bulk operation.
+         */
+        @JvmStatic
+        external fun renderCharacterGridNative(
+            templatePixels: IntArray,
+            templateWidth: Int,
+            templateHeight: Int,
+            charWidth: Int,
+            charHeight: Int,
+            characterIndices: IntArray,
+            characterColors: IntArray,
+            numCharColumns: Int,
+            numCharRows: Int,
+            isPortrait: Boolean,
+            outputWidth: Int,
+            outputHeight: Int,
+            outputPixels: IntArray,
+            backgroundColor: Int,
+            numThreads: Int
+        )
 
         fun fromParameters(params: Map<String, Any>): AsciiEffectKotlin {
             val colors = params.getOrElse("colors", { mapOf<String, Any>() }) as Map<String, Any>
