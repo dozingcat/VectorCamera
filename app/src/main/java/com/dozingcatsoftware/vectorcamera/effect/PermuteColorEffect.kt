@@ -17,7 +17,7 @@ enum class ColorComponentSource(val rsCode: Int) {
 /**
  * Pure Kotlin implementation of PermuteColorEffect that swaps RGB and/or UV components.
  */
-class PermuteColorEffectKotlin(
+class PermuteColorEffect(
     private val effectParams: Map<String, Any> = mapOf(),
     private val redSource: ColorComponentSource = ColorComponentSource.RED,
     private val greenSource: ColorComponentSource = ColorComponentSource.GREEN,
@@ -186,7 +186,7 @@ class PermuteColorEffectKotlin(
 
 
     companion object {
-        const val EFFECT_NAME = "permute_colors_kotlin"
+        const val EFFECT_NAME = "permuteColor"
         
         // Load native library
         private var nativeLibraryLoaded = false
@@ -213,12 +213,12 @@ class PermuteColorEffectKotlin(
             numThreads: Int
         ): IntArray?
         
-        fun fromParameters(effectParams: Map<String, Any>): PermuteColorEffectKotlin {
+        fun fromParameters(effectParams: Map<String, Any>): PermuteColorEffect {
             val redSource = ColorComponentSource.valueOf(effectParams["red"] as String)
             val greenSource = ColorComponentSource.valueOf(effectParams["green"] as String)
             val blueSource = ColorComponentSource.valueOf(effectParams["blue"] as String)
             val flipUV = effectParams.getOrElse("flipUV", { false }) as Boolean
-            return PermuteColorEffectKotlin(effectParams, redSource, greenSource, blueSource, flipUV)
+            return PermuteColorEffect(effectParams, redSource, greenSource, blueSource, flipUV)
         }
 
         fun noOp() = fromParameters(mapOf(

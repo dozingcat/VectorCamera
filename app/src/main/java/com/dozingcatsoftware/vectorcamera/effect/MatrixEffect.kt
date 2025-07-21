@@ -65,7 +65,7 @@ class TextParamsKotlin(
  * Pure Kotlin implementation of MatrixEffect that creates a "digital rain" Matrix-style effect
  * with Japanese characters, animated raindrops, and optional edge detection.
  */
-class MatrixEffectKotlin(
+class MatrixEffect(
     private val effectParams: Map<String, Any> = mapOf()
 ) : Effect {
 
@@ -144,14 +144,14 @@ class MatrixEffectKotlin(
             try {
                 System.loadLibrary("vectorcamera_native")
                 nativeLibraryLoaded = true
-                Log.i("MatrixEffectKotlin", "Native library loaded successfully")
+                Log.i("MatrixEffect", "Native library loaded successfully")
             } catch (e: UnsatisfiedLinkError) {
-                Log.w("MatrixEffectKotlin", "Native library not available, using Kotlin implementation")
+                Log.w("MatrixEffect", "Native library not available, using Kotlin implementation")
                 nativeLibraryLoaded = false
             }
         }
         
-        const val EFFECT_NAME = "matrixKotlin"
+        const val EFFECT_NAME = "matrix"
         const val DEFAULT_CHARACTER_COLUMNS = 120
 
         // Japanese hiragana and katakana characters, and (reversed) English letters and numbers
@@ -161,8 +161,8 @@ class MatrixEffectKotlin(
         const val MATRIX_REVERSED_CHARS = "QWERTYUIOPASDFGHJKLZXCVBNM1234567890"
         const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
 
-        fun fromParameters(params: Map<String, Any>): MatrixEffectKotlin {
-            return MatrixEffectKotlin(params)
+        fun fromParameters(params: Map<String, Any>): MatrixEffect {
+            return MatrixEffect(params)
         }
     }
 

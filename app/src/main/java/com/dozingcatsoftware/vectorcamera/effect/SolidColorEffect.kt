@@ -9,7 +9,7 @@ import kotlin.math.*
 /**
  * Pure Kotlin implementation of SolidColorEffect that maps each pixel to an output color based on its brightness.
  */
-class SolidColorEffectKotlin(
+class SolidColorEffect(
     private val effectParams: Map<String, Any> = mapOf(),
     private val colorMap: IntArray,
     private val backgroundFn: (CameraImage, Canvas, RectF) -> Unit = { _, _, _ -> }
@@ -104,9 +104,9 @@ class SolidColorEffectKotlin(
     }
 
     companion object {
-        const val EFFECT_NAME = "solid_color_kotlin"
+        const val EFFECT_NAME = "solidColor"
         
-        fun fromParameters(effectParams: Map<String, Any>): SolidColorEffectKotlin {
+        fun fromParameters(effectParams: Map<String, Any>): SolidColorEffect {
             // Parse color scheme parameters (backwards compatibility)
             val colorParams = effectParams.getOrElse("colors", { effectParams }) as Map<String, Any>
             
@@ -115,7 +115,7 @@ class SolidColorEffectKotlin(
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
                     val maxColor = parseColorFromList(colorParams, "maxColor", "maxEdgeColor")
                     val colorMap = createFixedColorMap(minColor, maxColor)
-                    return SolidColorEffectKotlin(effectParams, colorMap)
+                    return SolidColorEffect(effectParams, colorMap)
                 }
                 "linear_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -132,7 +132,7 @@ class SolidColorEffectKotlin(
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return SolidColorEffectKotlin(effectParams, alphaMap, backgroundFn)
+                    return SolidColorEffect(effectParams, alphaMap, backgroundFn)
                 }
                 "radial_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -150,7 +150,7 @@ class SolidColorEffectKotlin(
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return SolidColorEffectKotlin(effectParams, alphaMap, backgroundFn)
+                    return SolidColorEffect(effectParams, alphaMap, backgroundFn)
                 }
                 "grid_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor")
@@ -166,12 +166,12 @@ class SolidColorEffectKotlin(
                         gradient.drawToCanvas(canvas, rect, cameraImage.timestamp)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return SolidColorEffectKotlin(effectParams, alphaMap, backgroundFn)
+                    return SolidColorEffect(effectParams, alphaMap, backgroundFn)
                 }
                 else -> {
                     // Default to black to white gradient
                     val colorMap = createFixedColorMap(Color.BLACK, Color.WHITE)
-                    return SolidColorEffectKotlin(effectParams, colorMap)
+                    return SolidColorEffect(effectParams, colorMap)
                 }
             }
         }

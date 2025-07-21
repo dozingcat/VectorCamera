@@ -17,7 +17,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import com.dozingcatsoftware.vectorcamera.effect.AsciiEffectKotlin
+import com.dozingcatsoftware.vectorcamera.effect.AsciiEffect
 import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
@@ -180,7 +180,7 @@ class ViewImageActivity : AppCompatActivity() {
         // Stop reading metadata so often?
         val metadata = photoLibrary.metadataForItemId(imageId)
         val effect = effectRegistry.effectForMetadata(metadata.effectMetadata)
-        if (effect is AsciiEffectKotlin) {
+        if (effect is AsciiEffect) {
             showAsciiTypeShareDialog(metadata, effect)
         }
         else {
@@ -289,7 +289,7 @@ class ViewImageActivity : AppCompatActivity() {
         shareIfExists()
     }
 
-    private fun shareText(metadata: MediaMetadata, effect: AsciiEffectKotlin) {
+    private fun shareText(metadata: MediaMetadata, effect: AsciiEffect) {
         val textFile = photoLibrary.tempFileWithName(imageId + ".txt")
         val inputImage = createCameraImage(metadata)
         photoLibrary.createTempFileOutputStream(textFile).use {
@@ -298,7 +298,7 @@ class ViewImageActivity : AppCompatActivity() {
         shareFile(textFile.path, "text/plain")
     }
 
-    private fun shareHtml(metadata: MediaMetadata, effect: AsciiEffectKotlin) {
+    private fun shareHtml(metadata: MediaMetadata, effect: AsciiEffect) {
         val htmlFile = photoLibrary.tempFileWithName(imageId + ".html")
         val inputImage = createCameraImage(metadata)
         photoLibrary.createTempFileOutputStream(htmlFile).use {
@@ -307,7 +307,7 @@ class ViewImageActivity : AppCompatActivity() {
         shareFile(htmlFile.path, "text/html")
     }
 
-    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: AsciiEffectKotlin) {
+    private fun showAsciiTypeShareDialog(metadata: MediaMetadata, effect: AsciiEffect) {
         val shareTypes = arrayOf("image", "html", "text")
         var selectedShareType = "image"
         val shareTypeLabels = arrayOf(

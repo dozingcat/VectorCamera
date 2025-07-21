@@ -14,7 +14,7 @@ import kotlin.math.min
  * Preserves the "color" of each pixel as given by its U and V values, but replaces its
  * brightness (Y value) with its edge strength.
  */
-class EdgeLuminanceEffectKotlin : Effect {
+class EdgeLuminanceEffect : Effect {
 
     // Native method declarations
     private external fun processRowsNative(
@@ -47,7 +47,7 @@ class EdgeLuminanceEffectKotlin : Effect {
 
     // Static block to load native library
     companion object {
-        const val EFFECT_NAME = "edge_luminance_kotlin"
+        const val EFFECT_NAME = "edgeLuminance"
         
         private var nativeLibraryLoaded = false
         
@@ -62,8 +62,8 @@ class EdgeLuminanceEffectKotlin : Effect {
             }
         }
 
-        fun fromParameters(params: Map<String, Any>): EdgeLuminanceEffectKotlin {
-            return EdgeLuminanceEffectKotlin()
+        fun fromParameters(params: Map<String, Any>): EdgeLuminanceEffect {
+            return EdgeLuminanceEffect()
         }
     }
 

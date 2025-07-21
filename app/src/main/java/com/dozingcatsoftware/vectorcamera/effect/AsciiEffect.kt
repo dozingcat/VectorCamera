@@ -18,14 +18,14 @@ import kotlin.math.*
 /**
  * ASCII color modes for character rendering.
  */
-enum class AsciiColorModeKotlin(val id: Int) {
+enum class AsciiColorMode(val id: Int) {
     FIXED(0),    // Single text color
     PRIMARY(1),  // Primary color extraction 
     FULL(2);     // Full color from camera
 
     companion object {
-        fun fromString(s: String): AsciiColorModeKotlin {
-            return AsciiColorModeKotlin.valueOf(s.uppercase(Locale.getDefault()))
+        fun fromString(s: String): AsciiColorMode {
+            return AsciiColorMode.valueOf(s.uppercase(Locale.getDefault()))
         }
     }
 }
@@ -34,13 +34,13 @@ enum class AsciiColorModeKotlin(val id: Int) {
  * Pure Kotlin implementation of AsciiEffect that converts camera images to ASCII art
  * using configurable character sets and color modes.
  */
-class AsciiEffectKotlin(
+class AsciiEffect(
     private val effectParams: Map<String, Any> = mapOf(),
     private val numPreferredCharColumns: Int = DEFAULT_CHARACTER_COLUMNS,
     private val textColor: Int = Color.WHITE,
     private val backgroundColor: Int = Color.BLACK,
     private val pixelChars: String = " .:oO8#",
-    private val colorMode: AsciiColorModeKotlin = AsciiColorModeKotlin.FIXED
+    private val colorMode: AsciiColorMode = AsciiColorMode.FIXED
 ) : Effect {
 
     // Character grid layout
@@ -197,7 +197,7 @@ class AsciiEffectKotlin(
         val characterColors = IntArray(numCells)
         
         // For color modes that need camera color data
-        val needsColorData = colorMode == AsciiColorModeKotlin.PRIMARY || colorMode == AsciiColorModeKotlin.FULL
+        val needsColorData = colorMode == AsciiColorMode.PRIMARY || colorMode == AsciiColorMode.FULL
         val colorData = if (needsColorData) computeBlockColors(cameraImage, metrics) else null
         
         for (i in 0 until numCells) {
@@ -209,12 +209,12 @@ class AsciiEffectKotlin(
             
             // Determine color based on color mode
             characterColors[i] = when (colorMode) {
-                AsciiColorModeKotlin.FIXED -> textColor
-                AsciiColorModeKotlin.PRIMARY -> {
+                AsciiColorMode.FIXED -> textColor
+                AsciiColorMode.PRIMARY -> {
                     val avgColor = colorData!![i]
                     computePrimaryColor(avgColor)
                 }
-                AsciiColorModeKotlin.FULL -> colorData!![i]
+                AsciiColorMode.FULL -> colorData!![i]
             }
         }
         
@@ -553,7 +553,7 @@ class AsciiEffectKotlin(
         val blockAverages = computeBlockAverages(cameraImage, metrics)
         
         // Compute character data with colors
-        val needsColorData = colorMode == AsciiColorModeKotlin.PRIMARY || colorMode == AsciiColorModeKotlin.FULL
+        val needsColorData = colorMode == AsciiColorMode.PRIMARY || colorMode == AsciiColorMode.FULL
         val colorData = if (needsColorData) computeBlockColors(cameraImage, metrics) else null
         
         val result = AsciiResultKotlin(metrics.numCharacterRows, metrics.numCharacterColumns)
@@ -569,12 +569,12 @@ class AsciiEffectKotlin(
                 
                 // Determine color based on color mode
                 val color = when (colorMode) {
-                    AsciiColorModeKotlin.FIXED -> textColor
-                    AsciiColorModeKotlin.PRIMARY -> {
+                    AsciiColorMode.FIXED -> textColor
+                    AsciiColorMode.PRIMARY -> {
                         val avgColor = colorData!![cellIndex]
                         computePrimaryColor(avgColor)
                     }
-                    AsciiColorModeKotlin.FULL -> colorData!![cellIndex]
+                    AsciiColorMode.FULL -> colorData!![cellIndex]
                 }
                 
                 val red = Color.red(color)
@@ -612,7 +612,7 @@ class AsciiEffectKotlin(
         val metrics = textParams.getTextMetrics(cameraImage, EFFECTIVE_SIZE_FOR_TEXT_OUTPUT)
         val asciiResult = getCharacterInfo(cameraImage, pixelChars, metrics)
 
-        val isFixedColor = (colorMode == AsciiColorModeKotlin.FIXED)
+        val isFixedColor = (colorMode == AsciiColorMode.FIXED)
         val writer = OutputStreamWriter(out, Charsets.UTF_8)
         
         writer.write("<!DOCTYPE html>\n")
@@ -657,7 +657,7 @@ class AsciiEffectKotlin(
     }
 
     companion object {
-        const val EFFECT_NAME = "asciiKotlin"
+        const val EFFECT_NAME = "ascii"
         const val DEFAULT_CHARACTER_COLUMNS = 120
         val EFFECTIVE_SIZE_FOR_TEXT_OUTPUT = Size(2560, 1600)
         
@@ -718,7 +718,7 @@ class AsciiEffectKotlin(
             numThreads: Int
         )
 
-        fun fromParameters(params: Map<String, Any>): AsciiEffectKotlin {
+        fun fromParameters(params: Map<String, Any>): AsciiEffect {
             val colors = params.getOrElse("colors", { mapOf<String, Any>() }) as Map<String, Any>
             val textColor = intFromArgbList(
                 colors.getOrElse("text", { listOf(255, 255, 255) }) as List<Int>
@@ -735,12 +735,12 @@ class AsciiEffectKotlin(
             }
 
             val colorType = try {
-                AsciiColorModeKotlin.fromString(params.getOrElse("colorMode", { "fixed" }) as String)
+                AsciiColorMode.fromString(params.getOrElse("colorMode", { "fixed" }) as String)
             } catch (ex: IllegalArgumentException) {
-                AsciiColorModeKotlin.FIXED
+                AsciiColorMode.FIXED
             }
 
-            return AsciiEffectKotlin(params, numCharColumns, textColor, backgroundColor, pixelChars, colorType)
+            return AsciiEffect(params, numCharColumns, textColor, backgroundColor, pixelChars, colorType)
         }
 
         /**

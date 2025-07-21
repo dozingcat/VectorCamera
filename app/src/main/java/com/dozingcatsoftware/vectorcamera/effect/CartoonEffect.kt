@@ -12,7 +12,7 @@ import kotlin.math.*
  * by blurring and reducing the color space.
  */
 // TODO: Make blur radius a function of image dimensions?
-class CartoonEffectKotlin(
+class CartoonEffect(
     private val effectParams: Map<String, Any> = mapOf(),
     private val blurRadius: Int = 4
 ) : Effect {
@@ -306,7 +306,7 @@ class CartoonEffectKotlin(
     }
 
     companion object {
-        const val EFFECT_NAME = "cartoon_kotlin"
+        const val EFFECT_NAME = "cartoon"
         
         // Load native library
         private var nativeLibraryLoaded = false
@@ -330,9 +330,9 @@ class CartoonEffectKotlin(
             numThreads: Int
         ): IntArray?
         
-        fun fromParameters(effectParams: Map<String, Any>): CartoonEffectKotlin {
+        fun fromParameters(effectParams: Map<String, Any>): CartoonEffect {
             val blurRadius = effectParams.getOrElse("blurRadius", { 4 }) as Int
-            return CartoonEffectKotlin(effectParams, blurRadius)
+            return CartoonEffect(effectParams, blurRadius)
         }
         
         fun withBlurRadius(radius: Int) = fromParameters(mapOf("blurRadius" to radius))
@@ -341,7 +341,7 @@ class CartoonEffectKotlin(
          * Test method to verify the LUT functionality produces the expected quantization.
          */
         fun testLUT() {
-            val effect = CartoonEffectKotlin()
+            val effect = CartoonEffect()
             val lut = effect.createColorLUT()
             
             // Test key values

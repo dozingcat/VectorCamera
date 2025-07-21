@@ -161,7 +161,7 @@ void applyVerticalBlur(const int* input, int* output, int width, int height, int
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffectKotlin_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_processImageNativeFromYuvBytes(
     JNIEnv* env, 
     jobject /* this */, 
     jbyteArray yuvBytes_, 

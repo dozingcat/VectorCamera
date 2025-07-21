@@ -69,7 +69,7 @@ void processRows(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_EdgeEffectKotlin_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_EdgeEffect_00024Companion_processImageNativeFromYuvBytes(
     JNIEnv* env,
     jobject thiz,
     jbyteArray yData,

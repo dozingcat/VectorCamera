@@ -10,7 +10,7 @@ import kotlin.math.*
  * Pure Kotlin implementation of EdgeEffect that maps edge strength to colors.
  * Supports advanced color mapping including gradients.
  */
-class EdgeEffectKotlin private constructor(
+class EdgeEffect private constructor(
     private val effectParams: Map<String, Any> = mapOf(),
     private val colorMap: IntArray? = null,
     private val alphaMap: IntArray? = null,
@@ -134,7 +134,7 @@ class EdgeEffectKotlin private constructor(
     }
 
     companion object {
-        const val EFFECT_NAME = "edge_kotlin"
+        const val EFFECT_NAME = "edge"
         
         // Native method declaration
         private external fun processImageNativeFromYuvBytes(
@@ -161,7 +161,7 @@ class EdgeEffectKotlin private constructor(
             }
         }
         
-        fun fromParameters(effectParams: Map<String, Any>): EdgeEffectKotlin {
+        fun fromParameters(effectParams: Map<String, Any>): EdgeEffect {
             // Parse color scheme parameters (backwards compatibility)
             val colorParams = effectParams.getOrElse("colors", { effectParams }) as Map<String, Any>
             
@@ -170,7 +170,7 @@ class EdgeEffectKotlin private constructor(
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
                     val maxColor = parseColorFromList(colorParams, "maxColor", "maxEdgeColor")
                     val colorMap = createFixedColorMap(minColor, maxColor)
-                    return EdgeEffectKotlin(effectParams, colorMap = colorMap)
+                    return EdgeEffect(effectParams, colorMap = colorMap)
                 }
                 "linear_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -187,7 +187,7 @@ class EdgeEffectKotlin private constructor(
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return EdgeEffectKotlin(effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
+                    return EdgeEffect(effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
                 "radial_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -205,7 +205,7 @@ class EdgeEffectKotlin private constructor(
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return EdgeEffectKotlin(effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
+                    return EdgeEffect(effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
                 "grid_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor")
@@ -221,12 +221,12 @@ class EdgeEffectKotlin private constructor(
                         gradient.drawToCanvas(canvas, rect, cameraImage.timestamp)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return EdgeEffectKotlin(effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
+                    return EdgeEffect(effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
                 else -> {
                     // Default to black to white gradient
                     val colorMap = createFixedColorMap(Color.BLACK, Color.WHITE)
-                    return EdgeEffectKotlin(effectParams, colorMap = colorMap)
+                    return EdgeEffect(effectParams, colorMap = colorMap)
                 }
             }
         }

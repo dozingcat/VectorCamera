@@ -171,7 +171,7 @@ void renderAsciiCharacterGrid(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffectKotlin_computeAsciiDataNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_computeAsciiDataNative(
     JNIEnv *env,
     jobject /* this */,
     jbyteArray yuvBytes,
@@ -315,7 +315,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffectKotlin_computeAsciiDat
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffectKotlin_computeBlockBrightnessNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_computeBlockBrightnessNative(
     JNIEnv *env,
     jobject /* this */,
     jbyteArray yuvBytes,
@@ -392,7 +392,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffectKotlin_computeBlockBri
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffectKotlin_renderCharacterGridNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_renderCharacterGridNative(
     JNIEnv *env,
     jobject /* this */,
     jintArray templatePixels,

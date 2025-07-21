@@ -43,7 +43,7 @@ inline int calculateEdgeStrength(
 
 // Native implementation of processRows
 extern "C" JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_processRowsNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffect_processRowsNative(
     JNIEnv* env,
     jobject /* this */,
     jint startY,
@@ -103,7 +103,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
 
 // Optimized version that handles all threading internally in C++
 extern "C" JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_processImageNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffect_processImageNative(
     JNIEnv* env,
     jobject /* this */,
     jint width,
@@ -186,7 +186,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_process
 
 // Function to check if native implementation is available
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffectKotlin_isNativeAvailable(
+Java_com_dozingcatsoftware_vectorcamera_effect_EdgeLuminanceEffect_isNativeAvailable(
     JNIEnv* env,
     jobject /* this */
 ) {

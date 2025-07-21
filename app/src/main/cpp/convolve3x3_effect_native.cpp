@@ -103,7 +103,7 @@ FORCE_INLINE void processColorMappingRows(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3EffectKotlin_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3Effect_00024Companion_processImageNativeFromYuvBytes(
     JNIEnv* env, 
     jobject /* this */, 
     jbyteArray yuvBytes_, 

@@ -123,7 +123,7 @@ extern "C" {
  * Compute block brightness averages from YUV data with multi-threading.
  */
 JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_computeBlockBrightnessNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_computeBlockBrightnessNative(
     JNIEnv *env,
     jobject /* this */,
     jbyteArray yData,
@@ -179,7 +179,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_computeBlockBr
  * Apply edge detection to brightness grid with multi-threading.
  */
 JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_applyEdgeDetectionNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_applyEdgeDetectionNative(
     JNIEnv *env,
     jobject /* this */,
     jbyteArray input,
@@ -230,7 +230,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_applyEdgeDetec
  * Check if native library is available.
  */
 JNIEXPORT jboolean JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_isNativeAvailable(
+Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_isNativeAvailable(
     JNIEnv *env,
     jobject /* this */
 ) {
@@ -332,7 +332,7 @@ void renderCharacterGrid(
  * Render all characters to output buffer with multi-threading.
  */
 JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffectKotlin_renderCharacterGridNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_renderCharacterGridNative(
     JNIEnv *env,
     jobject /* this */,
     jintArray templatePixels,

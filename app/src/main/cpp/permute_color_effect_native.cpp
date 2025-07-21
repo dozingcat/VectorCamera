@@ -73,7 +73,7 @@ void processRows(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_PermuteColorEffectKotlin_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_PermuteColorEffect_00024Companion_processImageNativeFromYuvBytes(
     JNIEnv* env, 
     jobject /* this */, 
     jbyteArray yuvBytes_, 

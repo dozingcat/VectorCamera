@@ -10,7 +10,7 @@ import kotlin.math.*
  * Pure Kotlin implementation of Convolve3x3Effect that performs a 3x3 convolution operation 
  * on the brightness of the input image.
  */
-class Convolve3x3EffectKotlin(
+class Convolve3x3Effect(
     private val effectParams: Map<String, Any> = mapOf(),
     private val coefficients: FloatArray,
     private val colorMap: IntArray,
@@ -206,7 +206,7 @@ class Convolve3x3EffectKotlin(
     }
 
     companion object {
-        const val EFFECT_NAME = "convolve3x3_kotlin"
+        const val EFFECT_NAME = "convolve3x3"
         
         // Load native library
         private var nativeLibraryLoaded = false
@@ -231,7 +231,7 @@ class Convolve3x3EffectKotlin(
             numThreads: Int
         ): IntArray?
         
-        fun fromParameters(effectParams: Map<String, Any>): Convolve3x3EffectKotlin {
+        fun fromParameters(effectParams: Map<String, Any>): Convolve3x3Effect {
             // Parse coefficients
             val coeffs = FloatArray(9)
             val paramList = effectParams["coefficients"] as List<Number>
@@ -250,7 +250,7 @@ class Convolve3x3EffectKotlin(
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
                     val maxColor = parseColorFromList(colorParams, "maxColor", "maxEdgeColor")
                     val colorMap = createFixedColorMap(minColor, maxColor)
-                    return Convolve3x3EffectKotlin(effectParams, coeffs, colorMap)
+                    return Convolve3x3Effect(effectParams, coeffs, colorMap)
                 }
                 "linear_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -267,7 +267,7 @@ class Convolve3x3EffectKotlin(
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return Convolve3x3EffectKotlin(effectParams, coeffs, alphaMap, backgroundFn)
+                    return Convolve3x3Effect(effectParams, coeffs, alphaMap, backgroundFn)
                 }
                 "radial_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -285,7 +285,7 @@ class Convolve3x3EffectKotlin(
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return Convolve3x3EffectKotlin(effectParams, coeffs, alphaMap, backgroundFn)
+                    return Convolve3x3Effect(effectParams, coeffs, alphaMap, backgroundFn)
                 }
                 "grid_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor")
@@ -301,12 +301,12 @@ class Convolve3x3EffectKotlin(
                         gradient.drawToCanvas(canvas, rect, cameraImage.timestamp)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return Convolve3x3EffectKotlin(effectParams, coeffs, alphaMap, backgroundFn)
+                    return Convolve3x3Effect(effectParams, coeffs, alphaMap, backgroundFn)
                 }
                 else -> {
                     // Default to black to white gradient
                     val colorMap = createFixedColorMap(Color.BLACK, Color.WHITE)
-                    return Convolve3x3EffectKotlin(effectParams, coeffs, colorMap)
+                    return Convolve3x3Effect(effectParams, coeffs, colorMap)
                 }
             }
         }
