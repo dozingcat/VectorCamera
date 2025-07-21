@@ -4,7 +4,7 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
-import android.renderscript.RenderScript
+
 
 
 enum class ImageSize {
@@ -25,8 +25,8 @@ class CameraSelector(val context: Context) {
         selectedCameraIndex = (1 + selectedCameraIndex) % cameraCount
     }
 
-    fun createImageGenerator(rs: RenderScript): CameraImageGenerator {
-        return CameraImageGenerator(context, rs, cameraManager, cameraIds[selectedCameraIndex])
+    fun createImageGenerator(): CameraImageGenerator {
+        return CameraImageGenerator(context, cameraManager, cameraIds[selectedCameraIndex])
     }
 
     fun isSelectedCameraFrontFacing(): Boolean {

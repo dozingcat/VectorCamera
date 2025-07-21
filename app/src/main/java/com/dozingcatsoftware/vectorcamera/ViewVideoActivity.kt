@@ -9,7 +9,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
-import android.renderscript.RenderScript
+
 import androidx.core.content.FileProvider
 import android.view.MotionEvent
 import android.view.View
@@ -52,7 +52,7 @@ class ViewVideoActivity: AppCompatActivity() {
     private lateinit var binding: ViewVideoBinding
 
     private lateinit var photoLibrary: PhotoLibrary
-    private lateinit var rs : RenderScript
+
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
     private var originalEffect: Effect? = null
@@ -74,7 +74,6 @@ class ViewVideoActivity: AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ViewVideoBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
         binding.shareButton.setOnClickListener(this::doShare)
@@ -85,7 +84,7 @@ class ViewVideoActivity: AppCompatActivity() {
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")!!
-        videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
+        videoReader = VideoReader(photoLibrary, videoId, getLandscapeDisplaySize(this))
 
         binding.frameSeekBar.max = videoReader.numberOfFrames() - 1
         binding.frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {

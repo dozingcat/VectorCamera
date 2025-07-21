@@ -1,12 +1,12 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.renderscript.RenderScript
+
 import android.util.Log
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CameraImageProcessor(val rs: RenderScript) {
+class CameraImageProcessor() {
     private var consumerThread: Thread? = null
     private var receivedCameraImage: CameraImage? = null
     private val threadLock = ReentrantLock()
@@ -72,8 +72,7 @@ class CameraImageProcessor(val rs: RenderScript) {
             val t1 = System.nanoTime()
             val bitmap = effect.createBitmap(currentCamAllocation)
             val duration = System.nanoTime() - t1
-            // Get the flattened bytes if we need them. For ImageData, we can get them directly.
-            // For legacy RenderScript allocations, we use the flatten_yuv script.
+            // Get the flattened bytes if we need them.
             val yuvBytes = if (currentCamAllocation.status.isSavingImage()) {
                 // Get YUV bytes directly from ImageData
                 currentCamAllocation.getYuvBytes()

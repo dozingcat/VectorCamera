@@ -8,7 +8,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
-import android.renderscript.RenderScript
+
 import androidx.core.content.FileProvider
 import android.util.Log
 import android.util.Size
@@ -31,7 +31,7 @@ class ViewImageActivity : AppCompatActivity() {
     private lateinit var binding: ViewImageBinding
 
     private lateinit var photoLibrary: PhotoLibrary
-    private lateinit var rs : RenderScript
+
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
     private var effectSelectionIsPortrait = false
@@ -45,7 +45,6 @@ class ViewImageActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ViewImageBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
         binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
@@ -121,7 +120,7 @@ class ViewImageActivity : AppCompatActivity() {
         val imageData = ImageData.fromYuvBytes(
             yuvBytes, metadata.width, metadata.height
         )
-        return CameraImage(rs, null, null, imageData, metadata.orientation,
+        return CameraImage(imageData, metadata.orientation,
                 CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getLandscapeDisplaySize(this))
     }
 

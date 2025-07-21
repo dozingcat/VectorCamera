@@ -277,7 +277,7 @@ class AsciiEffectKotlin(
         val blue = Color.blue(avgColor)
         
         val maxComponent = maxOf(red, green, blue)
-        val threshold = (maxComponent * 0.875).toInt() // PRIMARY_COLOR_RATIO from RenderScript
+        val threshold = (maxComponent * 0.875).toInt()
         
         val primaryRed = if (red >= threshold) 255 else 0
         val primaryGreen = if (green >= threshold) 255 else 0

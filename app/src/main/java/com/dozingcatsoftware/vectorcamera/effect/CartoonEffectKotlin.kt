@@ -188,7 +188,6 @@ class CartoonEffectKotlin(
 
     /**
      * Apply a fast box blur to the image using separable convolution.
-     * This is more efficient than the naive approach and closer to RenderScript performance.
      */
     private fun applyBlur(pixels: IntArray, width: Int, height: Int, radius: Int): IntArray {
         if (radius <= 0) return pixels

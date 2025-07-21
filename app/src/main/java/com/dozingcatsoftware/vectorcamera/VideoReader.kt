@@ -1,6 +1,6 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.renderscript.RenderScript
+
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
@@ -8,7 +8,7 @@ import java.io.ByteArrayInputStream
 import java.nio.ByteBuffer
 
 // Maybe get rid of PhotoLibrary parameter and pass files/metadata as individual arguments.
-class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, videoId: String,
+class VideoReader(photoLibrary: PhotoLibrary, videoId: String,
                   private val displaySize: Size) {
     private val videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
     private val metadata = photoLibrary.metadataForItemId(videoId)
@@ -43,7 +43,7 @@ class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, vide
         videoFile.readFully(frameBuffer)
         val imageData = ImageData.fromYuvBytes(frameBuffer, metadata.width, metadata.height)
         var cameraImage = CameraImage(
-                rs, null, null,imageData, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
+                imageData, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
         val fp = forcePortrait
         if (fp != null) {

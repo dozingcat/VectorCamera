@@ -3,7 +3,7 @@ package com.dozingcatsoftware.vectorcamera
 import android.content.Context
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
-import android.renderscript.RenderScript
+
 import android.util.Log
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
@@ -53,7 +53,7 @@ class VCPreferences(val context: Context) {
         return jsonStringToMap(effectJson)
     }
 
-    fun effect(rs: RenderScript, defaultFn: (() -> Effect)): Effect {
+    fun effect(defaultFn: (() -> Effect)): Effect {
         val name = effectName()
         val params = effectParameters()
         if (name.isNotEmpty()) {

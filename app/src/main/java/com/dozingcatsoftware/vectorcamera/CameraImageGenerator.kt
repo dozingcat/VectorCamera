@@ -7,11 +7,11 @@ import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
-import android.renderscript.RenderScript
+
 import android.util.Log
 import android.util.Size
 
-class CameraImageGenerator(val context: Context, val rs: RenderScript,
+class CameraImageGenerator(val context: Context,
                            val cameraManager: CameraManager, val cameraId: String,
                            val timestampFn: () -> Long = System::currentTimeMillis) {
 
@@ -153,11 +153,10 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                     if (image != null) {
                         if (captureSession != null) {
                             // Extract image data immediately and close the image to free the buffer
-                            val imageData = ImageData.fromImage(image)
+                            val cameraImage = CameraImage.fromImage(image, imageOrientation, status, timestampFn())
                             image.close()
                             
-                            this.imageAllocationCallback?.invoke(CameraImage.withImageData(
-                                        rs, imageData, imageOrientation, status, timestampFn()))
+                            this.imageAllocationCallback?.invoke(cameraImage)
                         }
                         else {
                             Log.i(TAG, "captureSession is null, closing image")

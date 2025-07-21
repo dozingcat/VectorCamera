@@ -15,9 +15,6 @@ class EffectRegistry {
 
     // 36 effects, shown in 6x6 grid.
     // See Animated2dGradient.kt for description of gradient grids.
-
-    // Pure Kotlin/C++ effects - RenderScript completely removed!
-    
     val baseEffects = listOf<((String, Any) -> Any, EffectContext) -> Effect>(
 
             // Row 1, edges on black.

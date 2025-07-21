@@ -3,7 +3,7 @@ package com.dozingcatsoftware.vectorcamera
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Environment
-import android.renderscript.RenderScript
+
 import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.EffectMetadata
@@ -79,14 +79,8 @@ class PhotoLibrary(val rootDirectory: File) {
                     it.write(processedBitmap.yuvBytes)
                 }
                 else {
-                    val allocBytes = ByteArray(width * height)
-                    val planarYuv = processedBitmap.sourceImage.getPlanarYuvAllocations()!!
-                    planarYuv.y.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height)
-                    planarYuv.u.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height / 4)
-                    planarYuv.v.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height / 4)
+                    val yuvBytes = processedBitmap.sourceImage.getYuvBytes()
+                    it.write(yuvBytes)
                 }
             }
         })
@@ -247,8 +241,7 @@ class PhotoLibrary(val rootDirectory: File) {
         writeMetadata(metadata, itemId)
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.
-        val rs = RenderScript.create(context)
-        val videoReader = VideoReader(rs, this, itemId, getDisplaySize(context))
+        val videoReader = VideoReader(this, itemId, getDisplaySize(context))
         writeThumbnail(videoReader.bitmapForFrame(0), itemId)
     }
 

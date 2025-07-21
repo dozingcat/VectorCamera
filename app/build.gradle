@@ -7,7 +7,6 @@ android {
         applicationId "com.dozingcatsoftware.vectorcamera"
         minSdkVersion 23
         targetSdkVersion 36
-        renderscriptTargetApi 23
         versionCode 14
         versionName "1.7.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
@@ -30,9 +29,6 @@ android {
         }
     }
     namespace 'com.dozingcatsoftware.vectorcamera'
-    buildFeatures {
-        renderScript true
-    }
     externalNativeBuild {
         cmake {
             path file('src/main/cpp/CMakeLists.txt')

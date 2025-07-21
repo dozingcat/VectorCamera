@@ -7,7 +7,7 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.provider.MediaStore
-import android.renderscript.RenderScript
+
 import android.util.Log
 import android.util.Size
 import android.util.TypedValue
@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var photoLibrary: PhotoLibrary
 
-    private lateinit var rs: RenderScript
+
     private val effectRegistry = EffectRegistry()
     private var currentEffect: Effect? = null
     private var previousEffect: Effect? = null
@@ -78,9 +78,7 @@ class MainActivity : AppCompatActivity() {
 
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
-        // Use PROFILE type only on first run?
-        rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
-        imageProcessor = CameraImageProcessor(rs)
+        imageProcessor = CameraImageProcessor()
 
         currentEffect = effectFromPreferences()
         preferredImageSize =
@@ -88,7 +86,7 @@ class MainActivity : AppCompatActivity() {
                 else ImageSize.HALF_SCREEN
 
         cameraSelector = CameraSelector(this)
-        cameraImageGenerator = cameraSelector.createImageGenerator(rs)
+        cameraImageGenerator = cameraSelector.createImageGenerator()
 
         binding.toggleVideoButton.setOnClickListener(this::toggleVideoMode)
         binding.switchCameraButton.setOnClickListener(this::switchToNextCamera)
@@ -390,7 +388,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun effectFromPreferences(): Effect {
-        return preferences.effect(rs,
+        return preferences.effect(
                 {effectRegistry.defaultEffectAtIndex(0, preferences.lookupFunction)})
     }
 
@@ -435,7 +433,7 @@ class MainActivity : AppCompatActivity() {
         cameraSelector.selectNextCamera()
         cameraImageGenerator.stop({
             handler.post({
-                cameraImageGenerator = cameraSelector.createImageGenerator(rs)
+                cameraImageGenerator = cameraSelector.createImageGenerator()
                 restartCameraImageGenerator()
                 updateControls()
             })
