@@ -1,5 +1,6 @@
 package com.dozingcatsoftware.vectorcamera
 
+import RunningStats
 import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
@@ -62,6 +63,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var onBackPressedCallback: OnBackPressedCallback
+
+    val renderTimeStats = RunningStats()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -320,8 +323,12 @@ class MainActivity : AppCompatActivity() {
             if (lastBitmapTimestamp > pb.sourceImage.timestamp) {
                 return
             }
+            if (pb.generationTimeNanos > 0) {
+                renderTimeStats.addValue(pb.generationTimeNanos)
+            }
             lastBitmapTimestamp = pb.sourceImage.timestamp
             binding.overlayView.processedBitmap = pb
+            binding.overlayView.generationTimeAverageNanos = renderTimeStats.getAverage()
             binding.overlayView.invalidate()
             // Save image or video frame if necessary.
             if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {

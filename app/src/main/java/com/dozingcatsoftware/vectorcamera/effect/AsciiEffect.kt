@@ -119,18 +119,13 @@ class AsciiEffect(private val rs: RenderScript,
         // There's no input allocation passed directly to the kernel so we manually set x/y ranges.
         val options = Script.LaunchOptions()
                 .setX(0, metrics.numCharacterColumns).setY(0, metrics.numCharacterRows)
-        if (cameraImage.planarYuvAllocations != null) {
-            script._hasSingleYuvAllocation = false
-            script._yInput = cameraImage.planarYuvAllocations.y
-            script._uInput = cameraImage.planarYuvAllocations.u
-            script._vInput = cameraImage.planarYuvAllocations.v
-            script.forEach_writeCharacterToBitmap(options)
-        }
-        else {
-            script._hasSingleYuvAllocation = true
-            script._yuvInput = cameraImage.singleYuvAllocation
-            script.forEach_writeCharacterToBitmap(options)
-        }
+        
+        script._hasSingleYuvAllocation = false
+        val planarYuv = cameraImage.getPlanarYuvAllocations()!!
+        script._yInput = planarYuv.y
+        script._uInput = planarYuv.u
+        script._vInput = planarYuv.v
+        script.forEach_writeCharacterToBitmap(options)
         bitmapOutputAllocation!!.copyTo(resultBitmap)
 
         return resultBitmap
@@ -152,16 +147,12 @@ class AsciiEffect(private val rs: RenderScript,
         script._flipVertical = cameraImage.orientation.yFlipped
         script._portrait = cameraImage.orientation.portrait
         script._colorMode = colorMode.id
-        if (cameraImage.planarYuvAllocations != null) {
-            script._hasSingleYuvAllocation = false
-            script._yInput = cameraImage.planarYuvAllocations.y
-            script._uInput = cameraImage.planarYuvAllocations.u
-            script._vInput = cameraImage.planarYuvAllocations.v
-        }
-        else {
-            script._hasSingleYuvAllocation = true
-            script._yuvInput = cameraImage.singleYuvAllocation
-        }
+        
+        script._hasSingleYuvAllocation = false
+        val planarYuv = cameraImage.getPlanarYuvAllocations()!!
+        script._yInput = planarYuv.y
+        script._uInput = planarYuv.u
+        script._vInput = planarYuv.v
         script.forEach_computeCharacterInfoForBlock(asciiBlockAllocation)
 
         val allocBytes = ByteArray(4 * metrics.numCharacterColumns * metrics.numCharacterRows)

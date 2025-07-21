@@ -42,16 +42,11 @@ class PermuteColorEffect(
         script._gBlueSource = blueSource.rsCode
         script._gFlipUV = flipUV
 
-        if (cameraImage.planarYuvAllocations != null) {
-            script._gYInput = cameraImage.planarYuvAllocations.y
-            script._gUInput = cameraImage.planarYuvAllocations.u
-            script._gVInput = cameraImage.planarYuvAllocations.v
-            script.forEach_permuteColors_planar(outputAllocation)
-        }
-        else {
-            script._gYuvInput = cameraImage.singleYuvAllocation!!
-            script.forEach_permuteColors(outputAllocation)
-        }
+        val planarYuv = cameraImage.getPlanarYuvAllocations()!!
+        script._gYInput = planarYuv.y
+        script._gUInput = planarYuv.u
+        script._gVInput = planarYuv.v
+        script.forEach_permuteColors_planar(outputAllocation)
 
         val resultBitmap = Bitmap.createBitmap(
                 cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)

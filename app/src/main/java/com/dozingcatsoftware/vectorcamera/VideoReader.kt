@@ -41,10 +41,9 @@ class VideoReader(private val rs: RenderScript, photoLibrary: PhotoLibrary, vide
         val bpf = bytesPerFrame().toLong()
         videoFile.seek(frameIndex * bpf)
         videoFile.readFully(frameBuffer)
-        val allocation = PlanarYuvAllocations.fromInputStream(
-                rs, ByteArrayInputStream(frameBuffer), metadata.width, metadata.height)
-        var cameraImage = CameraImage.withAllocationSet(
-                rs, allocation, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
+        val imageData = ImageData.fromYuvBytes(frameBuffer, metadata.width, metadata.height)
+        var cameraImage = CameraImage(
+                rs, null, null,imageData, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
         val fp = forcePortrait
         if (fp != null) {
