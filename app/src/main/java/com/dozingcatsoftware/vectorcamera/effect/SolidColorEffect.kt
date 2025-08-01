@@ -23,18 +23,29 @@ class SolidColorEffect(
         backgroundFn.invoke(cameraImage, canvas, rect)
     }
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        
         val width = cameraImage.width()
         val height = cameraImage.height()
 
         // Get YUV data directly from CameraImage
         val yuvBytes = cameraImage.getYuvBytes()!!
-        return createBitmapFromYuvBytes(yuvBytes, width, height)
+        val (bitmap, threadsUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = CodeArchitecture.Kotlin,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Bitmap {
+    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Pair<Bitmap, Int> {
         // Determine optimal number of threads based on CPU cores and image size
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
@@ -79,7 +90,7 @@ class SolidColorEffect(
         if (++numFrames % 30 == 0) {
             Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Kotlin)")
         }
-        return bitmap
+        return Pair(bitmap, numThreads)
     }
 
     private fun processRows(

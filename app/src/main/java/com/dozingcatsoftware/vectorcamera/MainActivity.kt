@@ -321,9 +321,7 @@ class MainActivity : AppCompatActivity() {
             if (lastBitmapTimestamp > pb.sourceImage.timestamp) {
                 return
             }
-            if (pb.generationTimeNanos > 0) {
-                renderTimeStats.addValue(pb.generationTimeNanos)
-            }
+            renderTimeStats.addValue(pb.metadata.generationDurationNanos)
             lastBitmapTimestamp = pb.sourceImage.timestamp
             binding.overlayView.processedBitmap = pb
             binding.overlayView.generationTimeAverageNanos = renderTimeStats.getAverage()

@@ -4,6 +4,17 @@ import android.graphics.*
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 
+enum class CodeArchitecture {
+    Kotlin,
+    Native,
+}
+
+data class ProcessedBitmapMetadata(
+    val codeArchitecture: CodeArchitecture?,
+    val numThreads: Int?,
+    val generationDurationNanos: Long,
+)
+
 /**
  * The result of applying an Effect to a CameraImage. Contains references to the effect and
  * input image, and the bitmap created by applying the effect.
@@ -12,7 +23,7 @@ data class ProcessedBitmap(
         val effect: Effect,
         val sourceImage: CameraImage,
         val bitmap: Bitmap,
-        val generationTimeNanos: Long = -1,
+        val metadata: ProcessedBitmapMetadata,
     ) {
 
     /**
@@ -81,7 +92,6 @@ data class ProcessedBitmap(
 
     fun resizedTo(size: Size): ProcessedBitmap {
         val resizedSource = this.sourceImage.resizedTo(size)
-        val bitmap = effect.createBitmap(resizedSource)
-        return ProcessedBitmap(effect, resizedSource, bitmap)
+        return effect.createBitmap(resizedSource)
     }
 }

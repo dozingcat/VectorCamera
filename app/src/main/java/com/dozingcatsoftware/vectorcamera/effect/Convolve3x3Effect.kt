@@ -25,18 +25,29 @@ class Convolve3x3Effect(
         backgroundFn.invoke(cameraImage, canvas, rect)
     }
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        
         val width = cameraImage.width()
         val height = cameraImage.height()
 
         // Get YUV data directly from CameraImage
         val yuvBytes = cameraImage.getYuvBytes()!!
-        return createBitmapFromYuvBytes(yuvBytes, width, height)
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = architectureUsed,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Bitmap {
+    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         // Determine optimal number of threads based on CPU cores and image size
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
@@ -58,7 +69,7 @@ class Convolve3x3Effect(
                     }
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
-                    return bitmap
+                    return Triple(bitmap, numThreads, CodeArchitecture.Native)
                 }
             } catch (e: Exception) {
                 Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
@@ -66,7 +77,8 @@ class Convolve3x3Effect(
         }
         
         // Fall back to Kotlin implementation if native failed or not available
-        return createBitmapFromYuvBytesKotlin(yuvBytes, width, height, numThreads, t1)
+        val kotlinBitmap = createBitmapFromYuvBytesKotlin(yuvBytes, width, height, numThreads, t1)
+        return Triple(kotlinBitmap, numThreads, CodeArchitecture.Kotlin)
     }
     
     private fun createBitmapFromYuvBytesKotlin(yuvBytes: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {

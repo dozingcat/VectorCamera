@@ -27,8 +27,7 @@ class ProcessImageOperation(val timeFn: (() -> Long) = System::currentTimeMillis
             EffectRegistry().defaultEffectAtIndex(0, prefs.lookupFunction)
         })
         val t2 = timeFn()
-        val outputBitmap = effect.createBitmap(inputImage)
-        val processedBitmap = ProcessedBitmap(effect, inputImage, outputBitmap)
+        val processedBitmap = effect.createBitmap(inputImage)
 
         val t3 = timeFn()
         val photoId = photoLibrary.savePhoto(context, processedBitmap)

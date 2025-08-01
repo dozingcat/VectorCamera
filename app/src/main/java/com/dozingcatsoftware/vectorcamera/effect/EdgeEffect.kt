@@ -25,19 +25,30 @@ class EdgeEffect private constructor(
         backgroundFn?.invoke(cameraImage, canvas, rect)
     }
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        
         val width = cameraImage.width()
         val height = cameraImage.height()
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
         // Get YUV data directly from CameraImage
         val yuvBytes = cameraImage.getYuvBytes()!!
-        return createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = architectureUsed,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int): Bitmap {
+    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val ySize = width * height
         
         // Extract Y plane from the flattened YUV bytes
@@ -90,7 +101,8 @@ class EdgeEffect private constructor(
             val impl = if (nativeLibraryLoaded && colorMap != null) "native" else "Kotlin"
             Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads ($impl)")
         }
-        return bitmap
+        val architecture = if (nativeLibraryLoaded && colorMap != null) CodeArchitecture.Native else CodeArchitecture.Kotlin
+        return Triple(bitmap, numThreads, architecture)
     }
 
     private fun processRows(

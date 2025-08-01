@@ -136,8 +136,7 @@ class ViewImageActivity : AppCompatActivity() {
         if (newSize != null) {
             inputImage = inputImage.resizedTo(newSize)
         }
-        val bitmap = effect.createBitmap(inputImage)
-        return ProcessedBitmap(effect, inputImage, bitmap)
+        return effect.createBitmap(inputImage)
     }
 
     private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null,

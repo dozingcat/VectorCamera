@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
 
 data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
     fun toJson() = mapOf("name" to name, "params" to parameters)
@@ -20,7 +21,7 @@ data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
 }
 
 interface Effect {
-    fun createBitmap(cameraImage: CameraImage): Bitmap
+    fun createBitmap(cameraImage: CameraImage): ProcessedBitmap
 
     fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {}
 

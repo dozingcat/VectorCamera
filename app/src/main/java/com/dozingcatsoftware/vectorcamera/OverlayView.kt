@@ -32,7 +32,9 @@ class OverlayView(context: Context, attrs: AttributeSet) : View(context, attrs) 
             val x = 16 * density
             val y = 16 * density
             val ms = (generationTimeAverageNanos / 1e6).roundToInt()
-            val msg = "${pb.effect.effectName()} ${pb.bitmap.width}x${pb.bitmap.height} ${ms}ms"
+            val archStr = if (pb.metadata.codeArchitecture != null) pb.metadata.codeArchitecture.name else " "
+            val threadStr = if (pb.metadata.numThreads != null) "${pb.metadata.numThreads}T" else " "
+            val msg = "${pb.effect.effectName()} ${pb.bitmap.width}x${pb.bitmap.height} $archStr $threadStr ${ms}ms"
             canvas.drawText(msg, x, y, statsPaint)
         }
     }

@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.dozingcatsoftware.util.YuvUtils
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmapMetadata
+import com.dozingcatsoftware.vectorcamera.CodeArchitecture
 import kotlin.math.roundToInt
 import kotlinx.coroutines.*
 import java.util.concurrent.Executors
@@ -69,14 +72,25 @@ class EdgeLuminanceEffect : Effect {
 
     override fun effectName() = EFFECT_NAME
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        
         val width = cameraImage.width()
         val height = cameraImage.height()
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
         // Get YUV data directly from CameraImage
         val yuvBytes = cameraImage.getYuvBytes()!!
-        return createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
+        val bitmap = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = CodeArchitecture.Kotlin,
+            numThreads = null, // Single-threaded Kotlin processing
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
     var numFrames: Int = 0

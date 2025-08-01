@@ -50,7 +50,7 @@ class VideoReader(photoLibrary: PhotoLibrary, videoId: String,
             cameraImage = cameraImage.copy(
                     displaySize=displaySize, orientation=cameraImage.orientation.withPortrait(fp))
         }
-        return ProcessedBitmap(effect, cameraImage, effect.createBitmap(cameraImage))
+        return effect.createBitmap(cameraImage)
     }
 
     fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {

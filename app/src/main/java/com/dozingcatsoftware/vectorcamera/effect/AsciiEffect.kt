@@ -63,7 +63,8 @@ class AsciiEffect(
 
     var numFrames: Int = 0
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
         val t1 = System.currentTimeMillis()
         
         val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
@@ -84,7 +85,14 @@ class AsciiEffect(
         
         if (nativeResult == null || nativeResult.size != metrics.numCharacterColumns * metrics.numCharacterRows * 2) {
             Log.e(EFFECT_NAME, "Native ASCII computation failed, falling back to Kotlin")
-            return createBitmapFallback(cameraImage, metrics)
+            val fallbackBitmap = createBitmapFallback(cameraImage, metrics)
+            val endTime = System.nanoTime()
+            val metadata = ProcessedBitmapMetadata(
+                codeArchitecture = CodeArchitecture.Kotlin,
+                numThreads = 1, // Fallback is single-threaded Kotlin
+                generationDurationNanos = endTime - startTime
+            )
+            return ProcessedBitmap(this, cameraImage, fallbackBitmap, metadata)
         }
         
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
@@ -94,15 +102,30 @@ class AsciiEffect(
         // Create character template bitmap if needed
         updateCharTemplateBitmap(metrics.charPixelSize)
         
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsForThreading = 8
+        val threadsUsed = if (metrics.numCharacterRows >= minRowsForThreading) {
+            minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
+        } else {
+            1 // Single thread for small grids
+        }
+        
         // Render final bitmap using bulk character rendering
-        val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors)
+        val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors, threadsUsed)
         
         val elapsed = System.currentTimeMillis() - t1
         if (++numFrames % 30 == 0) {
             Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} ASCII image in $elapsed ms (native)")
         }
         
-        return resultBitmap
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = CodeArchitecture.Native,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, resultBitmap, metadata)
     }
     
     /**
@@ -118,8 +141,8 @@ class AsciiEffect(
         // Create character template bitmap if needed
         updateCharTemplateBitmap(metrics.charPixelSize)
         
-        // Render final bitmap using bulk character rendering
-        return renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors)
+        // Render final bitmap using bulk character rendering (fallback is single-threaded)
+        return renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors, 1)
     }
 
     /**
@@ -360,11 +383,12 @@ class AsciiEffect(
      * Render the final bitmap by drawing ASCII characters into a grid.
      * Uses high-performance native C++ implementation with threading.
      */
-    private fun renderFinalBitmap(
-        cameraImage: CameraImage, 
+        private fun renderFinalBitmap(
+        cameraImage: CameraImage,
         metrics: TextMetricsKotlin,
         characterIndices: IntArray,
-        characterColors: IntArray
+        characterColors: IntArray,
+        numThreads: Int
     ): Bitmap {
         val resultBitmap = Bitmap.createBitmap(
             metrics.outputSize.width, 
@@ -382,14 +406,6 @@ class AsciiEffect(
             val templatePixels = IntArray(template.width * template.height)
             template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
             
-            // Determine optimal thread count
-            val numCores = Runtime.getRuntime().availableProcessors()
-            val minRowsForThreading = 8
-            val numThreads = if (metrics.numCharacterRows >= minRowsForThreading) {
-                minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
-            } else {
-                1 // Single thread for small grids
-            }
             
             Companion.renderCharacterGridNative(
                 templatePixels,

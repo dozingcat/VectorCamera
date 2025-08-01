@@ -171,7 +171,8 @@ class MatrixEffect(
 
     var numFrames: Int = 0
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
         val t1 = System.currentTimeMillis()
         
         val rand = Random(cameraImage.timestamp)
@@ -187,8 +188,20 @@ class MatrixEffect(
         // Create character template bitmap if needed
         updateCharTemplateBitmap(metrics.charPixelSize)
         
+        val threadsUsed = if (nativeLibraryLoaded) {
+            val numCores = Runtime.getRuntime().availableProcessors()
+            val minRowsForThreading = 8
+            if (metrics.numCharacterRows >= minRowsForThreading) {
+                minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
+            } else {
+                1
+            }
+        } else {
+            1 // Kotlin fallback is single-threaded
+        }
+        
         // Render final bitmap
-        val resultBitmap = renderFinalBitmap(cameraImage, metrics)
+        val resultBitmap = renderFinalBitmap(cameraImage, metrics, threadsUsed)
         
         val elapsed = System.currentTimeMillis() - t1
         if (++numFrames % 30 == 0) {
@@ -196,7 +209,14 @@ class MatrixEffect(
             Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} Matrix image in $elapsed ms ($impl)")
         }
         
-        return resultBitmap
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, resultBitmap, metadata)
     }
 
     /**
@@ -530,7 +550,7 @@ class MatrixEffect(
      * Render the final bitmap using native bulk character rendering.
      * This replaces thousands of individual character operations with one multi-threaded C++ call.
      */
-    private fun renderFinalBitmap(cameraImage: CameraImage, metrics: TextMetricsKotlin): Bitmap {
+    private fun renderFinalBitmap(cameraImage: CameraImage, metrics: TextMetricsKotlin, numThreads: Int): Bitmap {
         val resultBitmap = Bitmap.createBitmap(
             metrics.outputSize.width, 
             metrics.outputSize.height, 
@@ -549,14 +569,7 @@ class MatrixEffect(
                 val templatePixels = IntArray(template.width * template.height)
                 template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
                 
-                // Determine optimal threading for character rendering
-                val numCores = Runtime.getRuntime().availableProcessors()
-                val minRowsForThreading = 8
-                val numThreads = if (metrics.numCharacterRows >= minRowsForThreading) {
-                    minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
-                } else {
-                    1
-                }
+                // Use the pre-calculated thread count passed as parameter
                 
                 // Render entire character grid in native code with multi-threading
                 renderCharacterGridNative(

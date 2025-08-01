@@ -69,11 +69,7 @@ class CameraImageProcessor() {
                 })
             }
 
-            val t1 = System.nanoTime()
-            val bitmap = effect.createBitmap(currentCamAllocation)
-            val duration = System.nanoTime() - t1
-            val processedBitmap = ProcessedBitmap(
-                    effect, currentCamAllocation, bitmap, generationTimeNanos=duration)
+            val processedBitmap = effect.createBitmap(currentCamAllocation)
             
             callback(processedBitmap)
             currentCamAllocation = null
