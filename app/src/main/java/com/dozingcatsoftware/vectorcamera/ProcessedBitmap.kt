@@ -12,7 +12,6 @@ data class ProcessedBitmap(
         val effect: Effect,
         val sourceImage: CameraImage,
         val bitmap: Bitmap,
-        val yuvBytes: ByteArray? = null,
         val generationTimeNanos: Long = -1,
     ) {
 

@@ -340,9 +340,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveImage(pb: ProcessedBitmap) {
         Log.i(TAG, "Saving picture")
-        if (pb.yuvBytes == null) {
-            Log.w(TAG, "yuvBytes not set for saved image")
-        }
         // This can take a while, so show a spinner. Should it allow the user to cancel?
         val saveIndicator = ProgressDialog(this)
         saveIndicator.isIndeterminate = true
@@ -369,21 +366,17 @@ class MainActivity : AppCompatActivity() {
     private fun recordVideoFrame(pb: ProcessedBitmap) {
         val vr = videoRecorder
         if (vr != null) {
-            if (pb.yuvBytes != null) {
-                if (videoFrameMetadata == null) {
-                    videoFrameMetadata = MediaMetadata(
-                            MediaType.VIDEO,
-                            currentEffect!!.effectMetadata(),
-                            pb.sourceImage.width(),
-                            pb.sourceImage.height(),
-                            pb.sourceImage.orientation,
-                            pb.sourceImage.timestamp)
-                }
-                vr.recordFrame(pb.sourceImage.timestamp, pb.yuvBytes)
+            val yuvBytes = pb.sourceImage.getYuvBytes()
+            if (videoFrameMetadata == null) {
+                videoFrameMetadata = MediaMetadata(
+                        MediaType.VIDEO,
+                        currentEffect!!.effectMetadata(),
+                        pb.sourceImage.width(),
+                        pb.sourceImage.height(),
+                        pb.sourceImage.orientation,
+                        pb.sourceImage.timestamp)
             }
-            else {
-                Log.w(TAG, "yuvBytes not set for video frame")
-            }
+            vr.recordFrame(pb.sourceImage.timestamp, yuvBytes)
         }
     }
 

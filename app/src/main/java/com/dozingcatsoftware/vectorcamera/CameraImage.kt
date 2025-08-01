@@ -291,13 +291,6 @@ data class CameraImage(
         return result
     }
 
-    /**
-     * No cleanup needed for ImageData - kept for compatibility.
-     */
-    fun close() {
-        // ImageData doesn't need cleanup - this method is kept for compatibility
-    }
-
     companion object {
         val zeroSize = Size(0, 0)
 

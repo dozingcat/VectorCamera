@@ -72,16 +72,8 @@ class CameraImageProcessor() {
             val t1 = System.nanoTime()
             val bitmap = effect.createBitmap(currentCamAllocation)
             val duration = System.nanoTime() - t1
-            // Get the flattened bytes if we need them.
-            val yuvBytes = if (currentCamAllocation.status.isSavingImage()) {
-                // Get YUV bytes directly from ImageData
-                currentCamAllocation.getYuvBytes()
-            } else {
-                null
-            }
-            
             val processedBitmap = ProcessedBitmap(
-                    effect, currentCamAllocation, bitmap, yuvBytes, generationTimeNanos=duration)
+                    effect, currentCamAllocation, bitmap, generationTimeNanos=duration)
             
             callback(processedBitmap)
             currentCamAllocation = null
