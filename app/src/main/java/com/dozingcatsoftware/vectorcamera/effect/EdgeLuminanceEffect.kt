@@ -47,7 +47,7 @@ class EdgeLuminanceEffect : Effect {
 
     // Static block to load native library
     companion object {
-        const val EFFECT_NAME = "edgeLuminance"
+        const val EFFECT_NAME = "edge_luminance"
         
         private var nativeLibraryLoaded = false
         

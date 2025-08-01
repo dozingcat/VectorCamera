@@ -186,7 +186,7 @@ class PermuteColorEffect(
 
 
     companion object {
-        const val EFFECT_NAME = "permuteColor"
+        const val EFFECT_NAME = "permute_color"
         
         // Load native library
         private var nativeLibraryLoaded = false

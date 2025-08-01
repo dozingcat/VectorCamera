@@ -104,7 +104,7 @@ class SolidColorEffect(
     }
 
     companion object {
-        const val EFFECT_NAME = "solidColor"
+        const val EFFECT_NAME = "solid_color"
         
         fun fromParameters(effectParams: Map<String, Any>): SolidColorEffect {
             // Parse color scheme parameters (backwards compatibility)
