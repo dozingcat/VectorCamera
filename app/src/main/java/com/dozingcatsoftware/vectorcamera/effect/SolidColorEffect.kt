@@ -45,12 +45,18 @@ class SolidColorEffect(
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Pair<Bitmap, Int> {
-        // Determine optimal number of threads based on CPU cores and image size
+    /**
+     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
+     */
+    private fun calculateOptimalThreads(height: Int): Int {
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = minOf(numCores, height / minRowsPerThread)
-        val numThreads = maxOf(1, maxThreads)
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Pair<Bitmap, Int> {
+        val numThreads = calculateOptimalThreads(height)
 
         val t1 = System.currentTimeMillis()
         

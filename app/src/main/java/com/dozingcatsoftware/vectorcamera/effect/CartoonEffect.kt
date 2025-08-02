@@ -43,12 +43,29 @@ class CartoonEffect(
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
-        // Determine optimal number of threads based on CPU cores and image size
-        val numCores = 1 // Runtime.getRuntime().availableProcessors()
+    /**
+     * Calculate the optimal number of threads for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = minOf(numCores, height / minRowsPerThread)
-        val numThreads = maxOf(1, maxThreads)
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
+     */
+    private fun calculateOptimalKotlinThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
 
         val t1 = System.currentTimeMillis()
         
@@ -56,16 +73,16 @@ class CartoonEffect(
         if (nativeLibraryLoaded) {
             try {
                 val nativePixels = processImageNativeFromYuvBytes(
-                    yuvBytes, width, height, blurRadius, numThreads
+                    yuvBytes, width, height, blurRadius, nativeThreads
                 )
                 if (nativePixels != null) {
                     val elapsed = System.currentTimeMillis() - t1
                     if (++numFrames % 30 == 0) {
-                        Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Native)")
+                        Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $nativeThreads threads (Native)")
                     }
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
-                    return Triple(bitmap, numThreads, CodeArchitecture.Native)
+                    return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
                 }
             } catch (e: Exception) {
                 Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
@@ -73,8 +90,8 @@ class CartoonEffect(
         }
         
         // Fall back to Kotlin implementation if native failed or not available
-        val kotlinBitmap = createBitmapFromYuvBytesKotlin(yuvBytes, width, height, numThreads, t1)
-        return Triple(kotlinBitmap, numThreads, CodeArchitecture.Kotlin)
+        val kotlinBitmap = createBitmapFromYuvBytesKotlin(yuvBytes, width, height, kotlinThreads, t1)
+        return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
     private fun createBitmapFromYuvBytesKotlin(yuvBytes: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {

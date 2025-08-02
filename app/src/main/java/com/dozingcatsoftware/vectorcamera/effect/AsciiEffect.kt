@@ -63,6 +63,27 @@ class AsciiEffect(
 
     var numFrames: Int = 0
 
+    /**
+     * Calculate the optimal number of threads for native ASCII processing based on character grid dimensions.
+     */
+    private fun calculateOptimalNativeThreads(numCharacterRows: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsForThreading = 8
+        return if (numCharacterRows >= minRowsForThreading) {
+            minOf(numCores, numCharacterRows / 4, Effect.MAX_NATIVE_THREADS).coerceAtLeast(1)
+        } else {
+            1 // Single thread for small grids
+        }
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin ASCII processing (fallback is always single-threaded).
+     */
+    private fun calculateOptimalKotlinThreads(numCharacterRows: Int): Int {
+        // Kotlin fallback for ASCII is single-threaded for simplicity
+        return 1
+    }
+
     override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
         val startTime = System.nanoTime()
         val t1 = System.currentTimeMillis()
@@ -87,9 +108,10 @@ class AsciiEffect(
             Log.e(EFFECT_NAME, "Native ASCII computation failed, falling back to Kotlin")
             val fallbackBitmap = createBitmapFallback(cameraImage, metrics)
             val endTime = System.nanoTime()
+            val kotlinThreads = calculateOptimalKotlinThreads(metrics.numCharacterRows)
             val metadata = ProcessedBitmapMetadata(
                 codeArchitecture = CodeArchitecture.Kotlin,
-                numThreads = 1, // Fallback is single-threaded Kotlin
+                numThreads = kotlinThreads,
                 generationDurationNanos = endTime - startTime
             )
             return ProcessedBitmap(this, cameraImage, fallbackBitmap, metadata)
@@ -102,13 +124,7 @@ class AsciiEffect(
         // Create character template bitmap if needed
         updateCharTemplateBitmap(metrics.charPixelSize)
         
-        val numCores = Runtime.getRuntime().availableProcessors()
-        val minRowsForThreading = 8
-        val threadsUsed = if (metrics.numCharacterRows >= minRowsForThreading) {
-            minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
-        } else {
-            1 // Single thread for small grids
-        }
+        val threadsUsed = calculateOptimalNativeThreads(metrics.numCharacterRows)
         
         // Render final bitmap using bulk character rendering
         val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors, threadsUsed)

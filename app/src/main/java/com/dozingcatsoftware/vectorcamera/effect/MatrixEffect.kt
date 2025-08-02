@@ -171,6 +171,27 @@ class MatrixEffect(
 
     var numFrames: Int = 0
 
+    /**
+     * Calculate the optimal number of threads for native Matrix processing based on character grid dimensions.
+     */
+    private fun calculateOptimalNativeThreads(numCharacterRows: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsForThreading = 8
+        return if (numCharacterRows >= minRowsForThreading) {
+            minOf(numCores, numCharacterRows / 4, Effect.MAX_NATIVE_THREADS).coerceAtLeast(1)
+        } else {
+            1 // Single thread for small grids
+        }
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin Matrix processing (fallback is always single-threaded).
+     */
+    private fun calculateOptimalKotlinThreads(numCharacterRows: Int): Int {
+        // Kotlin fallback for Matrix is single-threaded for simplicity
+        return 1
+    }
+
     override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
         val startTime = System.nanoTime()
         val t1 = System.currentTimeMillis()
@@ -189,15 +210,9 @@ class MatrixEffect(
         updateCharTemplateBitmap(metrics.charPixelSize)
         
         val threadsUsed = if (nativeLibraryLoaded) {
-            val numCores = Runtime.getRuntime().availableProcessors()
-            val minRowsForThreading = 8
-            if (metrics.numCharacterRows >= minRowsForThreading) {
-                minOf(numCores, metrics.numCharacterRows / 4).coerceAtLeast(1)
-            } else {
-                1
-            }
+            calculateOptimalNativeThreads(metrics.numCharacterRows)
         } else {
-            1 // Kotlin fallback is single-threaded
+            calculateOptimalKotlinThreads(metrics.numCharacterRows)
         }
         
         // Render final bitmap
@@ -235,14 +250,7 @@ class MatrixEffect(
         // Use native implementation if available for better performance
         if (nativeLibraryLoaded) {
             try {
-                val numCores = Runtime.getRuntime().availableProcessors()
-                // Use threading only for larger grids to avoid overhead
-                val minRowsForThreading = 16
-                val numThreads = if (metrics.numCharacterRows >= minRowsForThreading) {
-                    minOf(numCores, metrics.numCharacterRows / 8).coerceAtLeast(1)
-                } else {
-                    1 // Single thread for small grids
-                }
+                val numThreads = calculateOptimalNativeThreads(metrics.numCharacterRows)
                 
                 computeBlockBrightnessNative(
                     yData, width, height,

@@ -48,33 +48,56 @@ class EdgeEffect private constructor(
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYBytes(yData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
-        val pixels = IntArray(width * height)
-
-        // Determine optimal number of threads based on CPU cores and image size.
+    /**
+     * Calculate the optimal number of threads for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = minOf(numCores, height / minRowsPerThread)
-        val numThreads = maxOf(1, maxThreads)
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
+     */
+    private fun calculateOptimalKotlinThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    private fun createBitmapFromYBytes(yData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
+        val pixels = IntArray(width * height)
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
 
         val t1 = System.currentTimeMillis()
         
-        if (nativeLibraryLoaded && colorMap != null) {
+        val actualThreads: Int
+        val architecture: CodeArchitecture
+
+        val lookupMap = colorMap ?: alphaMap!!
+        if (nativeLibraryLoaded) {
             // Use optimized native implementation for fixed color maps only
-            processImageNativeFromYuvBytes(yData, width, height, multiplier, colorMap, pixels, numThreads)
+            actualThreads = nativeThreads
+            architecture = CodeArchitecture.Native
+            processImageNativeFromYuvBytes(yData, width, height, multiplier, lookupMap, pixels, actualThreads)
         } else {
             // Fallback to Kotlin implementation with coroutines
-            val lookupMap = colorMap ?: alphaMap!!
-            if (numThreads == 1) {
+            actualThreads = kotlinThreads
+            architecture = CodeArchitecture.Kotlin
+            if (actualThreads == 1) {
                 processRows(0, height, width, height, multiplier, yData, pixels, lookupMap)
             } else {
                 runBlocking {
                     val jobs = mutableListOf<Job>()
-                    val rowsPerThread = height / numThreads
+                    val rowsPerThread = height / actualThreads
                     
-                    for (threadIndex in 0 until numThreads) {
+                    for (threadIndex in 0 until actualThreads) {
                         val startY = threadIndex * rowsPerThread
-                        val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
+                        val endY = if (threadIndex == actualThreads - 1) height else (threadIndex + 1) * rowsPerThread
                         
                         val job = launch(Dispatchers.Default) {
                             processRows(startY, endY, width, height, multiplier, yData, pixels, lookupMap)
@@ -93,11 +116,10 @@ class EdgeEffect private constructor(
 
         val elapsed = System.currentTimeMillis() - t1
         if (++numFrames % 30 == 0) {
-            val impl = if (nativeLibraryLoaded && colorMap != null) "native" else "Kotlin"
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads ($impl)")
+            val impl = if (architecture == CodeArchitecture.Native) "native" else "Kotlin"
+            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $actualThreads threads ($impl)")
         }
-        val architecture = if (nativeLibraryLoaded && colorMap != null) CodeArchitecture.Native else CodeArchitecture.Kotlin
-        return Triple(bitmap, numThreads, architecture)
+        return Triple(bitmap, actualThreads, architecture)
     }
 
     private fun processRows(

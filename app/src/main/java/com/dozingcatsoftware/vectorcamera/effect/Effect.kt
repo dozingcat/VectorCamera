@@ -30,4 +30,12 @@ interface Effect {
     fun effectParameters(): Map<String, Any> = mapOf()
 
     fun effectMetadata(): EffectMetadata = EffectMetadata(effectName(), effectParameters())
+
+    companion object {
+        // Maximum thread counts based on performance characteristics
+        // Native code hits memory bandwidth limits quickly
+        const val MAX_NATIVE_THREADS = 2
+        // Kotlin code is more CPU-bound and benefits from more parallelism
+        const val MAX_KOTLIN_THREADS = 4
+    }
 }

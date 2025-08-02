@@ -72,6 +72,26 @@ class EdgeLuminanceEffect : Effect {
 
     override fun effectName() = EFFECT_NAME
 
+    /**
+     * Calculate the optimal number of threads for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
+     */
+    private fun calculateOptimalKotlinThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
     override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
         val startTime = System.nanoTime()
         
@@ -79,20 +99,17 @@ class EdgeLuminanceEffect : Effect {
         val height = cameraImage.height()
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
-        // Determine optimal number of threads based on CPU cores and image size.
-        // On a Pixel 8a, using 9 threads renders in ~110ms and 1 thread takes ~330ms using Kotlin.
-        val numCores = 4 // Runtime.getRuntime().availableProcessors()
-        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = min(numCores, height / minRowsPerThread)
-        val numThreads = maxOf(1, maxThreads)
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
+        val actualThreads = if (nativeLibraryLoaded) nativeThreads else kotlinThreads
 
         val yuvBytes = cameraImage.getYuvBytes()
-        val bitmap = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier, numThreads)
+        val bitmap = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier, actualThreads)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
             codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
-            numThreads = numThreads, // Single-threaded Kotlin processing
+            numThreads = actualThreads,
             generationDurationNanos = endTime - startTime
         )
         
