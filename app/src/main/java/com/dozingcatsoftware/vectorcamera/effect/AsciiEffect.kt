@@ -61,8 +61,6 @@ class AsciiEffect(
         canvas.drawRect(rect, backgroundPaint)
     }
 
-    var numFrames: Int = 0
-
     /**
      * Calculate the optimal number of threads for native ASCII processing based on character grid dimensions.
      */
@@ -86,14 +84,17 @@ class AsciiEffect(
 
     override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
         val startTime = System.nanoTime()
-        val t1 = System.currentTimeMillis()
-        
+
         val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
         
         // Use native C++ implementation for intensive computations
-        val yuvBytes = cameraImage.getYuvBytes()
-        val nativeResult = Companion.computeAsciiDataNative(
-            yuvBytes,
+        // Get individual planes directly
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        
+        val nativeResult = Companion.computeAsciiDataNativeFromPlanes(
+            yData, uData, vData,
             cameraImage.width(),
             cameraImage.height(),
             metrics.numCharacterColumns,
@@ -128,11 +129,6 @@ class AsciiEffect(
         
         // Render final bitmap using bulk character rendering
         val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors, threadsUsed)
-        
-        val elapsed = System.currentTimeMillis() - t1
-        if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} ASCII image in $elapsed ms (native)")
-        }
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -698,8 +694,10 @@ class AsciiEffect(
          * Returns an IntArray with [characterIndices..., characterColors...]
          */
         @JvmStatic
-        external fun computeAsciiDataNative(
-            yuvBytes: ByteArray,
+        external fun computeAsciiDataNativeFromPlanes(
+            yData: ByteArray,
+            uData: ByteArray,
+            vData: ByteArray,
             width: Int,
             height: Int,
             numCharCols: Int,

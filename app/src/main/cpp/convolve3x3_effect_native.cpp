@@ -103,42 +103,41 @@ FORCE_INLINE void processColorMappingRows(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3Effect_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3Effect_00024Companion_processImageNativeFromYData(
     JNIEnv* env, 
     jobject /* this */, 
-    jbyteArray yuvBytes_, 
+    jbyteArray yData_, 
     jint width, 
     jint height,
     jfloatArray coefficients_,
     jintArray colorMap_,
     jint numThreads
 ) {
-    // Get YUV data
-    jbyte* yuvBytes = env->GetByteArrayElements(yuvBytes_, NULL);
-    if (yuvBytes == NULL) {
+    // Get Y plane data only (convolution only uses luminance)
+    jbyte* yBytes = env->GetByteArrayElements(yData_, NULL);
+    if (yBytes == NULL) {
         return NULL;
     }
 
     // Get coefficients
     jfloat* coefficients = env->GetFloatArrayElements(coefficients_, NULL);
     if (coefficients == NULL) {
-        env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+        env->ReleaseByteArrayElements(yData_, yBytes, 0);
         return NULL;
     }
 
     // Get color map
     jint* colorMap = env->GetIntArrayElements(colorMap_, NULL);
     if (colorMap == NULL) {
-        env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+        env->ReleaseByteArrayElements(yData_, yBytes, 0);
         env->ReleaseFloatArrayElements(coefficients_, coefficients, 0);
         return NULL;
     }
 
-    const unsigned char* yuvData = reinterpret_cast<const unsigned char*>(yuvBytes);
+    const unsigned char* yData = reinterpret_cast<const unsigned char*>(yBytes);
     
     // Calculate Y plane size
     int ySize = width * height;
-    const unsigned char* yData = yuvData;  // Y plane is at the beginning
 
     // Create intermediate array for convolved data
     unsigned char* convolvedData = new unsigned char[ySize];
@@ -167,7 +166,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3Effect_00024Companion_
     jintArray result = env->NewIntArray(width * height);
     if (result == NULL) {
         delete[] convolvedData;
-        env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+        env->ReleaseByteArrayElements(yData_, yBytes, 0);
         env->ReleaseFloatArrayElements(coefficients_, coefficients, 0);
         env->ReleaseIntArrayElements(colorMap_, colorMap, 0);
         return NULL;
@@ -176,7 +175,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3Effect_00024Companion_
     jint* pixels = env->GetIntArrayElements(result, NULL);
     if (pixels == NULL) {
         delete[] convolvedData;
-        env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+        env->ReleaseByteArrayElements(yData_, yBytes, 0);
         env->ReleaseFloatArrayElements(coefficients_, coefficients, 0);
         env->ReleaseIntArrayElements(colorMap_, colorMap, 0);
         return NULL;
@@ -205,7 +204,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_Convolve3x3Effect_00024Companion_
     // Clean up
     delete[] convolvedData;
     env->ReleaseIntArrayElements(result, pixels, 0);
-    env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+    env->ReleaseByteArrayElements(yData_, yBytes, 0);
     env->ReleaseFloatArrayElements(coefficients_, coefficients, 0);
     env->ReleaseIntArrayElements(colorMap_, colorMap, 0);
 

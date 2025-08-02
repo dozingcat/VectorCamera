@@ -103,8 +103,11 @@ class EdgeLuminanceEffect : Effect {
         val kotlinThreads = calculateOptimalKotlinThreads(height)
         val actualThreads = if (nativeLibraryLoaded) nativeThreads else kotlinThreads
 
-        val yuvBytes = cameraImage.getYuvBytes()
-        val bitmap = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier, actualThreads)
+        // Get individual plane data directly
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        val bitmap = createBitmapFromPlanes(yData, uData, vData, width, height, multiplier, actualThreads)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -116,18 +119,8 @@ class EdgeLuminanceEffect : Effect {
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    var numFrames: Int = 0
-
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int, numThreads: Int): Bitmap {
-        val ySize = width * height
+    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, multiplier: Int, numThreads: Int): Bitmap {
         val uvWidth = (width + 1) / 2
-        val uvHeight = (height + 1) / 2
-        val uvSize = uvWidth * uvHeight
-
-        // Extract planes from the flattened YUV bytes
-        val yData = yuvBytes.sliceArray(0 until ySize)
-        val uData = yuvBytes.sliceArray(ySize until ySize + uvSize)
-        val vData = yuvBytes.sliceArray(ySize + uvSize until ySize + 2 * uvSize)
 
         val pixels = IntArray(width * height)
 
@@ -163,12 +156,6 @@ class EdgeLuminanceEffect : Effect {
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        val elapsed = System.currentTimeMillis() - t1
-        if (++numFrames % 30 == 0) {
-            val impl = if (nativeLibraryLoaded) "native" else "Kotlin"
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads ($impl)")
-        }
         return bitmap
     }
 

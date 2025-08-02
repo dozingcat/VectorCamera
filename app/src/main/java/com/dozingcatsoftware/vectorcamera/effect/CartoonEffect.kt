@@ -27,9 +27,11 @@ class CartoonEffect(
         val width = cameraImage.width()
         val height = cameraImage.height()
 
-        // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()
-        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
+        // Get individual plane data directly
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromPlanes(yData, uData, vData, width, height)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -40,8 +42,6 @@ class CartoonEffect(
         
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
-
-    var numFrames: Int = 0
 
     /**
      * Calculate the optimal number of threads for native processing based on image dimensions.
@@ -63,23 +63,17 @@ class CartoonEffect(
         return maxOf(1, maxThreads)
     }
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
+    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        val t1 = System.currentTimeMillis()
-        
         // Try native implementation first
         if (nativeLibraryLoaded) {
             try {
-                val nativePixels = processImageNativeFromYuvBytes(
-                    yuvBytes, width, height, blurRadius, nativeThreads
+                val nativePixels = processImageNativeFromPlanes(
+                    yData, uData, vData, width, height, blurRadius, nativeThreads
                 )
                 if (nativePixels != null) {
-                    val elapsed = System.currentTimeMillis() - t1
-                    if (++numFrames % 30 == 0) {
-                        Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $nativeThreads threads (Native)")
-                    }
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
                     return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
@@ -89,28 +83,23 @@ class CartoonEffect(
             }
         }
         
-        // Fall back to Kotlin implementation if native failed or not available
-        val kotlinBitmap = createBitmapFromYuvBytesKotlin(yuvBytes, width, height, kotlinThreads, t1)
+        // Fall back to Kotlin implementation using individual planes directly
+        val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads)
         return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
-    private fun createBitmapFromYuvBytesKotlin(yuvBytes: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {
+    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
         // Create color quantization LUT (lookup table)
         val colorLUT = createColorLUT()
         
-        // Process the image
-        val pixels = processImage(yuvBytes, width, height, numThreads, colorLUT)
+        // Process the image using individual planes
+        val pixels = processImageFromPlanes(yData, uData, vData, width, height, numThreads, colorLUT)
         
         // Apply blur effect
         val blurredPixels = applyBlur(pixels, width, height, blurRadius)
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(blurredPixels, 0, width, 0, 0, width, height)
-
-        val elapsed = System.currentTimeMillis() - startTime
-        if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Kotlin)")
-        }
         return bitmap
     }
 
@@ -127,22 +116,16 @@ class CartoonEffect(
         return lut
     }
 
-    private fun processImage(
-        yuvBytes: ByteArray,
+    private fun processImageFromPlanes(
+        yData: ByteArray,
+        uData: ByteArray,
+        vData: ByteArray,
         width: Int,
         height: Int,
         numThreads: Int,
         colorLUT: IntArray
     ): IntArray {
-        val ySize = width * height
         val uvWidth = (width + 1) / 2
-        val uvHeight = (height + 1) / 2
-        val uvSize = uvWidth * uvHeight
-
-        // Extract planes from the flattened YUV bytes
-        val yData = yuvBytes.sliceArray(0 until ySize)
-        val uData = yuvBytes.sliceArray(ySize until ySize + uvSize)
-        val vData = yuvBytes.sliceArray(ySize + uvSize until ySize + 2 * uvSize)
 
         val pixels = IntArray(width * height)
 
@@ -351,8 +334,10 @@ class CartoonEffect(
             }
         }
         
-        private external fun processImageNativeFromYuvBytes(
-            yuvBytes: ByteArray,
+        private external fun processImageNativeFromPlanes(
+            yData: ByteArray,
+            uData: ByteArray,
+            vData: ByteArray,
             width: Int,
             height: Int,
             blurRadius: Int,

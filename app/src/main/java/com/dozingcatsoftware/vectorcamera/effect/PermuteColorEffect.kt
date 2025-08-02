@@ -34,8 +34,11 @@ class PermuteColorEffect(
         val width = cameraImage.width()
         val height = cameraImage.height()
 
-        val yuvBytes = cameraImage.getYuvBytes()
-        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
+        // Get individual plane data directly
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromPlanes(yData, uData, vData, width, height)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -46,8 +49,6 @@ class PermuteColorEffect(
         
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
-
-    var numFrames: Int = 0
 
     /**
      * Calculate the optimal number of threads for native processing based on image dimensions.
@@ -69,7 +70,7 @@ class PermuteColorEffect(
         return maxOf(1, maxThreads)
     }
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
+    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
@@ -78,8 +79,8 @@ class PermuteColorEffect(
         // Try native implementation first
         if (nativeLibraryLoaded) {
             try {
-                val nativePixels = processImageNativeFromYuvBytes(
-                    yuvBytes, width, height,
+                val nativePixels = processImageNativeFromPlanes(
+                    yData, uData, vData, width, height,
                     redSource.rsCode,  // Use rsCode values that match C++ expectations
                     greenSource.rsCode,
                     blueSource.rsCode,
@@ -87,10 +88,6 @@ class PermuteColorEffect(
                     nativeThreads
                 )
                 if (nativePixels != null) {
-                    val elapsed = System.currentTimeMillis() - t1
-                    if (++numFrames % 30 == 0) {
-                        Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $nativeThreads threads (Native)")
-                    }
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
                     return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
@@ -100,21 +97,13 @@ class PermuteColorEffect(
             }
         }
         
-        // Fall back to Kotlin implementation if native failed or not available
-        val kotlinBitmap = createBitmapFromYuvBytesKotlin(yuvBytes, width, height, kotlinThreads, t1)
+        // Fall back to Kotlin implementation using individual planes directly
+        val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads, t1)
         return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
-    private fun createBitmapFromYuvBytesKotlin(yuvBytes: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {
-        val ySize = width * height
+    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {
         val uvWidth = (width + 1) / 2
-        val uvHeight = (height + 1) / 2
-        val uvSize = uvWidth * uvHeight
-
-        // Extract planes from the flattened YUV bytes
-        val yData = yuvBytes.sliceArray(0 until ySize)
-        val uData = yuvBytes.sliceArray(ySize until ySize + uvSize)
-        val vData = yuvBytes.sliceArray(ySize + uvSize until ySize + 2 * uvSize)
 
         val pixels = IntArray(width * height)
         
@@ -143,11 +132,6 @@ class PermuteColorEffect(
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        val elapsed = System.currentTimeMillis() - startTime
-        if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Kotlin)")
-        }
         return bitmap
     }
 
@@ -229,8 +213,10 @@ class PermuteColorEffect(
             }
         }
         
-        private external fun processImageNativeFromYuvBytes(
-            yuvBytes: ByteArray,
+        private external fun processImageNativeFromPlanes(
+            yData: ByteArray,
+            uData: ByteArray,
+            vData: ByteArray,
             width: Int,
             height: Int,
             redSource: Int,

@@ -169,8 +169,6 @@ class MatrixEffect(
     override fun effectName() = EFFECT_NAME
     override fun effectParameters() = effectParams
 
-    var numFrames: Int = 0
-
     /**
      * Calculate the optimal number of threads for native Matrix processing based on character grid dimensions.
      */
@@ -218,12 +216,6 @@ class MatrixEffect(
         // Render final bitmap
         val resultBitmap = renderFinalBitmap(cameraImage, metrics, threadsUsed)
         
-        val elapsed = System.currentTimeMillis() - t1
-        if (++numFrames % 30 == 0) {
-            val impl = if (nativeLibraryLoaded) "native" else "Kotlin"
-            Log.i(EFFECT_NAME, "Generated ${metrics.outputSize.width}x${metrics.outputSize.height} Matrix image in $elapsed ms ($impl)")
-        }
-        
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
             codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
@@ -240,9 +232,8 @@ class MatrixEffect(
     private fun computeBlockAverages(cameraImage: CameraImage, metrics: TextMetricsKotlin): ByteArray {
         val width = cameraImage.width()
         val height = cameraImage.height()
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val ySize = width * height
-        val yData = yuvBytes.sliceArray(0 until ySize)
+        // Get Y plane directly (Matrix effect only uses luminance for block averages)
+        val yData = cameraImage.getYBytes()
         
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val blockAverages = ByteArray(numCells)

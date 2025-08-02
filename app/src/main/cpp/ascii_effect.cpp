@@ -171,10 +171,12 @@ void renderAsciiCharacterGrid(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_computeAsciiDataNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_computeAsciiDataNativeFromPlanes(
     JNIEnv *env,
     jobject /* this */,
-    jbyteArray yuvBytes,
+    jbyteArray yData_,
+    jbyteArray uData_,
+    jbyteArray vData_,
     jint width,
     jint height,
     jint numCharCols,
@@ -184,25 +186,32 @@ Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_computeAsciiDataNativ
     jint pixelCharsLength,
     jint textColor) {
 
-    // Get YUV data
-    jbyte* yuv = env->GetByteArrayElements(yuvBytes, nullptr);
-    if (!yuv) {
-        LOGI("Failed to get YUV byte array");
+    // Get individual plane data
+    jbyte* yBytes = env->GetByteArrayElements(yData_, nullptr);
+    jbyte* uBytes = env->GetByteArrayElements(uData_, nullptr);
+    jbyte* vBytes = env->GetByteArrayElements(vData_, nullptr);
+    
+    if (!yBytes || !uBytes || !vBytes) {
+        LOGI("Failed to get plane byte arrays");
+        if (yBytes) env->ReleaseByteArrayElements(yData_, yBytes, JNI_ABORT);
+        if (uBytes) env->ReleaseByteArrayElements(uData_, uBytes, JNI_ABORT);
+        if (vBytes) env->ReleaseByteArrayElements(vData_, vBytes, JNI_ABORT);
         return nullptr;
     }
 
-    const int ySize = width * height;
-    const int uvSize = (width / 2) * (height / 2);
-    const auto* yData = reinterpret_cast<const uint8_t*>(yuv);
-    const auto* uData = reinterpret_cast<const uint8_t*>(yuv + ySize);
-    const auto* vData = reinterpret_cast<const uint8_t*>(yuv + ySize + uvSize);
+    const auto* yData = reinterpret_cast<const uint8_t*>(yBytes);
+    const auto* uData = reinterpret_cast<const uint8_t*>(uBytes);
+    const auto* vData = reinterpret_cast<const uint8_t*>(vBytes);
 
+    const int uvSize = (width / 2) * (height / 2);
     const int numCells = numCharCols * numCharRows;
     
     // Result array: [characterIndices..., characterColors...]
     jintArray result = env->NewIntArray(numCells * 2);
     if (!result) {
-        env->ReleaseByteArrayElements(yuvBytes, yuv, JNI_ABORT);
+        env->ReleaseByteArrayElements(yData_, yBytes, JNI_ABORT);
+        env->ReleaseByteArrayElements(uData_, uBytes, JNI_ABORT);
+        env->ReleaseByteArrayElements(vData_, vBytes, JNI_ABORT);
         return nullptr;
     }
     
@@ -309,7 +318,9 @@ Java_com_dozingcatsoftware_vectorcamera_effect_AsciiEffect_computeAsciiDataNativ
     }
     
     env->ReleaseIntArrayElements(result, resultData, 0);
-    env->ReleaseByteArrayElements(yuvBytes, yuv, JNI_ABORT);
+    env->ReleaseByteArrayElements(yData_, yBytes, JNI_ABORT);
+    env->ReleaseByteArrayElements(uData_, uBytes, JNI_ABORT);
+    env->ReleaseByteArrayElements(vData_, vBytes, JNI_ABORT);
     
     return result;
 }

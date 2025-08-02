@@ -92,7 +92,7 @@ class CustomEffect(
         val metadata = ProcessedBitmapMetadata(
             codeArchitecture = baseProcessedBitmap.metadata.codeArchitecture,
             numThreads = baseProcessedBitmap.metadata.numThreads,
-            generationDurationNanos = baseProcessedBitmap.metadata.generationDurationNanos + (endTime - startTime)
+            generationDurationNanos = endTime - startTime
         )
         
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)

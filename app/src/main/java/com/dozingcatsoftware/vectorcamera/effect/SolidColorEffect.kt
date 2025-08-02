@@ -29,9 +29,9 @@ class SolidColorEffect(
         val width = cameraImage.width()
         val height = cameraImage.height()
 
-        // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val (bitmap, threadsUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
+        // Get Y plane data directly (solid color effect only needs luminance)
+        val yData = cameraImage.getYBytes()
+        val (bitmap, threadsUsed) = createBitmapFromYData(yData, width, height)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -43,8 +43,6 @@ class SolidColorEffect(
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    var numFrames: Int = 0
-
     /**
      * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
      */
@@ -55,14 +53,10 @@ class SolidColorEffect(
         return maxOf(1, maxThreads)
     }
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Pair<Bitmap, Int> {
+    private fun createBitmapFromYData(yData: ByteArray, width: Int, height: Int): Pair<Bitmap, Int> {
         val numThreads = calculateOptimalThreads(height)
 
         val t1 = System.currentTimeMillis()
-        
-        val ySize = width * height
-        // Extract Y plane from the flattened YUV bytes (we only need luminance for solid color effect)
-        val yData = yuvBytes.sliceArray(0 until ySize)
 
         val pixels = IntArray(width * height)
 
@@ -91,11 +85,6 @@ class SolidColorEffect(
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        val elapsed = System.currentTimeMillis() - t1
-        if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Kotlin)")
-        }
         return Pair(bitmap, numThreads)
     }
 

@@ -46,8 +46,6 @@ class EdgeEffect private constructor(
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    var numFrames: Int = 0
-
     /**
      * Calculate the optimal number of threads for native processing based on image dimensions.
      */
@@ -73,8 +71,6 @@ class EdgeEffect private constructor(
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        val t1 = System.currentTimeMillis()
-        
         val actualThreads: Int
         val architecture: CodeArchitecture
 
@@ -114,11 +110,6 @@ class EdgeEffect private constructor(
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
 
-        val elapsed = System.currentTimeMillis() - t1
-        if (++numFrames % 30 == 0) {
-            val impl = if (architecture == CodeArchitecture.Native) "native" else "Kotlin"
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $actualThreads threads ($impl)")
-        }
         return Triple(bitmap, actualThreads, architecture)
     }
 

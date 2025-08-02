@@ -161,32 +161,35 @@ void applyVerticalBlur(const int* input, int* output, int width, int height, int
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_processImageNativeFromPlanes(
     JNIEnv* env, 
     jobject /* this */, 
-    jbyteArray yuvBytes_, 
+    jbyteArray yData_, 
+    jbyteArray uData_, 
+    jbyteArray vData_, 
     jint width, 
     jint height,
     jint blurRadius,
     jint numThreads
 ) {
-    // Get YUV data
-    jbyte* yuvBytes = env->GetByteArrayElements(yuvBytes_, NULL);
-    if (yuvBytes == NULL) {
+    // Get individual plane data
+    jbyte* yBytes = env->GetByteArrayElements(yData_, NULL);
+    jbyte* uBytes = env->GetByteArrayElements(uData_, NULL);
+    jbyte* vBytes = env->GetByteArrayElements(vData_, NULL);
+    
+    if (yBytes == NULL || uBytes == NULL || vBytes == NULL) {
+        if (yBytes) env->ReleaseByteArrayElements(yData_, yBytes, 0);
+        if (uBytes) env->ReleaseByteArrayElements(uData_, uBytes, 0);
+        if (vBytes) env->ReleaseByteArrayElements(vData_, vBytes, 0);
         return NULL;
     }
 
-    const unsigned char* yuvData = reinterpret_cast<const unsigned char*>(yuvBytes);
+    const unsigned char* yData = reinterpret_cast<const unsigned char*>(yBytes);
+    const unsigned char* uData = reinterpret_cast<const unsigned char*>(uBytes);
+    const unsigned char* vData = reinterpret_cast<const unsigned char*>(vBytes);
     
-    // Calculate YUV plane sizes and offsets
-    int ySize = width * height;
+    // Calculate UV dimensions
     int uvWidth = (width + 1) / 2;
-    int uvHeight = (height + 1) / 2;
-    int uvSize = uvWidth * uvHeight;
-
-    const unsigned char* yData = yuvData;
-    const unsigned char* uData = yuvData + ySize;
-    const unsigned char* vData = yuvData + ySize + uvSize;
 
     // Create color quantization LUT
     int colorLUT[256];
@@ -195,13 +198,17 @@ Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_proc
     // Create output arrays
     jintArray result = env->NewIntArray(width * height);
     if (result == NULL) {
-        env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+        env->ReleaseByteArrayElements(yData_, yBytes, 0);
+        env->ReleaseByteArrayElements(uData_, uBytes, 0);
+        env->ReleaseByteArrayElements(vData_, vBytes, 0);
         return NULL;
     }
 
     jint* pixels = env->GetIntArrayElements(result, NULL);
     if (pixels == NULL) {
-        env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+        env->ReleaseByteArrayElements(yData_, yBytes, 0);
+        env->ReleaseByteArrayElements(uData_, uBytes, 0);
+        env->ReleaseByteArrayElements(vData_, vBytes, 0);
         return NULL;
     }
 
@@ -241,7 +248,9 @@ Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_proc
 
     // Release arrays
     env->ReleaseIntArrayElements(result, pixels, 0);
-    env->ReleaseByteArrayElements(yuvBytes_, yuvBytes, 0);
+    env->ReleaseByteArrayElements(yData_, yBytes, 0);
+    env->ReleaseByteArrayElements(uData_, uBytes, 0);
+    env->ReleaseByteArrayElements(vData_, vBytes, 0);
 
     return result;
 } 

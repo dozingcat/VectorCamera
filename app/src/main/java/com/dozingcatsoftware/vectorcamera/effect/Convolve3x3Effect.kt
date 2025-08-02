@@ -32,8 +32,9 @@ class Convolve3x3Effect(
         val height = cameraImage.height()
 
         // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
+        // Get Y plane directly (convolution only uses luminance)
+        val yData = cameraImage.getYBytes()
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYData(yData, width, height)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -44,8 +45,6 @@ class Convolve3x3Effect(
         
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
-
-    var numFrames: Int = 0
 
     /**
      * Calculate the optimal number of threads for native processing based on image dimensions.
@@ -67,23 +66,17 @@ class Convolve3x3Effect(
         return maxOf(1, maxThreads)
     }
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
+    private fun createBitmapFromYData(yData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        val t1 = System.currentTimeMillis()
-        
         // Try native implementation first
         if (nativeLibraryLoaded) {
             try {
-                val nativePixels = processImageNativeFromYuvBytes(
-                    yuvBytes, width, height, coefficients, colorMap, nativeThreads
+                val nativePixels = processImageNativeFromYData(
+                    yData, width, height, coefficients, colorMap, nativeThreads
                 )
                 if (nativePixels != null) {
-                    val elapsed = System.currentTimeMillis() - t1
-                    if (++numFrames % 30 == 0) {
-                        Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $nativeThreads threads (Native)")
-                    }
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
                     return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
@@ -93,15 +86,12 @@ class Convolve3x3Effect(
             }
         }
         
-        // Fall back to Kotlin implementation if native failed or not available
-        val kotlinBitmap = createBitmapFromYuvBytesKotlin(yuvBytes, width, height, kotlinThreads, t1)
+        // Fall back to Kotlin implementation using Y plane directly
+        val kotlinBitmap = createBitmapFromYDataKotlin(yData, width, height, kotlinThreads)
         return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
-    private fun createBitmapFromYuvBytesKotlin(yuvBytes: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {
-        val ySize = width * height
-        // Extract Y plane from the flattened YUV bytes (we only need luminance for convolution)
-        val yData = yuvBytes.sliceArray(0 until ySize)
+    private fun createBitmapFromYDataKotlin(yData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
 
         // First apply convolution to get brightness values
         val convolvedData = applyConvolution(yData, width, height, numThreads)
@@ -112,11 +102,6 @@ class Convolve3x3Effect(
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        val elapsed = System.currentTimeMillis() - startTime
-        if (++numFrames % 30 == 0) {
-            Log.i(EFFECT_NAME, "Generated ${width}x${height} image in $elapsed ms with $numThreads threads (Kotlin)")
-        }
         return bitmap
     }
 
@@ -251,8 +236,8 @@ class Convolve3x3Effect(
             }
         }
         
-        private external fun processImageNativeFromYuvBytes(
-            yuvBytes: ByteArray,
+        private external fun processImageNativeFromYData(
+            yData: ByteArray,
             width: Int,
             height: Int,
             coefficients: FloatArray,

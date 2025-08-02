@@ -125,6 +125,7 @@ data class CameraImage(
         
         if (pixelStride == 1 && rowStride == width) {
             // Densely packed, can use directly.
+            android.util.Log.i("CameraImage", "Dense Y")
             return yData
         }
         
@@ -159,9 +160,10 @@ data class CameraImage(
 
         if (imageData.uvPixelStride == 1 && imageData.uvRowStride == uvWidth) {
             // Densely packed, can use directly.
+            android.util.Log.i("CameraImage", "Dense U/V")
             return uOrVData
         }
-
+        android.util.Log.i("CameraImage", "pixel stride: ${imageData.uvPixelStride} width: $uvWidth row stride: ${imageData.uvRowStride}")
         // Need to extract with stride
         val outputBytes = ByteArray(uvWidth * uvHeight)
         var outputIndex = 0
