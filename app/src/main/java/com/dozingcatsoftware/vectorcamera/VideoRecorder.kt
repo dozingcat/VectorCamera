@@ -5,7 +5,7 @@ import java.io.OutputStream
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-private data class Frame(val timestamp: Long, val data: ByteArray)
+private data class Frame(val timestamp: Long, val data: List<ByteArray>)
 
 class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
                     val frameCallback: ((VideoRecorder, Status) -> Unit)?) {
@@ -30,7 +30,7 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
         writerThread!!.start()
     }
 
-    fun recordFrame(timestamp: Long, frameBytes: ByteArray) {
+    fun recordFrame(timestamp: Long, frameBytes: List<ByteArray>) {
         Log.i("VideoRecorder", "recordFrame: ${timestamp}, ${frameBytes.size} bytes")
         frameQueueLock.withLock({
             if (frameQueue.size < MAX_QUEUED_FRAMES) {
@@ -90,7 +90,9 @@ class VideoRecorder(val videoId: String, val videoOutput: OutputStream,
                 Log.i(TAG, "Got frame ${framesRead}")
                 frameTimestamps.add(currentFrame.timestamp)
                 // We could gzip the frames, but compression is very slow.
-                videoOutput.write(currentFrame.data)
+                for (bytes in currentFrame.data) {
+                    videoOutput.write(bytes)
+                }
                 frameCallback?.invoke(this, this.status)
                 currentFrame = null
             }

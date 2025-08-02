@@ -75,8 +75,9 @@ class PhotoLibrary(val rootDirectory: File) {
         val t2 = System.currentTimeMillis()
         writeFileAtomicallyUsingTempDir(rawImageFile, getTempDirectory(), {fos ->
             GZIPOutputStream(fos, gzipBufferSize).use {
-                val yuvBytes = processedBitmap.sourceImage.getYuvBytes()
-                it.write(yuvBytes)
+                it.write(processedBitmap.sourceImage.getYBytes())
+                it.write(processedBitmap.sourceImage.getUBytes())
+                it.write(processedBitmap.sourceImage.getVBytes())
             }
         })
         val t3 = System.currentTimeMillis()

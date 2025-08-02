@@ -98,8 +98,9 @@ data class CameraImage(
     fun size() = Size(width(), height())
 
     /**
-     * Returns YUV bytes directly from ImageData.
-     * This is the primary method used by all Kotlin/C++ effects.
+     * Returns a flattened array with concatenated Y/U/V planes. (Note U and V are not interleaved)
+     * This method needs to make additional data copies, and should be avoided in favor of getting
+     * Y/U/V data individually.
      */
     fun getYuvBytes(): ByteArray {
         val yBytes = getYBytes()
@@ -122,10 +123,11 @@ data class CameraImage(
         val yData = imageData.yData
         val pixelStride = imageData.yPixelStride
         val rowStride = imageData.yRowStride
-        
+
+        // The Y plane is usually dense so we don't need to copy.
         if (pixelStride == 1 && rowStride == width) {
             // Densely packed, can use directly.
-            android.util.Log.i("CameraImage", "Dense Y")
+            // android.util.Log.i("CameraImage", "Dense Y")
             return yData
         }
         
@@ -158,12 +160,15 @@ data class CameraImage(
         val uvPixelStride = imageData.uvPixelStride
         val uvRowStride = imageData.uvRowStride
 
+        // Typically the U and V planes are interleaved so we can't just return the array directly.
+        // It might be possible to have a single "uvData" array and access the U and V values with
+        // appropriate offsets, but that would be much more complex.
         if (imageData.uvPixelStride == 1 && imageData.uvRowStride == uvWidth) {
             // Densely packed, can use directly.
-            android.util.Log.i("CameraImage", "Dense U/V")
+            // android.util.Log.i("CameraImage", "Dense U/V")
             return uOrVData
         }
-        android.util.Log.i("CameraImage", "pixel stride: ${imageData.uvPixelStride} width: $uvWidth row stride: ${imageData.uvRowStride}")
+        // android.util.Log.i("CameraImage", "pixel stride: ${imageData.uvPixelStride} width: $uvWidth row stride: ${imageData.uvRowStride}")
         // Need to extract with stride
         val outputBytes = ByteArray(uvWidth * uvHeight)
         var outputIndex = 0
@@ -198,22 +203,23 @@ data class CameraImage(
      * Resizes ImageData using bilinear interpolation on YUV byte arrays.
      */
     private fun resizeImageData(imageData: ImageData, newWidth: Int, newHeight: Int): ImageData {
-        val yuvBytes = getYuvBytes()
-        val resizedYuvBytes = resizeYuvBytes(yuvBytes, imageData.width, imageData.height, 
-                                           newWidth, newHeight)
+        val resizedYuvBytes = resizeYuvBytes(
+            getYBytes(), getUBytes(), getVBytes(),
+            imageData.width, imageData.height,
+            newWidth, newHeight)
         return ImageData.fromYuvBytes(resizedYuvBytes, newWidth, newHeight)
     }
 
     /**
      * Resizes YUV byte array using bilinear interpolation.
      */
-    private fun resizeYuvBytes(yuvBytes: ByteArray, oldWidth: Int, oldHeight: Int, 
-                              newWidth: Int, newHeight: Int): ByteArray {
-        val oldYSize = oldWidth * oldHeight
+    private fun resizeYuvBytes(
+            yData: ByteArray, uData: ByteArray, vData: ByteArray,
+            oldWidth: Int, oldHeight: Int,
+            newWidth: Int, newHeight: Int): ByteArray {
         val oldUvWidth = (oldWidth + 1) / 2
         val oldUvHeight = (oldHeight + 1) / 2
-        val oldUvSize = oldUvWidth * oldUvHeight
-        
+
         val newYSize = newWidth * newHeight
         val newUvWidth = (newWidth + 1) / 2
         val newUvHeight = (newHeight + 1) / 2
@@ -222,18 +228,15 @@ data class CameraImage(
         val result = ByteArray(newYSize + 2 * newUvSize)
         
         // Resize Y plane
-        val oldYData = yuvBytes.sliceArray(0 until oldYSize)
-        val newYData = resizePlane(oldYData, oldWidth, oldHeight, newWidth, newHeight)
+        val newYData = resizePlane(yData, oldWidth, oldHeight, newWidth, newHeight)
         System.arraycopy(newYData, 0, result, 0, newYSize)
         
         // Resize U plane
-        val oldUData = yuvBytes.sliceArray(oldYSize until oldYSize + oldUvSize)
-        val newUData = resizePlane(oldUData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
+        val newUData = resizePlane(uData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
         System.arraycopy(newUData, 0, result, newYSize, newUvSize)
         
         // Resize V plane
-        val oldVData = yuvBytes.sliceArray(oldYSize + oldUvSize until oldYSize + 2 * oldUvSize)
-        val newVData = resizePlane(oldVData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
+        val newVData = resizePlane(vData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
         System.arraycopy(newVData, 0, result, newYSize + newUvSize, newUvSize)
         
         return result

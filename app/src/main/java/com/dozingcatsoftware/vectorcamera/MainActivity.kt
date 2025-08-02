@@ -364,17 +364,19 @@ class MainActivity : AppCompatActivity() {
     private fun recordVideoFrame(pb: ProcessedBitmap) {
         val vr = videoRecorder
         if (vr != null) {
-            val yuvBytes = pb.sourceImage.getYuvBytes()
+            val source = pb.sourceImage
             if (videoFrameMetadata == null) {
                 videoFrameMetadata = MediaMetadata(
                         MediaType.VIDEO,
                         currentEffect!!.effectMetadata(),
-                        pb.sourceImage.width(),
-                        pb.sourceImage.height(),
-                        pb.sourceImage.orientation,
-                        pb.sourceImage.timestamp)
+                        source.width(),
+                        source.height(),
+                        source.orientation,
+                        source.timestamp)
             }
-            vr.recordFrame(pb.sourceImage.timestamp, yuvBytes)
+            vr.recordFrame(source.timestamp, listOf(
+                source.getYBytes(), source.getUBytes(), source.getVBytes()
+            ))
         }
     }
 
