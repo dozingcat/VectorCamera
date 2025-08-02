@@ -141,9 +141,8 @@ class ViewImageActivity : AppCompatActivity() {
 
     private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null,
                           newSize: Size? = null) {
-        binding.overlayView.processedBitmap =
-                createProcessedBitmap(effect, metadata, forcePortrait, newSize)
-        binding.overlayView.invalidate()
+        val pb = createProcessedBitmap(effect, metadata, forcePortrait, newSize)
+        binding.overlayView.updateBitmap(pb)
     }
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
@@ -167,8 +166,7 @@ class ViewImageActivity : AppCompatActivity() {
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
                 photoLibrary.writeThumbnail(pb, imageId)
-                binding.overlayView.processedBitmap = pb
-                binding.overlayView.invalidate()
+                binding.overlayView.updateBitmap(pb)
                 updateInEffectSelectionModeFlag(false)
                 binding.controlBar.visibility = View.VISIBLE
             }

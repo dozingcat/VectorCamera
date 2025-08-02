@@ -28,6 +28,8 @@ class VCPreferences(val context: Context) {
 
     fun takePictureWithVolumeButton() = sharedPrefs().getBoolean(context.getString(R.string.takePictureWithVolumeButtonPrefsKey), false)
 
+    fun showDebugInfo() = sharedPrefs().getBoolean(context.getString(R.string.showDebugInfoPrefsKey), false)
+
     val lookupFunction = fun(key: String, defaultValue: Any): Any {
         if (defaultValue is String) {
             return sharedPrefs().getString(key, defaultValue)!!

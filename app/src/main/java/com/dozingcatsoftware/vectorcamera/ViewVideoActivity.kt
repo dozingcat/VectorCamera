@@ -143,7 +143,7 @@ class ViewVideoActivity: AppCompatActivity() {
     private fun loadFrame(index: Int) {
         frameIndex = index
         val bitmap = videoReader.bitmapForFrame(index)
-        binding.overlayView.processedBitmap = bitmap
+        binding.overlayView.updateBitmap(bitmap)
         binding.overlayView.invalidate()
     }
 
@@ -225,8 +225,7 @@ class ViewVideoActivity: AppCompatActivity() {
     private fun showFrame(index: Int, pb: ProcessedBitmap) {
         if (isPlaying) {
             frameIndex = index
-            binding.overlayView.processedBitmap = pb
-            binding.overlayView.invalidate()
+            binding.overlayView.updateBitmap(pb)
             updateControls()
         }
     }

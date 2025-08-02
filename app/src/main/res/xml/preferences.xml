@@ -10,6 +10,9 @@
         <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
             android:enabled="true"
             android:title="@string/autoConvertPicturesPrefsTitle" />
+        <CheckBoxPreference android:key="@string/showDebugInfoPrefsKey"
+            android:enabled="true"
+            android:title="@string/showDebugInfoPrefsTitle" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Text characters">

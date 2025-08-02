@@ -61,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     private var askedForPermissions = false
     private var libraryMigrationDone = false
 
+    private var showDebugInfo = false
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var onBackPressedCallback: OnBackPressedCallback
 
@@ -137,6 +139,7 @@ class MainActivity : AppCompatActivity() {
             binding.overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
         }
         binding.overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        showDebugInfo = preferences.showDebugInfo()
     }
 
     override fun onPause() {
@@ -323,9 +326,8 @@ class MainActivity : AppCompatActivity() {
             }
             renderTimeStats.addValue(pb.metadata.generationDurationNanos)
             lastBitmapTimestamp = pb.sourceImage.timestamp
-            binding.overlayView.processedBitmap = pb
             binding.overlayView.generationTimeAverageNanos = renderTimeStats.getAverage()
-            binding.overlayView.invalidate()
+            binding.overlayView.updateBitmap(pb, showDebugInfo)
             // Save image or video frame if necessary.
             if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 saveImage(pb)
