@@ -3,7 +3,7 @@ package com.dozingcatsoftware.vectorcamera
 import android.content.Context
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
-import android.renderscript.RenderScript
+
 import android.util.Log
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
@@ -27,6 +27,8 @@ class VCPreferences(val context: Context) {
     }
 
     fun takePictureWithVolumeButton() = sharedPrefs().getBoolean(context.getString(R.string.takePictureWithVolumeButtonPrefsKey), false)
+
+    fun showDebugInfo() = sharedPrefs().getBoolean(context.getString(R.string.showDebugInfoPrefsKey), false)
 
     val lookupFunction = fun(key: String, defaultValue: Any): Any {
         if (defaultValue is String) {
@@ -53,12 +55,12 @@ class VCPreferences(val context: Context) {
         return jsonStringToMap(effectJson)
     }
 
-    fun effect(rs: RenderScript, defaultFn: (() -> Effect)): Effect {
+    fun effect(defaultFn: (() -> Effect)): Effect {
         val name = effectName()
         val params = effectParameters()
         if (name.isNotEmpty()) {
             try {
-                return effectRegistry.effectForNameAndParameters(rs, name, params)
+                return effectRegistry.effectForNameAndParameters(name, params)
             }
             catch (ex: Exception) {
                 Log.w(TAG, "Error reading effect from preferences", ex)

@@ -8,7 +8,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
-import android.renderscript.RenderScript
+
 import androidx.core.content.FileProvider
 import android.util.Log
 import android.util.Size
@@ -31,7 +31,7 @@ class ViewImageActivity : AppCompatActivity() {
     private lateinit var binding: ViewImageBinding
 
     private lateinit var photoLibrary: PhotoLibrary
-    private lateinit var rs : RenderScript
+
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
     private var effectSelectionIsPortrait = false
@@ -45,7 +45,6 @@ class ViewImageActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ViewImageBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
         binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
@@ -83,13 +82,13 @@ class ViewImageActivity : AppCompatActivity() {
 
     private fun loadImage() {
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
+        val effect = effectRegistry.effectForMetadata(metadata.effectMetadata)
         showImage(effect, metadata)
     }
 
     private fun showModeSelectionGrid(isPortrait: Boolean) {
         val comboEffect = CombinationEffect(
-                effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
+                effectRegistry.defaultEffectFunctions(preferences.lookupFunction))
         // Shrink the image so each combo grid cell doesn't have to process the full size.
         // May want to incrementally show the grid as cells are rendered, like for the live view.
         val metadata = photoLibrary.metadataForItemId(imageId)
@@ -117,10 +116,11 @@ class ViewImageActivity : AppCompatActivity() {
     }
 
     private fun createCameraImage(metadata: MediaMetadata): CameraImage {
-        val planarYuv = photoLibrary.rawImageFileInputStreamForItemId(imageId).use {
-            PlanarYuvAllocations.fromInputStream(rs, it, metadata.width, metadata.height)
-        }
-        return CameraImage(rs, null, planarYuv, metadata.orientation,
+        val yuvBytes = photoLibrary.rawImageFileInputStreamForItemId(imageId).readBytes()
+        val imageData = ImageData.fromYuvBytes(
+            yuvBytes, metadata.width, metadata.height
+        )
+        return CameraImage(imageData, metadata.orientation,
                 CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getLandscapeDisplaySize(this))
     }
 
@@ -136,15 +136,13 @@ class ViewImageActivity : AppCompatActivity() {
         if (newSize != null) {
             inputImage = inputImage.resizedTo(newSize)
         }
-        val bitmap = effect.createBitmap(inputImage)
-        return ProcessedBitmap(effect, inputImage, bitmap)
+        return effect.createBitmap(inputImage)
     }
 
     private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null,
                           newSize: Size? = null) {
-        binding.overlayView.processedBitmap =
-                createProcessedBitmap(effect, metadata, forcePortrait, newSize)
-        binding.overlayView.invalidate()
+        val pb = createProcessedBitmap(effect, metadata, forcePortrait, newSize)
+        binding.overlayView.updateBitmap(pb)
     }
 
     private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
@@ -161,15 +159,14 @@ class ViewImageActivity : AppCompatActivity() {
 
                 val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
                 val effect = effectRegistry.defaultEffectAtIndex(
-                        effectIndex, rs, preferences.lookupFunction)
+                        effectIndex, preferences.lookupFunction)
                 // Update metadata and thumbnail, *not* the full size image because that's slow.
                 val newMetadata = photoLibrary.metadataForItemId(imageId)
                         .withEffectMetadata(effect.effectMetadata())
                 val pb = createProcessedBitmap(effect, newMetadata)
                 photoLibrary.writeMetadata(newMetadata, imageId)
                 photoLibrary.writeThumbnail(pb, imageId)
-                binding.overlayView.processedBitmap = pb
-                binding.overlayView.invalidate()
+                binding.overlayView.updateBitmap(pb)
                 updateInEffectSelectionModeFlag(false)
                 binding.controlBar.visibility = View.VISIBLE
             }
@@ -179,7 +176,7 @@ class ViewImageActivity : AppCompatActivity() {
     private fun shareImage(view: View) {
         // Stop reading metadata so often?
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val effect = effectRegistry.effectForMetadata(rs, metadata.effectMetadata)
+        val effect = effectRegistry.effectForMetadata(metadata.effectMetadata)
         if (effect is AsciiEffect) {
             showAsciiTypeShareDialog(metadata, effect)
         }

@@ -1,78 +1,376 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
-import android.graphics.Bitmap
-import android.renderscript.*
-import com.dozingcatsoftware.util.ScriptC_planar_yuv_to_rgba
+import android.graphics.*
+import android.util.Log
+import com.dozingcatsoftware.util.YuvUtils
 import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
-import kotlin.math.roundToInt
+import kotlinx.coroutines.*
+import kotlin.math.*
 
 /**
- * Effect that produces a cartoon-like image by blurring and reducing the color space.
+ * Pure Kotlin implementation of CartoonEffect that produces a cartoon-like image 
+ * by blurring and reducing the color space.
  */
-class CartoonEffect(val rs: RenderScript): Effect {
-
-    private var outputAllocation: Allocation? = null
-    // private val script = ScriptC_edge_color(rs)
-    private var blurredAllocation: Allocation? = null
-    private var blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs))
-
-    private var rgbAllocation: Allocation? = null
-    private var yuvToRgbScript = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs))
-    private var planarYuvToRgbScript = ScriptC_planar_yuv_to_rgba(rs)
-
-    private var toonAllocation: Allocation? = null
-    private var toonLutScript = ScriptIntrinsicLUT.create(rs, Element.U8_4(rs))
+// TODO: Make blur radius a function of image dimensions?
+class CartoonEffect(
+    private val effectParams: Map<String, Any> = mapOf(),
+    private val blurRadius: Int = 4
+) : Effect {
 
     override fun effectName() = EFFECT_NAME
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        rgbAllocation = reuseOrCreate2dAllocation(rgbAllocation,
-                rs, Element::U8_4, cameraImage.width(), cameraImage.height())
-        if (cameraImage.singleYuvAllocation != null) {
-            yuvToRgbScript.setInput(cameraImage.singleYuvAllocation)
-            yuvToRgbScript.forEach(rgbAllocation)
-        }
-        else {
-            val planarAllocs = cameraImage.planarYuvAllocations!!
-            planarYuvToRgbScript._yInputAlloc = planarAllocs.y
-            planarYuvToRgbScript._uInputAlloc = planarAllocs.u
-            planarYuvToRgbScript._vInputAlloc = planarAllocs.v
-            planarYuvToRgbScript.forEach_convertToRgba(rgbAllocation)
-        }
+    override fun effectParameters() = effectParams
 
-        blurredAllocation = reuseOrCreate2dAllocation(blurredAllocation,
-                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
-        blurScript.setRadius(4f)
-        blurScript.setInput(rgbAllocation)
-        blurScript.forEach(blurredAllocation)
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        
+        val width = cameraImage.width()
+        val height = cameraImage.height()
 
-        // Reduce to 2 bits for each color component. Possible RGB values are (0, 85, 170, 255).
-        toonAllocation = reuseOrCreate2dAllocation(blurredAllocation,
-                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
+        // Get individual plane data directly
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromPlanes(yData, uData, vData, width, height)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = architectureUsed,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
+    }
+
+    /**
+     * Calculate the optimal number of threads for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
+     */
+    private fun calculateOptimalKotlinThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
+
+        // Try native implementation first
+        if (nativeLibraryLoaded) {
+            try {
+                val nativePixels = processImageNativeFromPlanes(
+                    yData, uData, vData, width, height, blurRadius, nativeThreads
+                )
+                if (nativePixels != null) {
+                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
+                    return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
+                }
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
+            }
+        }
+        
+        // Fall back to Kotlin implementation using individual planes directly
+        val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads)
+        return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+    }
+    
+    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
+        // Create color quantization LUT (lookup table)
+        val colorLUT = createColorLUT()
+        
+        // Process the image using individual planes
+        val pixels = processImageFromPlanes(yData, uData, vData, width, height, numThreads, colorLUT)
+        
+        // Apply blur effect
+        val blurredPixels = applyBlur(pixels, width, height, blurRadius)
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.setPixels(blurredPixels, 0, width, 0, 0, width, height)
+        return bitmap
+    }
+
+    /**
+     * Create a color lookup table that reduces each color component to 2 bits (4 levels).
+     * Possible RGB values are (0, 85, 170, 255).
+     */
+    private fun createColorLUT(): IntArray {
+        val lut = IntArray(256)
         for (index in 0 until 256) {
             val mapval = (index / 85.0).roundToInt() * 85
-            toonLutScript.setRed(index, mapval)
-            toonLutScript.setGreen(index, mapval)
-            toonLutScript.setBlue(index, mapval)
+            lut[index] = mapval
         }
-        toonLutScript.forEach(blurredAllocation, toonAllocation)
+        return lut
+    }
 
-        // Do convolution to find edges and blend?
-        outputAllocation = toonAllocation
+    private fun processImageFromPlanes(
+        yData: ByteArray,
+        uData: ByteArray,
+        vData: ByteArray,
+        width: Int,
+        height: Int,
+        numThreads: Int,
+        colorLUT: IntArray
+    ): IntArray {
+        val uvWidth = (width + 1) / 2
 
-        val resultBitmap = Bitmap.createBitmap(
-                cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
-        outputAllocation!!.copyTo(resultBitmap)
+        val pixels = IntArray(width * height)
 
-        return resultBitmap
+        // Multi-threaded processing
+        if (numThreads == 1) {
+            processRows(0, height, width, height, yData, uData, vData, uvWidth, pixels, colorLUT)
+        } else {
+            runBlocking {
+                val jobs = mutableListOf<Job>()
+                val rowsPerThread = height / numThreads
+                
+                for (threadIndex in 0 until numThreads) {
+                    val startY = threadIndex * rowsPerThread
+                    val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
+                    
+                    val job = launch(Dispatchers.Default) {
+                        processRows(startY, endY, width, height, yData, uData, vData, uvWidth, pixels, colorLUT)
+                    }
+                    jobs.add(job)
+                }
+                
+                // Wait for all threads to complete
+                jobs.forEach { it.join() }
+            }
+        }
+
+        return pixels
+    }
+
+    private fun processRows(
+        startY: Int, 
+        endY: Int, 
+        width: Int, 
+        height: Int, 
+        yData: ByteArray, 
+        uData: ByteArray, 
+        vData: ByteArray, 
+        uvWidth: Int, 
+        pixels: IntArray,
+        colorLUT: IntArray
+    ) {
+        for (y in startY until endY) {
+            for (x in 0 until width) {
+                val pixelIndex = y * width + x
+
+                // Get Y value
+                val yy = yData[pixelIndex].toInt() and 0xFF
+
+                // Get U and V values (subsampled)
+                val uvX = x / 2
+                val uvY = y / 2
+                val uvIndex = uvY * uvWidth + uvX
+                val u = uData[uvIndex].toInt() and 0xFF
+                val v = vData[uvIndex].toInt() and 0xFF
+
+                // Convert YUV to RGB
+                val rgb = YuvUtils.yuvToRgb(yy, u, v, includeAlpha = false)
+                val r = (rgb shr 16) and 0xFF
+                val g = (rgb shr 8) and 0xFF
+                val b = rgb and 0xFF
+
+                // Apply color quantization using LUT
+                val quantizedR = colorLUT[r]
+                val quantizedG = colorLUT[g]
+                val quantizedB = colorLUT[b]
+
+                // Create final ARGB pixel
+                pixels[pixelIndex] = Color.argb(255, quantizedR, quantizedG, quantizedB)
+            }
+        }
+    }
+
+    /**
+     * Apply a fast box blur to the image using separable convolution.
+     */
+    private fun applyBlur(pixels: IntArray, width: Int, height: Int, radius: Int): IntArray {
+        if (radius <= 0) return pixels
+        
+        // Apply horizontal blur first
+        val horizontalBlur = applyHorizontalBlur(pixels, width, height, radius)
+        
+        // Apply vertical blur to the horizontally blurred image
+        return applyVerticalBlur(horizontalBlur, width, height, radius)
+    }
+    
+    private fun applyHorizontalBlur(pixels: IntArray, width: Int, height: Int, radius: Int): IntArray {
+        val blurred = IntArray(width * height)
+        val kernelSize = radius * 2 + 1
+        
+        for (y in 0 until height) {
+            var totalR = 0
+            var totalG = 0
+            var totalB = 0
+            
+            // Initialize sliding window for first pixel
+            for (kx in -radius..radius) {
+                val sampleX = kx.coerceIn(0, width - 1)
+                val sampleIndex = y * width + sampleX
+                val samplePixel = pixels[sampleIndex]
+                
+                totalR += Color.red(samplePixel)
+                totalG += Color.green(samplePixel)
+                totalB += Color.blue(samplePixel)
+            }
+            
+            // Apply blur to each pixel in the row using sliding window
+            for (x in 0 until width) {
+                val avgR = totalR / kernelSize
+                val avgG = totalG / kernelSize
+                val avgB = totalB / kernelSize
+                
+                val pixelIndex = y * width + x
+                blurred[pixelIndex] = Color.argb(255, avgR, avgG, avgB)
+                
+                // Update sliding window for next pixel
+                if (x < width - 1) {
+                    // Remove leftmost pixel from window
+                    val leftX = (x - radius).coerceIn(0, width - 1)
+                    val leftIndex = y * width + leftX
+                    val leftPixel = pixels[leftIndex]
+                    totalR -= Color.red(leftPixel)
+                    totalG -= Color.green(leftPixel)
+                    totalB -= Color.blue(leftPixel)
+                    
+                    // Add rightmost pixel to window
+                    val rightX = (x + radius + 1).coerceIn(0, width - 1)
+                    val rightIndex = y * width + rightX
+                    val rightPixel = pixels[rightIndex]
+                    totalR += Color.red(rightPixel)
+                    totalG += Color.green(rightPixel)
+                    totalB += Color.blue(rightPixel)
+                }
+            }
+        }
+        
+        return blurred
+    }
+    
+    private fun applyVerticalBlur(pixels: IntArray, width: Int, height: Int, radius: Int): IntArray {
+        val blurred = IntArray(width * height)
+        val kernelSize = radius * 2 + 1
+        
+        for (x in 0 until width) {
+            var totalR = 0
+            var totalG = 0
+            var totalB = 0
+            
+            // Initialize sliding window for first pixel
+            for (ky in -radius..radius) {
+                val sampleY = ky.coerceIn(0, height - 1)
+                val sampleIndex = sampleY * width + x
+                val samplePixel = pixels[sampleIndex]
+                
+                totalR += Color.red(samplePixel)
+                totalG += Color.green(samplePixel)
+                totalB += Color.blue(samplePixel)
+            }
+            
+            // Apply blur to each pixel in the column using sliding window
+            for (y in 0 until height) {
+                val avgR = totalR / kernelSize
+                val avgG = totalG / kernelSize
+                val avgB = totalB / kernelSize
+                
+                val pixelIndex = y * width + x
+                blurred[pixelIndex] = Color.argb(255, avgR, avgG, avgB)
+                
+                // Update sliding window for next pixel
+                if (y < height - 1) {
+                    // Remove topmost pixel from window
+                    val topY = (y - radius).coerceIn(0, height - 1)
+                    val topIndex = topY * width + x
+                    val topPixel = pixels[topIndex]
+                    totalR -= Color.red(topPixel)
+                    totalG -= Color.green(topPixel)
+                    totalB -= Color.blue(topPixel)
+                    
+                    // Add bottommost pixel to window
+                    val bottomY = (y + radius + 1).coerceIn(0, height - 1)
+                    val bottomIndex = bottomY * width + x
+                    val bottomPixel = pixels[bottomIndex]
+                    totalR += Color.red(bottomPixel)
+                    totalG += Color.green(bottomPixel)
+                    totalB += Color.blue(bottomPixel)
+                }
+            }
+        }
+        
+        return blurred
     }
 
     companion object {
         const val EFFECT_NAME = "cartoon"
-
-        fun fromParameters(rs: RenderScript, params: Map<String, Any>): CartoonEffect {
-            return CartoonEffect(rs)
+        
+        // Load native library
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                Log.i(EFFECT_NAME, "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(EFFECT_NAME, "Failed to load native library, using Kotlin implementation: ${e.message}")
+                nativeLibraryLoaded = false
+            }
+        }
+        
+        private external fun processImageNativeFromPlanes(
+            yData: ByteArray,
+            uData: ByteArray,
+            vData: ByteArray,
+            width: Int,
+            height: Int,
+            blurRadius: Int,
+            numThreads: Int
+        ): IntArray?
+        
+        fun fromParameters(effectParams: Map<String, Any>): CartoonEffect {
+            val blurRadius = effectParams.getOrElse("blurRadius", { 4 }) as Int
+            return CartoonEffect(effectParams, blurRadius)
+        }
+        
+        fun withBlurRadius(radius: Int) = fromParameters(mapOf("blurRadius" to radius))
+        
+        /**
+         * Test method to verify the LUT functionality produces the expected quantization.
+         */
+        fun testLUT() {
+            val effect = CartoonEffect()
+            val lut = effect.createColorLUT()
+            
+            // Test key values
+            assert(lut[0] == 0) { "LUT[0] should be 0, got ${lut[0]}" }
+            assert(lut[42] == 0) { "LUT[42] should be 0, got ${lut[42]}" }
+            assert(lut[43] == 85) { "LUT[43] should be 85, got ${lut[43]}" }
+            assert(lut[85] == 85) { "LUT[85] should be 85, got ${lut[85]}" }
+            assert(lut[127] == 85) { "LUT[127] should be 85, got ${lut[127]}" }
+            assert(lut[128] == 170) { "LUT[128] should be 170, got ${lut[128]}" }
+            assert(lut[170] == 170) { "LUT[170] should be 170, got ${lut[170]}" }
+            assert(lut[212] == 170) { "LUT[212] should be 170, got ${lut[212]}" }
+            assert(lut[213] == 255) { "LUT[213] should be 255, got ${lut[213]}" }
+            assert(lut[255] == 255) { "LUT[255] should be 255, got ${lut[255]}" }
+            
+            Log.i(EFFECT_NAME, "LUT test passed - color quantization is working correctly")
         }
     }
-}
+} 

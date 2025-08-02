@@ -1,20 +1,14 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.renderscript.Allocation
-import android.renderscript.RenderScript
+
 import android.util.Log
 import com.dozingcatsoftware.vectorcamera.effect.Effect
-import com.dozingcatsoftware.util.flattenedYuvImageBytes
-import com.dozingcatsoftware.util.ioReceiveIfInput
-import java.lang.ref.WeakReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CameraImageProcessor(val rs: RenderScript) {
+class CameraImageProcessor() {
     private var consumerThread: Thread? = null
     private var receivedCameraImage: CameraImage? = null
-    private var lastAllocationRef: WeakReference<Allocation>? = null
-    private var allocationUpdateCount = 0
     private val threadLock = ReentrantLock()
     private val allocationLock = ReentrantLock()
     private val allocationAvailable = allocationLock.newCondition()
@@ -36,47 +30,17 @@ class CameraImageProcessor(val rs: RenderScript) {
             consumerThread = null
         })
         allocationLock.withLock({
-            if (lastAllocationRef != null) {
-                val lastAllocation = lastAllocationRef!!.get()
-                for (i in 0 until allocationUpdateCount) {
-                    ioReceiveIfInput(lastAllocation)
-                }
-                lastAllocationRef = null
-                allocationUpdateCount = 0
+            if (receivedCameraImage != null) {
+                receivedCameraImage = null
             }
         })
     }
 
     fun queueCameraImage(cameraImage: CameraImage) {
-        threadLock.withLock({
-            if (consumerThread == null) {
-                ioReceiveIfInput(cameraImage.singleYuvAllocation)
-                return
-            }
-        })
-
         allocationLock.withLock({
-            val allocation = cameraImage.singleYuvAllocation!!
-            if (lastAllocationRef != null) {
-                val prevAllocation = lastAllocationRef!!.get()
-                if (prevAllocation == allocation) {
-                    allocationUpdateCount += 1
-                }
-                else {
-                    for (i in 0 until allocationUpdateCount) {
-                        ioReceiveIfInput(prevAllocation)
-                    }
-                    lastAllocationRef = WeakReference(allocation)
-                    allocationUpdateCount = 1
-                }
-            }
-            else {
-                lastAllocationRef = WeakReference(allocation)
-                allocationUpdateCount = 1
-            }
             this.receivedCameraImage = cameraImage
             allocationAvailable.signal()
-            debugLog("queueCameraImage, count=${allocationUpdateCount}")
+            debugLog("queueCameraImage")
         })
     }
 
@@ -99,25 +63,15 @@ class CameraImageProcessor(val rs: RenderScript) {
                         allocationAvailable.awaitNanos(250000000)
                     }
                     else {
-                        debugLog("Calling ioReceive, count=${allocationUpdateCount}")
-                        for (i in 0 until allocationUpdateCount) {
-                            ioReceiveIfInput(currentCamAllocation!!.singleYuvAllocation)
-                        }
-                        allocationUpdateCount = 0
+                        debugLog("Processing camera image")
                         receivedCameraImage = null
                     }
                 })
             }
 
-            val bitmap = effect.createBitmap(currentCamAllocation!!)
-            // Get the flattened bytes if we need them. RenderScript seems to not play well with
-            // threads, so we don't want to try to parallelize this.
-            val yuvBytes =
-                    if (currentCamAllocation!!.status.isSavingImage())
-                        flattenedYuvImageBytes(rs, currentCamAllocation!!.singleYuvAllocation!!)
-                    else null
-            callback(ProcessedBitmap(
-                    effect, currentCamAllocation!!, bitmap, yuvBytes))
+            val processedBitmap = effect.createBitmap(currentCamAllocation)
+            
+            callback(processedBitmap)
             currentCamAllocation = null
         }
     }

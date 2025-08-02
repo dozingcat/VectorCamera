@@ -9,6 +9,9 @@ import android.graphics.RectF
 import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmapMetadata
+import com.dozingcatsoftware.vectorcamera.CodeArchitecture
 
 /**
  * Effect that takes a list of other effects and renders them all in a grid. Used to implement
@@ -34,7 +37,8 @@ class CombinationEffect(
         return b!!
     }
 
-    override fun createBitmap(originalCameraImage: CameraImage): Bitmap {
+    override fun createBitmap(originalCameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
         val gridSize = Math.ceil(Math.sqrt(effectFactories.size.toDouble())).toInt()
         val tileSize = Size(
                 originalCameraImage.displaySize.width / gridSize,
@@ -66,7 +70,8 @@ class CombinationEffect(
 
             val ei = effectIndex
             val effect = effectFactories[ei]()
-            val tileBitmap = effect.createBitmap(cameraImage)
+            val tileProcessedBitmap = effect.createBitmap(cameraImage)
+            val tileBitmap = tileProcessedBitmap.bitmap
             val tileBitmapRect = Rect(0, 0, tileBitmap.width, tileBitmap.height)
             effect.drawBackground(cameraImage, tileCanvas, srcRect)
             tileCanvas.drawBitmap(tileBitmap, tileBitmapRect, srcRect, null)
@@ -96,7 +101,15 @@ class CombinationEffect(
             }
         }
         Log.i(TAG, "Combo time: ${System.currentTimeMillis() - t0}, updated: $numUpdated")
-        return resultBitmap
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = CodeArchitecture.Kotlin, // Combination effect uses Kotlin for grid rendering
+            numThreads = 1, // Single-threaded combination rendering (subeffects have their own threading)
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, originalCameraImage, resultBitmap, metadata)
     }
 
     companion object {

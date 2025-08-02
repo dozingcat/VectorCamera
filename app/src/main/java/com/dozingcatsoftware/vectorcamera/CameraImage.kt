@@ -1,71 +1,306 @@
 package com.dozingcatsoftware.vectorcamera
 
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.ScriptIntrinsicResize
+import android.media.Image
 import android.util.Size
-import com.dozingcatsoftware.util.create2dAllocation
+import kotlin.math.ceil
 
 /**
- * An image to be processed, which can come directly from a camera input or from an existing image.
- * The image data is either a YUV allocation in `singleYuvAllocation`, or separate Y/U/V allocations
- * in `planarYuvAllocations`.
+ * Data structure that holds YUV image data extracted from Android's Image class.
  */
-data class CameraImage(val rs: RenderScript,
-                       val singleYuvAllocation: Allocation?,
-                       val planarYuvAllocations: PlanarYuvAllocations?,
-                       val orientation: ImageOrientation, val status: CameraStatus,
-                       val timestamp: Long, val displaySize: Size = zeroSize) {
+data class ImageData(
+    val width: Int,
+    val height: Int,
+    val yData: ByteArray,
+    val uData: ByteArray,
+    val vData: ByteArray,
+    val yPixelStride: Int,
+    val yRowStride: Int,
+    val uvPixelStride: Int,
+    val uvRowStride: Int
+) {
+    companion object {
+        fun fromImage(image: Image): ImageData {
+            val planes = image.planes
+            if (planes.size != 3) {
+                throw IllegalStateException("Expected 3 planes for YUV_420_888, got ${planes.size}")
+            }
+
+            // Extract Y plane
+            val yPlane = planes[0]
+            val yBuffer = yPlane.buffer
+            val ySize = yBuffer.remaining()
+            val yData = ByteArray(ySize)
+            yBuffer.get(yData)
+
+            // Extract U plane  
+            val uPlane = planes[1]
+            val uBuffer = uPlane.buffer
+            val uSize = uBuffer.remaining()
+            val uData = ByteArray(uSize)
+            uBuffer.get(uData)
+
+            // Extract V plane
+            val vPlane = planes[2]
+            val vBuffer = vPlane.buffer
+            val vSize = vBuffer.remaining()
+            val vData = ByteArray(vSize)
+            vBuffer.get(vData)
+
+            return ImageData(
+                width = image.width,
+                height = image.height,
+                yData = yData,
+                uData = uData,
+                vData = vData,
+                yPixelStride = yPlane.pixelStride,
+                yRowStride = yPlane.rowStride,
+                uvPixelStride = uPlane.pixelStride,
+                uvRowStride = uPlane.rowStride
+            )
+        }
+
+        fun fromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): ImageData {
+            val uvWidth = ceil(width / 2.0).toInt()
+            val uvHeight = ceil(height / 2.0).toInt()
+            val uStart = width * height
+            val vStart = uStart + (uvWidth * uvHeight)
+
+            return ImageData(
+                width = width,
+                height = height,
+                yData = yuvBytes.copyOfRange(0, uStart),
+                uData = yuvBytes.copyOfRange(uStart, vStart),
+                vData = yuvBytes.copyOfRange(vStart, yuvBytes.size),
+                yPixelStride = 1,
+                yRowStride = width,
+                uvPixelStride = 1,
+                uvRowStride = uvWidth
+            )
+        }
+    }
+}
+
+/**
+ * An image to be processed, which comes directly from camera input or from an existing image.
+ */
+data class CameraImage(
+    private val imageData: ImageData,
+    val orientation: ImageOrientation, 
+    val status: CameraStatus,
+    val timestamp: Long, 
+    val displaySize: Size = zeroSize
+) {
 
     // width() and height() return the dimensions of the actual camera input, which is always
-    // landscape. In portrait orientation the rendered image will have the dimensioned swapped.
-    fun width(): Int {
-        return singleYuvAllocation?.type?.x ?: planarYuvAllocations!!.y.type.x
-    }
-
-    fun height(): Int {
-        return singleYuvAllocation?.type?.y ?: planarYuvAllocations!!.y.type.y
-    }
-
+    // landscape. In portrait orientation the rendered image will have the dimensions swapped.
+    fun width(): Int = imageData.width
+    fun height(): Int = imageData.height
     fun size() = Size(width(), height())
 
+    /**
+     * Returns a flattened array with concatenated Y/U/V planes. (Note U and V are not interleaved)
+     * This method needs to make additional data copies, and should be avoided in favor of getting
+     * Y/U/V data individually.
+     */
+    fun getYuvBytes(): ByteArray {
+        val yBytes = getYBytes()
+        val uBytes = getUBytes()
+        val vBytes = getVBytes()
+
+        val outputBytes = ByteArray(yBytes.size + uBytes.size + vBytes.size)
+        System.arraycopy(yBytes, 0, outputBytes, 0, yBytes.size)
+        System.arraycopy(uBytes, 0, outputBytes, yBytes.size, uBytes.size)
+        System.arraycopy(vBytes, 0, outputBytes, yBytes.size + uBytes.size, vBytes.size)
+        return outputBytes
+    }
+
+    /**
+     * Extracts Y plane bytes, handling pixel stride and row stride.
+     */
+    fun getYBytes(): ByteArray {
+        val width = imageData.width
+        val height = imageData.height
+        val yData = imageData.yData
+        val pixelStride = imageData.yPixelStride
+        val rowStride = imageData.yRowStride
+
+        // The Y plane is usually dense so we don't need to copy.
+        if (pixelStride == 1 && rowStride == width) {
+            // Densely packed, can use directly.
+            // android.util.Log.i("CameraImage", "Dense Y")
+            return yData
+        }
+        
+        // Need to extract with stride
+        val outputBytes = ByteArray(width * height)
+        var outputIndex = 0
+        
+        for (row in 0 until height) {
+            var inputIndex = row * rowStride
+            for (col in 0 until width) {
+                outputBytes[outputIndex++] = yData[inputIndex]
+                inputIndex += pixelStride
+            }
+        }
+        
+        return outputBytes
+    }
+
+    fun getUBytes(): ByteArray = extractUvPlaneBytes(imageData.uData)
+    fun getVBytes(): ByteArray = extractUvPlaneBytes(imageData.vData)
+
+    /**
+     * Extracts U or V plane bytes, handling pixel stride and row stride.
+     */
+    private fun extractUvPlaneBytes(uOrVData: ByteArray): ByteArray {
+        val width = imageData.width
+        val height = imageData.height
+        val uvWidth = (width + 1) / 2  // Round up for odd dimensions
+        val uvHeight = (height + 1) / 2
+        val uvPixelStride = imageData.uvPixelStride
+        val uvRowStride = imageData.uvRowStride
+
+        // Typically the U and V planes are interleaved so we can't just return the array directly.
+        // It might be possible to have a single "uvData" array and access the U and V values with
+        // appropriate offsets, but that would be much more complex.
+        if (imageData.uvPixelStride == 1 && imageData.uvRowStride == uvWidth) {
+            // Densely packed, can use directly.
+            // android.util.Log.i("CameraImage", "Dense U/V")
+            return uOrVData
+        }
+        // android.util.Log.i("CameraImage", "pixel stride: ${imageData.uvPixelStride} width: $uvWidth row stride: ${imageData.uvRowStride}")
+        // Need to extract with stride
+        val outputBytes = ByteArray(uvWidth * uvHeight)
+        var outputIndex = 0
+        
+        for (row in 0 until uvHeight) {
+            var inputIndex = row * uvRowStride
+            for (col in 0 until uvWidth) {
+                outputBytes[outputIndex++] = uOrVData[inputIndex]
+                inputIndex += uvPixelStride
+            }
+        }
+        
+        return outputBytes
+    }
+
+    /**
+     * Creates a resized copy of this CameraImage using pure Kotlin bilinear interpolation.
+     */
     fun resizedTo(size: Size): CameraImage {
-        val resizeScript = ScriptIntrinsicResize.create(rs)
+        // If no resizing needed, return copy
+        if (size.width == width() && size.height == height()) {
+            return this
+        }
+        
+        // Resize the ImageData using direct YUV byte manipulation
+        val resizedImageData = resizeImageData(imageData, size.width, size.height)
+        
+        return copy(imageData = resizedImageData)
+    }
 
-        fun doResize(inputAlloc: Allocation, w: Int, h: Int): Allocation {
-            val outputAlloc = create2dAllocation(rs, Element::U8, w, h)
-            resizeScript.setInput(inputAlloc)
-            resizeScript.forEach_bicubic(outputAlloc)
-            return outputAlloc
-        }
+    /**
+     * Resizes ImageData using bilinear interpolation on YUV byte arrays.
+     */
+    private fun resizeImageData(imageData: ImageData, newWidth: Int, newHeight: Int): ImageData {
+        val resizedYuvBytes = resizeYuvBytes(
+            getYBytes(), getUBytes(), getVBytes(),
+            imageData.width, imageData.height,
+            newWidth, newHeight)
+        return ImageData.fromYuvBytes(resizedYuvBytes, newWidth, newHeight)
+    }
 
-        return if (singleYuvAllocation != null) {
-            val outputAlloc = doResize(singleYuvAllocation, size.width, size.height)
-            copy(singleYuvAllocation = outputAlloc)
+    /**
+     * Resizes YUV byte array using bilinear interpolation.
+     */
+    private fun resizeYuvBytes(
+            yData: ByteArray, uData: ByteArray, vData: ByteArray,
+            oldWidth: Int, oldHeight: Int,
+            newWidth: Int, newHeight: Int): ByteArray {
+        val oldUvWidth = (oldWidth + 1) / 2
+        val oldUvHeight = (oldHeight + 1) / 2
+
+        val newYSize = newWidth * newHeight
+        val newUvWidth = (newWidth + 1) / 2
+        val newUvHeight = (newHeight + 1) / 2
+        val newUvSize = newUvWidth * newUvHeight
+        
+        val result = ByteArray(newYSize + 2 * newUvSize)
+        
+        // Resize Y plane
+        val newYData = resizePlane(yData, oldWidth, oldHeight, newWidth, newHeight)
+        System.arraycopy(newYData, 0, result, 0, newYSize)
+        
+        // Resize U plane
+        val newUData = resizePlane(uData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
+        System.arraycopy(newUData, 0, result, newYSize, newUvSize)
+        
+        // Resize V plane
+        val newVData = resizePlane(vData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
+        System.arraycopy(newVData, 0, result, newYSize + newUvSize, newUvSize)
+        
+        return result
+    }
+
+    /**
+     * Resizes a single plane using bilinear interpolation.
+     */
+    private fun resizePlane(data: ByteArray, oldWidth: Int, oldHeight: Int, 
+                           newWidth: Int, newHeight: Int): ByteArray {
+        val result = ByteArray(newWidth * newHeight)
+        val xRatio = oldWidth.toFloat() / newWidth
+        val yRatio = oldHeight.toFloat() / newHeight
+        
+        for (y in 0 until newHeight) {
+            for (x in 0 until newWidth) {
+                val px = x * xRatio
+                val py = y * yRatio
+                
+                val x1 = px.toInt()
+                val y1 = py.toInt()
+                val x2 = kotlin.math.min(x1 + 1, oldWidth - 1)
+                val y2 = kotlin.math.min(y1 + 1, oldHeight - 1)
+                
+                val fx = px - x1
+                val fy = py - y1
+                
+                val p1 = data[y1 * oldWidth + x1].toInt() and 0xFF
+                val p2 = data[y1 * oldWidth + x2].toInt() and 0xFF
+                val p3 = data[y2 * oldWidth + x1].toInt() and 0xFF
+                val p4 = data[y2 * oldWidth + x2].toInt() and 0xFF
+                
+                val interpolated = (p1 * (1 - fx) * (1 - fy) +
+                                  p2 * fx * (1 - fy) +
+                                  p3 * (1 - fx) * fy +
+                                  p4 * fx * fy).toInt()
+                
+                result[y * newWidth + x] = interpolated.toByte()
+            }
         }
-        else {
-            val planes = planarYuvAllocations!!
-            val yOutput = doResize(planes.y, size.width, size.height)
-            val uOutput = doResize(planes.u, size.width / 2, size.height / 2)
-            val vOutput = doResize(planes.v, size.width / 2, size.height / 2)
-            copy(planarYuvAllocations = PlanarYuvAllocations(yOutput, uOutput, vOutput))
-        }
+        
+        return result
     }
 
     companion object {
-        private val zeroSize = Size(0, 0)
+        val zeroSize = Size(0, 0)
 
-        fun withAllocation(rs: RenderScript, allocation: Allocation, orientation: ImageOrientation,
-                           status: CameraStatus, timestamp: Long,
-                           displaySize: Size = zeroSize): CameraImage {
-            return CameraImage(rs, allocation, null, orientation, status, timestamp, displaySize)
+        /**
+         * Creates a CameraImage from an Android Image (from ImageReader).
+         */
+        fun fromImage(image: Image, orientation: ImageOrientation, status: CameraStatus, 
+                     timestamp: Long, displaySize: Size = zeroSize): CameraImage {
+            val imageData = ImageData.fromImage(image)
+            return CameraImage(imageData, orientation, status, timestamp, displaySize)
         }
 
-        fun withAllocationSet(rs: RenderScript, yuv: PlanarYuvAllocations,
-                              orientation: ImageOrientation, status: CameraStatus, timestamp: Long,
-                              displaySize: Size = zeroSize): CameraImage {
-            return CameraImage(rs, null, yuv, orientation, status, timestamp, displaySize)
+        /**
+         * Creates a CameraImage from YUV bytes.
+         */
+        fun fromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, 
+                        orientation: ImageOrientation, status: CameraStatus,
+                        timestamp: Long, displaySize: Size = zeroSize): CameraImage {
+            val imageData = ImageData.fromYuvBytes(yuvBytes, width, height)
+            return CameraImage(imageData, orientation, status, timestamp, displaySize)
         }
     }
 }

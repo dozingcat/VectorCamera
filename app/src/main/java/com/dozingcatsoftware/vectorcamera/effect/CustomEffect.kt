@@ -3,6 +3,9 @@ package com.dozingcatsoftware.vectorcamera.effect
 import android.graphics.*
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmapMetadata
+import com.dozingcatsoftware.vectorcamera.CodeArchitecture
 
 class CustomEffect(
         private val baseEffect: Effect,
@@ -18,8 +21,10 @@ class CustomEffect(
         baseEffect.drawBackground(cameraImage, canvas, rect)
     }
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val bitmap = baseEffect.createBitmap(cameraImage)
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        val baseProcessedBitmap = baseEffect.createBitmap(cameraImage)
+        val bitmap = baseProcessedBitmap.bitmap
         // If in the combo grid, show "Custom" label. This is way more complicated than it should be
         // due to the combinations of landscape/portrait and X and Y rotations.
         if (context == EffectContext.COMBO_GRID) {
@@ -82,6 +87,14 @@ class CustomEffect(
             p.style = Paint.Style.STROKE
             canvas.drawText(text, 0f, 0f, p)
         }
-        return bitmap
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = baseProcessedBitmap.metadata.codeArchitecture,
+            numThreads = baseProcessedBitmap.metadata.numThreads,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 }

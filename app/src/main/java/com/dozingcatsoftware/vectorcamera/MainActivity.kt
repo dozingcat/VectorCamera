@@ -1,12 +1,13 @@
 package com.dozingcatsoftware.vectorcamera
 
+import RunningStats
 import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.provider.MediaStore
-import android.renderscript.RenderScript
+
 import android.util.Log
 import android.util.Size
 import android.util.TypedValue
@@ -37,7 +38,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var photoLibrary: PhotoLibrary
 
-    private lateinit var rs: RenderScript
+
     private val effectRegistry = EffectRegistry()
     private var currentEffect: Effect? = null
     private var previousEffect: Effect? = null
@@ -60,8 +61,12 @@ class MainActivity : AppCompatActivity() {
     private var askedForPermissions = false
     private var libraryMigrationDone = false
 
+    private var showDebugInfo = false
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var onBackPressedCallback: OnBackPressedCallback
+
+    val renderTimeStats = RunningStats()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,9 +80,7 @@ class MainActivity : AppCompatActivity() {
 
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
-        // Use PROFILE type only on first run?
-        rs = RenderScript.create(this, RenderScript.ContextType.NORMAL)
-        imageProcessor = CameraImageProcessor(rs)
+        imageProcessor = CameraImageProcessor()
 
         currentEffect = effectFromPreferences()
         preferredImageSize =
@@ -85,7 +88,7 @@ class MainActivity : AppCompatActivity() {
                 else ImageSize.HALF_SCREEN
 
         cameraSelector = CameraSelector(this)
-        cameraImageGenerator = cameraSelector.createImageGenerator(rs)
+        cameraImageGenerator = cameraSelector.createImageGenerator()
 
         binding.toggleVideoButton.setOnClickListener(this::toggleVideoMode)
         binding.switchCameraButton.setOnClickListener(this::switchToNextCamera)
@@ -117,7 +120,7 @@ class MainActivity : AppCompatActivity() {
             Log.i(TAG, "Starting effect loading thread")
             for (i in 0 until effectRegistry.defaultEffectCount()) {
                 effectRegistry.defaultEffectAtIndex(
-                    i, rs, preferences.lookupFunction, EffectContext.PRELOAD)
+                    i, preferences.lookupFunction, EffectContext.PRELOAD)
             }
             Log.i(TAG, "Done loading effects")
         }).start()
@@ -136,6 +139,7 @@ class MainActivity : AppCompatActivity() {
             binding.overlayView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
         }
         binding.overlayView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        showDebugInfo = preferences.showDebugInfo()
     }
 
     override fun onPause() {
@@ -320,9 +324,10 @@ class MainActivity : AppCompatActivity() {
             if (lastBitmapTimestamp > pb.sourceImage.timestamp) {
                 return
             }
+            renderTimeStats.addValue(pb.metadata.generationDurationNanos)
             lastBitmapTimestamp = pb.sourceImage.timestamp
-            binding.overlayView.processedBitmap = pb
-            binding.overlayView.invalidate()
+            binding.overlayView.generationTimeAverageNanos = renderTimeStats.getAverage()
+            binding.overlayView.updateBitmap(pb, showDebugInfo)
             // Save image or video frame if necessary.
             if (pb.sourceImage.status == CameraStatus.CAPTURING_PHOTO) {
                 saveImage(pb)
@@ -335,9 +340,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveImage(pb: ProcessedBitmap) {
         Log.i(TAG, "Saving picture")
-        if (pb.yuvBytes == null) {
-            Log.w(TAG, "yuvBytes not set for saved image")
-        }
         // This can take a while, so show a spinner. Should it allow the user to cancel?
         val saveIndicator = ProgressDialog(this)
         saveIndicator.isIndeterminate = true
@@ -364,27 +366,25 @@ class MainActivity : AppCompatActivity() {
     private fun recordVideoFrame(pb: ProcessedBitmap) {
         val vr = videoRecorder
         if (vr != null) {
-            if (pb.yuvBytes != null) {
-                if (videoFrameMetadata == null) {
-                    videoFrameMetadata = MediaMetadata(
-                            MediaType.VIDEO,
-                            currentEffect!!.effectMetadata(),
-                            pb.sourceImage.width(),
-                            pb.sourceImage.height(),
-                            pb.sourceImage.orientation,
-                            pb.sourceImage.timestamp)
-                }
-                vr.recordFrame(pb.sourceImage.timestamp, pb.yuvBytes)
+            val source = pb.sourceImage
+            if (videoFrameMetadata == null) {
+                videoFrameMetadata = MediaMetadata(
+                        MediaType.VIDEO,
+                        currentEffect!!.effectMetadata(),
+                        source.width(),
+                        source.height(),
+                        source.orientation,
+                        source.timestamp)
             }
-            else {
-                Log.w(TAG, "yuvBytes not set for video frame")
-            }
+            vr.recordFrame(source.timestamp, listOf(
+                source.getYBytes(), source.getUBytes(), source.getVBytes()
+            ))
         }
     }
 
     private fun effectFromPreferences(): Effect {
-        return preferences.effect(rs,
-                {effectRegistry.defaultEffectAtIndex(0, rs, preferences.lookupFunction)})
+        return preferences.effect(
+                {effectRegistry.defaultEffectAtIndex(0, preferences.lookupFunction)})
     }
 
     private fun handleAllocationFromCamera(imageFromCamera: CameraImage) {
@@ -428,7 +428,7 @@ class MainActivity : AppCompatActivity() {
         cameraSelector.selectNextCamera()
         cameraImageGenerator.stop({
             handler.post({
-                cameraImageGenerator = cameraSelector.createImageGenerator(rs)
+                cameraImageGenerator = cameraSelector.createImageGenerator()
                 restartCameraImageGenerator()
                 updateControls()
             })
@@ -470,7 +470,7 @@ class MainActivity : AppCompatActivity() {
         if (inEffectSelectionMode) {
             previousEffect = currentEffect
             val comboEffects = effectRegistry.defaultEffectFunctions(
-                    rs, preferences.lookupFunction, EffectContext.COMBO_GRID)
+                    preferences.lookupFunction, EffectContext.COMBO_GRID)
             currentEffect = CombinationEffect(comboEffects, 50)
             preferredImageSize = ImageSize.EFFECT_GRID
             binding.controlLayout.visibility = View.GONE
@@ -540,7 +540,7 @@ class MainActivity : AppCompatActivity() {
         effectIndex = index
         Log.i(TAG, "Selected effect ${index}")
 
-        val eff = effectRegistry.defaultEffectAtIndex(index, rs, preferences.lookupFunction)
+        val eff = effectRegistry.defaultEffectAtIndex(index, preferences.lookupFunction)
         preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
         updateInEffectSelectionModeFlag(false)
         binding.overlayView.visibility = View.VISIBLE
@@ -597,7 +597,7 @@ class MainActivity : AppCompatActivity() {
         // when the user selects a custom effect, `currentEffect` gets set to the underlying effect
         // rather than the "wrapper" CustomEffect.
         val newEffect = effectRegistry.defaultEffectAtIndex(
-                effectIndex, rs, preferences.lookupFunction)
+                effectIndex, preferences.lookupFunction)
         // Save the resulting effect so that it will restore correctly.
         preferences.saveEffectInfo(newEffect.effectName(), newEffect.effectParameters())
         restartCameraImageGenerator()

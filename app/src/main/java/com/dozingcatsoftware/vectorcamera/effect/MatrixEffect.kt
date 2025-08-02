@@ -4,104 +4,441 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
+import android.util.Log
 import android.util.Size
-import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
-import com.dozingcatsoftware.util.toUInt
-import com.dozingcatsoftware.vectorcamera.CameraImage
-import java.util.*
-import kotlin.math.min
-import kotlin.math.roundToInt
 
-class Raindrop(val x: Int, val y: Int, val startTimestamp: Long) {
+import com.dozingcatsoftware.util.scaleToTargetSize
+import com.dozingcatsoftware.vectorcamera.*
+
+import java.util.*
+import kotlin.math.*
+
+
+/**
+ * Kotlin-based raindrop animation state.
+ */
+class RaindropKotlin(val x: Int, val y: Int, val startTimestamp: Long) {
     var prevLength = -1L
 }
 
-class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Effect {
+/**
+ * Character grid metrics for text layout.
+ */
+class TextMetricsKotlin(
+    val isPortrait: Boolean, 
+    val outputSize: Size, 
+    val charPixelSize: Size,
+    val numCharacterRows: Int, 
+    val numCharacterColumns: Int
+)
 
-    private val numPreferredCharColumns =
-            effectParams.getOrElse("numColumns", {DEFAULT_CHARACTER_COLUMNS}) as Int
+/**
+ * Text layout parameters.
+ */
+class TextParamsKotlin(
+    private val numPreferredCharColumns: Int,
+    private val minCharWidth: Int,
+    private val charHeightOverWidth: Double
+) {
+    fun getTextMetrics(cameraImage: CameraImage, maxOutputSize: Size): TextMetricsKotlin {
+        val isPortrait = cameraImage.orientation.portrait
+        val targetOutputSize = scaleToTargetSize(cameraImage.size(), maxOutputSize)
+        
+        val numPixelsForColumns = if (isPortrait) targetOutputSize.height else targetOutputSize.width
+        val numCharColumns = minOf(numPreferredCharColumns, numPixelsForColumns / minCharWidth)
+        val charPixelWidth = numPixelsForColumns / numCharColumns
+        val charPixelHeight = (charPixelWidth * charHeightOverWidth).roundToInt()
+        val numPixelsForRows = if (isPortrait) targetOutputSize.width else targetOutputSize.height
+        val numCharRows = numPixelsForRows / charPixelHeight
+        
+        val actualOutputSize = if (isPortrait) 
+            Size(numCharRows * charPixelHeight, numCharColumns * charPixelWidth)
+        else 
+            Size(numCharColumns * charPixelWidth, numCharRows * charPixelHeight)
+            
+        return TextMetricsKotlin(isPortrait, actualOutputSize, Size(charPixelWidth, charPixelHeight),
+                numCharRows, numCharColumns)
+    }
+}
+
+/**
+ * Pure Kotlin implementation of MatrixEffect that creates a "digital rain" Matrix-style effect
+ * with Japanese characters, animated raindrops, and optional edge detection.
+ */
+class MatrixEffect(
+    private val effectParams: Map<String, Any> = mapOf()
+) : Effect {
+
+    private val numPreferredCharColumns = 
+        effectParams.getOrElse("numColumns", { DEFAULT_CHARACTER_COLUMNS }) as Int
     private val computeEdges = effectParams.get("edges") == true
-    private val textColor = effectParams.getOrElse("textColor", {0x00ff00}) as Int
+    private val textColor = effectParams.getOrElse("textColor", { 0x00ff00 }) as Int
     private val maxTextRed = (textColor shr 16) and 0xff
     private val maxTextGreen = (textColor shr 8) and 0xff
     private val maxTextBlue = textColor and 0xff
 
-
-    private val textParams = TextParams(numPreferredCharColumns, 10, 1.8)
-    private val raindrops = HashSet<Raindrop>()
+    // Animation parameters
+    private val textParams = TextParamsKotlin(numPreferredCharColumns, 10, 1.8)
+    private val raindrops = HashSet<RaindropKotlin>()
     private var raindropDecayMillis = 2000L
     private var raindropMillisPerTick = 200L
     private var newRaindropProbPerFrame = 0.05
     private var maxRaindropLength = 15
-    // Every frame, this fraction of characters will change.
     private var charChangeProbPerFrame = 1.0 / 300
+    
+    // Character grid state
+    private var characterIndices: IntArray? = null
+    private var characterColors: IntArray? = null
+    private var characterTemplate: Bitmap? = null
+    private var lastCharPixelSize: Size? = null
 
-    private var characterTemplateAllocation: Allocation? = null
-    private var characterIndexAllocation: Allocation? = null
-    private var characterColorAllocation: Allocation? = null
-    private var averageBrightnessAllocation: Allocation? = null
-    private var charBrightnessAllocation: Allocation? = null
-    private var bitmapOutputAllocation: Allocation? = null
-    private val textScript = ScriptC_ascii(rs)
-    private val edgeScript = ScriptC_edge(rs)
+    // Native method declarations
+    private external fun computeBlockBrightnessNative(
+        yData: ByteArray,
+        imageWidth: Int,
+        imageHeight: Int,
+        numCharColumns: Int,
+        numCharRows: Int,
+        isPortrait: Boolean,
+        blockAverages: ByteArray,
+        numThreads: Int
+    )
+    
+    private external fun applyEdgeDetectionNative(
+        input: ByteArray,
+        output: ByteArray,
+        width: Int,
+        height: Int,
+        multiplier: Int,
+        numThreads: Int
+    )
+    
+
+    
+    private external fun renderCharacterGridNative(
+        templatePixels: IntArray,
+        templateWidth: Int,
+        templateHeight: Int,
+        charWidth: Int,
+        charHeight: Int,
+        characterIndices: IntArray,
+        characterColors: IntArray,
+        numCharColumns: Int,
+        numCharRows: Int,
+        isPortrait: Boolean,
+        xFlipped: Boolean,
+        yFlipped: Boolean,
+        outputWidth: Int,
+        outputHeight: Int,
+        outputPixels: IntArray,
+        numThreads: Int
+    )
+    
+    private external fun isNativeAvailable(): Boolean
+
+    // Static block to load native library
+    companion object {
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                Log.i("MatrixEffect", "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w("MatrixEffect", "Native library not available, using Kotlin implementation")
+                nativeLibraryLoaded = false
+            }
+        }
+        
+        const val EFFECT_NAME = "matrix"
+        const val DEFAULT_CHARACTER_COLUMNS = 120
+
+        // Japanese hiragana and katakana characters, and (reversed) English letters and numbers
+        const val MATRIX_NORMAL_CHARS =
+            "ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕ" +
+            "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ"
+        const val MATRIX_REVERSED_CHARS = "QWERTYUIOPASDFGHJKLZXCVBNM1234567890"
+        const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
+
+        fun fromParameters(params: Map<String, Any>): MatrixEffect {
+            return MatrixEffect(params)
+        }
+    }
 
     override fun effectName() = EFFECT_NAME
-
     override fun effectParameters() = effectParams
 
-    private fun updateGridCharacters(metrics: TextMetrics, rand: Random) {
+    /**
+     * Calculate the optimal number of threads for native Matrix processing based on character grid dimensions.
+     */
+    private fun calculateOptimalNativeThreads(numCharacterRows: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsForThreading = 8
+        return if (numCharacterRows >= minRowsForThreading) {
+            minOf(numCores, numCharacterRows / 4, Effect.MAX_NATIVE_THREADS).coerceAtLeast(1)
+        } else {
+            1 // Single thread for small grids
+        }
+    }
+
+    /**
+     * Calculate the optimal number of threads for Kotlin Matrix processing (fallback is always single-threaded).
+     */
+    private fun calculateOptimalKotlinThreads(numCharacterRows: Int): Int {
+        // Kotlin fallback for Matrix is single-threaded for simplicity
+        return 1
+    }
+
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        val t1 = System.currentTimeMillis()
+        
+        val rand = Random(cameraImage.timestamp)
+        val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
+        
+        // Compute grid brightness values (with optional edge detection)
+        val blockAverages = computeBlockAverages(cameraImage, metrics)
+        
+        // Update character grid and raindrop animations
+        updateGridCharacters(metrics, rand)
+        updateGridColors(cameraImage, metrics, blockAverages, rand)
+        
+        // Create character template bitmap if needed
+        updateCharTemplateBitmap(metrics.charPixelSize)
+        
+        val threadsUsed = if (nativeLibraryLoaded) {
+            calculateOptimalNativeThreads(metrics.numCharacterRows)
+        } else {
+            calculateOptimalKotlinThreads(metrics.numCharacterRows)
+        }
+        
+        // Render final bitmap
+        val resultBitmap = renderFinalBitmap(cameraImage, metrics, threadsUsed)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
+            numThreads = threadsUsed,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, resultBitmap, metadata)
+    }
+
+    /**
+     * Compute average brightness for each character cell, with optional edge detection.
+     */
+    private fun computeBlockAverages(cameraImage: CameraImage, metrics: TextMetricsKotlin): ByteArray {
+        val width = cameraImage.width()
+        val height = cameraImage.height()
+        // Get Y plane directly (Matrix effect only uses luminance for block averages)
+        val yData = cameraImage.getYBytes()
+        
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
-        val prevCharAlloc = characterIndexAllocation
-        characterIndexAllocation = reuseOrCreate2dAllocation(
-                characterIndexAllocation, rs, Element::U32,
-                metrics.numCharacterColumns, metrics.numCharacterRows)
-        if (prevCharAlloc == characterIndexAllocation) {
-            // Change characters.
-            val newChar = IntArray(1)
+        val blockAverages = ByteArray(numCells)
+        
+        // Use native implementation if available for better performance
+        if (nativeLibraryLoaded) {
+            try {
+                val numThreads = calculateOptimalNativeThreads(metrics.numCharacterRows)
+                
+                computeBlockBrightnessNative(
+                    yData, width, height,
+                    metrics.numCharacterColumns, metrics.numCharacterRows,
+                    metrics.isPortrait, blockAverages, numThreads
+                )
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native block brightness computation failed, falling back to Kotlin", e)
+                computeBlockAveragesKotlin(yData, width, height, metrics, blockAverages)
+            }
+        } else {
+            computeBlockAveragesKotlin(yData, width, height, metrics, blockAverages)
+        }
+        
+        // Apply edge detection if enabled
+        return if (computeEdges) {
+            applyEdgeDetection(blockAverages, metrics.numCharacterColumns, metrics.numCharacterRows)
+        } else {
+            blockAverages
+        }
+    }
+    
+    /**
+     * Kotlin fallback for block brightness computation.
+     */
+    private fun computeBlockAveragesKotlin(
+        yData: ByteArray, 
+        width: Int, 
+        height: Int, 
+        metrics: TextMetricsKotlin, 
+        blockAverages: ByteArray
+    ) {
+        // Compute brightness for each character cell
+        for (blockY in 0 until metrics.numCharacterRows) {
+            for (blockX in 0 until metrics.numCharacterColumns) {
+                val blockIndex = blockY * metrics.numCharacterColumns + blockX
+                
+                // Calculate input pixel region for this character cell
+                val xmin: Int
+                val xmax: Int
+                val ymin: Int
+                val ymax: Int
+                
+                if (metrics.isPortrait) {
+                    val inputPixelsPerCol = height / metrics.numCharacterColumns
+                    val inputPixelsPerRow = width / metrics.numCharacterRows
+                    xmin = blockY * inputPixelsPerRow
+                    xmax = xmin + inputPixelsPerRow
+                    ymin = (metrics.numCharacterColumns - 1 - blockX) * inputPixelsPerCol
+                    ymax = ymin + inputPixelsPerCol
+                } else {
+                    val inputPixelsPerCol = width / metrics.numCharacterColumns
+                    val inputPixelsPerRow = height / metrics.numCharacterRows
+                    xmin = blockX * inputPixelsPerCol
+                    xmax = xmin + inputPixelsPerCol
+                    ymin = blockY * inputPixelsPerRow
+                    ymax = ymin + inputPixelsPerRow
+                }
+                
+                // Average Y (brightness) values over the block
+                var brightnessTotal = 0L
+                var pixelCount = 0
+                for (yy in ymin until ymax) {
+                    for (xx in xmin until xmax) {
+                        if (xx in 0 until width && yy in 0 until height) {
+                            brightnessTotal += (yData[yy * width + xx].toInt() and 0xFF)
+                            pixelCount++
+                        }
+                    }
+                }
+                
+                blockAverages[blockIndex] = if (pixelCount > 0) 
+                    (brightnessTotal / pixelCount).toByte() 
+                else 
+                    0.toByte()
+            }
+        }
+    }
+    
+    /**
+     * Apply simple edge detection to the brightness grid.
+     */
+    private fun applyEdgeDetection(input: ByteArray, width: Int, height: Int): ByteArray {
+        val result = ByteArray(input.size)
+        val multiplier = 4 // Edge strength multiplier
+        
+        // Use native implementation if available for better performance
+        if (nativeLibraryLoaded) {
+            try {
+                val numCores = Runtime.getRuntime().availableProcessors()
+                // Use threading only for larger grids to avoid overhead
+                val minRowsForThreading = 32
+                val numThreads = if (height >= minRowsForThreading) {
+                    minOf(numCores, height / 16).coerceAtLeast(1)
+                } else {
+                    1 // Single thread for small grids
+                }
+                
+                applyEdgeDetectionNative(input, result, width, height, multiplier, numThreads)
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native edge detection failed, falling back to Kotlin", e)
+                applyEdgeDetectionKotlin(input, result, width, height, multiplier)
+            }
+        } else {
+            applyEdgeDetectionKotlin(input, result, width, height, multiplier)
+        }
+        
+        return result
+    }
+    
+    /**
+     * Kotlin fallback for edge detection.
+     */
+    private fun applyEdgeDetectionKotlin(input: ByteArray, result: ByteArray, width: Int, height: Int, multiplier: Int) {
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val index = y * width + x
+                
+                if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
+                    val center = input[index].toInt() and 0xFF
+                    val surroundingSum =
+                        (input[(y - 1) * width + (x - 1)].toInt() and 0xFF) +
+                        (input[(y - 1) * width + x].toInt() and 0xFF) +
+                        (input[(y - 1) * width + (x + 1)].toInt() and 0xFF) +
+                        (input[y * width + (x - 1)].toInt() and 0xFF) +
+                        (input[y * width + (x + 1)].toInt() and 0xFF) +
+                        (input[(y + 1) * width + (x - 1)].toInt() and 0xFF) +
+                        (input[(y + 1) * width + x].toInt() and 0xFF) +
+                        (input[(y + 1) * width + (x + 1)].toInt() and 0xFF)
+                    
+                    val edge = 8 * center - surroundingSum
+                    result[index] = (multiplier * edge).coerceIn(0, 255).toByte()
+                } else {
+                    result[index] = 0
+                }
+            }
+        }
+    }
+
+    /**
+     * Update the character indices for each grid cell.
+     */
+    private fun updateGridCharacters(metrics: TextMetricsKotlin, rand: Random) {
+        val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
+        val prevIndices = characterIndices
+        
+        characterIndices = IntArray(numCells)
+        
+        if (prevIndices != null && prevIndices.size == numCells) {
+            // Copy previous characters and change a few randomly
+            System.arraycopy(prevIndices, 0, characterIndices!!, 0, numCells)
+            
             val numChanged = (numCells * charChangeProbPerFrame).toInt()
             for (i in 0 until numChanged) {
-                newChar[0] = rand.nextInt(NUM_MATRIX_CHARS)
                 val offset = rand.nextInt(numCells)
-                characterIndexAllocation!!.copy1DRangeFrom(offset, 1, newChar)
+                characterIndices!![offset] = rand.nextInt(NUM_MATRIX_CHARS)
             }
-        }
-        else {
-            // Initialize with random characters.
-            val indices = IntArray(numCells)
+        } else {
+            // Initialize with random characters
             for (i in 0 until numCells) {
-                indices[i] = rand.nextInt(NUM_MATRIX_CHARS)
+                characterIndices!![i] = rand.nextInt(NUM_MATRIX_CHARS)
             }
-            characterIndexAllocation!!.copyFrom(indices)
         }
     }
 
-    private fun maxRaindrops(metrics: TextMetrics): Int {
-        return Math.min(10, metrics.numCharacterColumns / 10)
-    }
-
+    /**
+     * Update character colors based on brightness and raindrop animations.
+     */
     private fun updateGridColors(
-            ci: CameraImage, metrics: TextMetrics, blockAverages: ByteArray, rand: Random) {
-        val prevColorAlloc = characterColorAllocation
-        characterColorAllocation = reuseOrCreate2dAllocation(
-                characterColorAllocation, rs, Element::RGBA_8888,
-                metrics.numCharacterColumns, metrics.numCharacterRows)
-        if (prevColorAlloc != characterColorAllocation) {
+        ci: CameraImage, 
+        metrics: TextMetricsKotlin, 
+        blockAverages: ByteArray, 
+        rand: Random
+    ) {
+        val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
+        val prevColors = characterColors
+        
+        characterColors = IntArray(numCells)
+        
+        if (prevColors == null || prevColors.size != numCells) {
             raindrops.clear()
         }
-        val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
-        val ca = ByteArray(4 * numCells)
+        
+        // Set base colors from brightness
         for (i in 0 until numCells) {
-            val fraction = toUInt(blockAverages[i]) / 255.0
-            ca[4*i] = (fraction * maxTextRed).toInt().toByte()
-            ca[4*i + 1] = (fraction * maxTextGreen).toInt().toByte()
-            ca[4*i + 2] = (fraction * maxTextBlue).toInt().toByte()
-            ca[4*i + 3] = 0xff.toByte()
+            val fraction = (blockAverages[i].toInt() and 0xFF) / 255.0
+            val red = (fraction * maxTextRed).toInt().coerceIn(0, 255)
+            val green = (fraction * maxTextGreen).toInt().coerceIn(0, 255)
+            val blue = (fraction * maxTextBlue).toInt().coerceIn(0, 255)
+            characterColors!![i] = Color.argb(255, red, green, blue)
         }
+        
+        // Update raindrops
         val raindropLifetimeMillis = maxRaindropLength * raindropMillisPerTick + raindropDecayMillis
-        var rit = raindrops.iterator()
+        
+        // Remove expired raindrops
+        val rit = raindrops.iterator()
         while (rit.hasNext()) {
             val drop = rit.next()
             val diff = ci.timestamp - drop.startTimestamp
@@ -109,161 +446,234 @@ class MatrixEffect(val rs: RenderScript, val effectParams: Map<String, Any>): Ef
                 rit.remove()
             }
         }
-        if (raindrops.size < maxRaindrops(metrics) && rand.nextDouble() < newRaindropProbPerFrame) {
-            raindrops.add(Raindrop(
-                    rand.nextInt(metrics.numCharacterColumns),
-                    rand.nextInt(metrics.numCharacterRows),
-                    ci.timestamp))
+        
+        // Add new raindrops
+        val maxRaindrops = minOf(10, metrics.numCharacterColumns / 10)
+        if (raindrops.size < maxRaindrops && rand.nextDouble() < newRaindropProbPerFrame) {
+            raindrops.add(RaindropKotlin(
+                rand.nextInt(metrics.numCharacterColumns),
+                rand.nextInt(metrics.numCharacterRows),
+                ci.timestamp
+            ))
         }
+        
+        // Apply raindrop effects
         for (drop in raindrops) {
             val dir = if (ci.orientation.yFlipped) -1 else 1
             val ticks = (ci.timestamp - drop.startTimestamp) / raindropMillisPerTick
-            // If the raindrop is extending into a new cell, change that cell's character.
-            val length = min(maxRaindropLength.toLong(), ticks)
+            val length = minOf(maxRaindropLength.toLong(), ticks)
             val growing = (length > drop.prevLength)
             drop.prevLength = length
+            
             for (dy in 0..length) {
                 val y = drop.y + (dy * dir).toInt()
-                if (y < 0 || y >= metrics.numCharacterRows) {
-                    break
+                if (y < 0 || y >= metrics.numCharacterRows) break
+                
+                // Change character if raindrop is growing
+                if (growing && dy == length) {
+                    val cellIndex = y * metrics.numCharacterColumns + drop.x
+                    if (cellIndex in 0 until numCells) {
+                        characterIndices!![cellIndex] = rand.nextInt(NUM_MATRIX_CHARS)
+                    }
                 }
-                if (growing && (dy == length)) {
-                    val newChar = intArrayOf(rand.nextInt(NUM_MATRIX_CHARS))
-                    characterIndexAllocation!!.copy2DRangeFrom(drop.x, y, 1, 1, newChar)
-                }
-                val millisSinceActive =
-                        ci.timestamp - (drop.startTimestamp + dy * raindropMillisPerTick)
+                
+                // Set bright color for raindrop trail
+                val millisSinceActive = ci.timestamp - (drop.startTimestamp + dy * raindropMillisPerTick)
                 val fraction = 1.0 - (millisSinceActive.toDouble() / raindropLifetimeMillis)
-                if (fraction <= 0) {
-                    continue
+                if (fraction > 0) {
+                    val cellIndex = y * metrics.numCharacterColumns + drop.x
+                    if (cellIndex in 0 until numCells) {
+                        val brightness = (255 * fraction).roundToInt().coerceIn(0, 255)
+                        val isHead = (dy == ticks)
+                        
+                        val red = if (isHead) 255 else (fraction * maxTextRed).toInt().coerceIn(0, 255)
+                        val green = if (isHead) 255 else (fraction * maxTextGreen).toInt().coerceIn(0, 255)
+                        val blue = if (isHead) 255 else (fraction * maxTextBlue).toInt().coerceIn(0, 255)
+                        
+                        characterColors!![cellIndex] = Color.argb(255, red, green, blue)
+                    }
                 }
-                val brightness = (255 * fraction).roundToInt().toByte()
-                val baseOffset = 4 * (y * metrics.numCharacterColumns + drop.x)
-                ca[baseOffset] = if (dy == ticks) brightness else (fraction * maxTextRed).toInt().toByte()
-                ca[baseOffset + 1] =
-                        if (dy == ticks) brightness else (fraction * maxTextGreen).toInt().toByte()
-                ca[baseOffset + 2] =
-                        if (dy == ticks) brightness else (fraction * maxTextBlue).toInt().toByte()
-                ca[baseOffset + 3] = 0xff.toByte()
             }
         }
-        characterColorAllocation!!.copyFrom(ca)
     }
 
+    /**
+     * Create or update the character template bitmap with all Matrix characters.
+     */
     private fun updateCharTemplateBitmap(charPixelSize: Size) {
-        val charBitmapWidth = charPixelSize.width * NUM_MATRIX_CHARS
-        val origTemplateAlloc = characterTemplateAllocation
-        characterTemplateAllocation = reuseOrCreate2dAllocation(characterTemplateAllocation,
-                rs, Element::RGBA_8888, charBitmapWidth, charPixelSize.height)
-        // Only recreate character bitmap if the dimensions changed.
-        if (characterTemplateAllocation != origTemplateAlloc) {
-            val paint = Paint()
-            paint.textSize = charPixelSize.height * 5f / 6
-            paint.color = Color.argb(255, 0, 255, 0)
-
-            val charBitmap = Bitmap.createBitmap(
-                    charBitmapWidth, charPixelSize.height, Bitmap.Config.ARGB_8888)
-            val charBitmapCanvas = Canvas(charBitmap)
-            charBitmapCanvas.drawColor(Color.argb(255, 0, 0, 0))
-            val normalChars = MATRIX_NORMAL_CHARS
-            val reversedChars = MATRIX_REVERSED_CHARS
-            val numNormalChars = normalChars.length
-            for (i in 0 until numNormalChars) {
-                charBitmapCanvas.drawText(normalChars[i].toString(),
-                        (i * charPixelSize.width).toFloat(), charPixelSize.height - 1f, paint)
-            }
-            // Reversed characters are drawn at negative X positions so that after the scale
-            // transform they'll be in the right place.
-            charBitmapCanvas.scale(-1f, 1f)
-            for (i in 0 until reversedChars.length) {
-                charBitmapCanvas.drawText(reversedChars[i].toString(),
-                        -((normalChars.length + i + 1) * charPixelSize.width).toFloat(),
-                        charPixelSize.height - 1f, paint)
-            }
-            characterTemplateAllocation!!.copyFrom(charBitmap)
+        // Only recreate if size changed
+        if (characterTemplate != null && charPixelSize == lastCharPixelSize) {
+            return
         }
+        
+        lastCharPixelSize = charPixelSize
+        val charBitmapWidth = charPixelSize.width * NUM_MATRIX_CHARS
+        
+        val paint = Paint().apply {
+            textSize = charPixelSize.height * 5f / 6
+            color = Color.WHITE  // Use white for template, then color with filters
+            isAntiAlias = false
+        }
+        
+        characterTemplate = Bitmap.createBitmap(charBitmapWidth, charPixelSize.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(characterTemplate!!)
+        canvas.drawColor(Color.BLACK)
+        
+        // Draw normal characters
+        val normalChars = MATRIX_NORMAL_CHARS
+        for (i in normalChars.indices) {
+            canvas.drawText(
+                normalChars[i].toString(),
+                (i * charPixelSize.width).toFloat(),
+                charPixelSize.height - 1f,
+                paint
+            )
+        }
+        
+        // Draw reversed characters (mirrored horizontally)
+        canvas.save()
+        canvas.scale(-1f, 1f)
+        val reversedChars = MATRIX_REVERSED_CHARS
+        for (i in reversedChars.indices) {
+            canvas.drawText(
+                reversedChars[i].toString(),
+                -((normalChars.length + i + 1) * charPixelSize.width).toFloat(),
+                charPixelSize.height - 1f,
+                paint
+            )
+        }
+        canvas.restore()
     }
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        val rand = Random(cameraImage.timestamp)
-        val metrics = textParams.getTextMetrics(cameraImage, cameraImage.displaySize)
+    /**
+     * Render the final bitmap using native bulk character rendering.
+     * This replaces thousands of individual character operations with one multi-threaded C++ call.
+     */
+    private fun renderFinalBitmap(cameraImage: CameraImage, metrics: TextMetricsKotlin, numThreads: Int): Bitmap {
         val resultBitmap = Bitmap.createBitmap(
-                metrics.outputSize.width, metrics.outputSize.height, Bitmap.Config.ARGB_8888)
-        val cps = metrics.charPixelSize
-
-        updateCharTemplateBitmap(cps)
-
-        bitmapOutputAllocation = reuseOrCreate2dAllocation(bitmapOutputAllocation,
-                rs, Element::RGBA_8888, resultBitmap.width, resultBitmap.height)
-
-        textScript._characterBitmapInput = characterTemplateAllocation
-        textScript._imageOutput = bitmapOutputAllocation
-        textScript._inputImageWidth = cameraImage.width()
-        textScript._inputImageHeight = cameraImage.height()
-        textScript._characterPixelWidth = cps.width
-        textScript._characterPixelHeight = cps.height
-        textScript._numCharColumns = metrics.numCharacterColumns
-        textScript._numCharRows = metrics.numCharacterRows
-        textScript._numCharacters = NUM_MATRIX_CHARS
-        // Only flip on the final output, otherwise we'll double flip and end up with no change.
-        textScript._flipHorizontal = false
-        textScript._flipVertical = false
-        textScript._portrait = metrics.isPortrait
-        textScript._colorMode = 0
-        if (cameraImage.planarYuvAllocations != null) {
-            textScript._hasSingleYuvAllocation = false
-            textScript._yInput = cameraImage.planarYuvAllocations.y
-            textScript._uInput = cameraImage.planarYuvAllocations.u
-            textScript._vInput = cameraImage.planarYuvAllocations.v
+            metrics.outputSize.width, 
+            metrics.outputSize.height, 
+            Bitmap.Config.ARGB_8888
+        )
+        
+        val template = characterTemplate!!
+        val charWidth = metrics.charPixelSize.width
+        val charHeight = metrics.charPixelSize.height
+        val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
+        
+        // Use native bulk rendering if available for massive performance improvement
+        if (nativeLibraryLoaded) {
+            try {
+                // Get template bitmap pixels once
+                val templatePixels = IntArray(template.width * template.height)
+                template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
+                
+                // Use the pre-calculated thread count passed as parameter
+                
+                // Render entire character grid in native code with multi-threading
+                renderCharacterGridNative(
+                    templatePixels, template.width, template.height,
+                    charWidth, charHeight,
+                    characterIndices!!, characterColors!!,
+                    metrics.numCharacterColumns, metrics.numCharacterRows,
+                    metrics.isPortrait, cameraImage.orientation.xFlipped, cameraImage.orientation.yFlipped,
+                    metrics.outputSize.width, metrics.outputSize.height,
+                    outputPixels, numThreads
+                )
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
+                renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
+            }
+        } else {
+            renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
         }
-        else {
-            textScript._hasSingleYuvAllocation = true
-            textScript._yuvInput = cameraImage.singleYuvAllocation
-        }
-
-        averageBrightnessAllocation = reuseOrCreate2dAllocation(averageBrightnessAllocation,
-                rs, Element::U8, metrics.numCharacterColumns, metrics.numCharacterRows)
-        textScript.forEach_computeBrightnessForBlock(averageBrightnessAllocation)
-
-        if (computeEdges) {
-            charBrightnessAllocation = reuseOrCreate2dAllocation(charBrightnessAllocation,
-                    rs, Element::U8, metrics.numCharacterColumns, metrics.numCharacterRows)
-            edgeScript._gWidth = metrics.numCharacterColumns
-            edgeScript._gHeight = metrics.numCharacterRows
-            edgeScript._gYuvInput = averageBrightnessAllocation
-            edgeScript.forEach_computeEdges(charBrightnessAllocation)
-        }
-        else {
-            charBrightnessAllocation = averageBrightnessAllocation
-        }
-
-        val blockAverages = ByteArray(charBrightnessAllocation!!.bytesSize)
-        charBrightnessAllocation!!.copyTo(blockAverages)
-
-        updateGridCharacters(metrics, rand)
-        updateGridColors(cameraImage, metrics, blockAverages, rand)
-
-        textScript._flipHorizontal = cameraImage.orientation.xFlipped
-        textScript._flipVertical = cameraImage.orientation.yFlipped
-        textScript.forEach_writeCharacterToBitmapWithColor(
-                characterIndexAllocation, characterColorAllocation)
-        bitmapOutputAllocation!!.copyTo(resultBitmap)
+        
+        // Create bitmap from rendered pixels
+        resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0, 
+                              metrics.outputSize.width, metrics.outputSize.height)
         return resultBitmap
     }
-
-    companion object {
-        const val EFFECT_NAME = "matrix"
-        const val DEFAULT_CHARACTER_COLUMNS = 120
-
-        // Hirigana and half-width katakana characters, and (reversed) English letters and numbers.
-        const val MATRIX_NORMAL_CHARS =
-                "ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕ" +
-                "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ"
-        const val MATRIX_REVERSED_CHARS = "QWERTYUIOPASDFGHJKLZXCVBNM1234567890"
-        const val NUM_MATRIX_CHARS = MATRIX_NORMAL_CHARS.length + MATRIX_REVERSED_CHARS.length
-
-        fun fromParameters(rs: RenderScript, params: Map<String, Any>): MatrixEffect {
-            return MatrixEffect(rs, params)
+    
+    /**
+     * Kotlin fallback for character grid rendering.
+     */
+    private fun renderFinalBitmapKotlin(
+        cameraImage: CameraImage, 
+        metrics: TextMetricsKotlin, 
+        template: Bitmap, 
+        charWidth: Int, 
+        charHeight: Int, 
+        outputPixels: IntArray
+    ) {
+        // Fill with black background
+        outputPixels.fill(Color.BLACK)
+        
+        val templatePixels = IntArray(template.width * template.height)
+        template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
+        
+        for (blockY in 0 until metrics.numCharacterRows) {
+            for (blockX in 0 until metrics.numCharacterColumns) {
+                val cellIndex = blockY * metrics.numCharacterColumns + blockX
+                if (cellIndex >= characterIndices!!.size || cellIndex >= characterColors!!.size) continue
+                
+                val charIndex = characterIndices!![cellIndex]
+                val color = characterColors!![cellIndex]
+                
+                // Calculate source and destination rectangles
+                val srcLeft = charIndex * charWidth
+                
+                val dstLeft: Int
+                val dstTop: Int
+                val dstWidth: Int
+                val dstHeight: Int
+                
+                if (metrics.isPortrait) {
+                    dstLeft = blockY * charHeight
+                    dstTop = (metrics.numCharacterColumns - 1 - blockX) * charWidth
+                    dstWidth = charHeight
+                    dstHeight = charWidth
+                } else {
+                    dstLeft = blockX * charWidth
+                    dstTop = blockY * charHeight
+                    dstWidth = charWidth
+                    dstHeight = charHeight
+                }
+                
+                // Render character pixels directly to output buffer
+                for (dy in 0 until dstHeight) {
+                    for (dx in 0 until dstWidth) {
+                        var srcX: Int
+                        var srcY: Int
+                        
+                        if (metrics.isPortrait) {
+                            // Portrait transformation
+                            srcX = srcLeft + (if (cameraImage.orientation.yFlipped) dy else charWidth - 1 - dy)
+                            srcY = if (cameraImage.orientation.xFlipped) charHeight - 1 - dx else dx
+                        } else {
+                            // Landscape transformation
+                            srcX = srcLeft + (if (cameraImage.orientation.xFlipped) charWidth - 1 - dx else dx)
+                            srcY = if (cameraImage.orientation.yFlipped) charHeight - 1 - dy else dy
+                        }
+                        
+                        // Bounds check
+                        if (srcX >= srcLeft && srcX < srcLeft + charWidth && srcY >= 0 && srcY < charHeight) {
+                            val templatePixel = templatePixels[srcY * template.width + srcX]
+                            val red = Color.red(templatePixel)
+                            val green = Color.green(templatePixel)
+                            val blue = Color.blue(templatePixel)
+                            
+                            val outputColor = if (red > 0 || green > 0 || blue > 0) color else Color.BLACK
+                            
+                            val outX = dstLeft + dx
+                            val outY = dstTop + dy
+                            if (outX >= 0 && outX < metrics.outputSize.width && outY >= 0 && outY < metrics.outputSize.height) {
+                                outputPixels[outY * metrics.outputSize.width + outX] = outputColor
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
-}
+
+} 

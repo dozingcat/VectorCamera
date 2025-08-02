@@ -4,15 +4,14 @@ import android.content.Context
 import android.graphics.ImageFormat
 import android.graphics.Rect
 import android.hardware.camera2.*
+import android.media.Image
+import android.media.ImageReader
 import android.os.Handler
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.Type
+
 import android.util.Log
 import android.util.Size
 
-class CameraImageGenerator(val context: Context, val rs: RenderScript,
+class CameraImageGenerator(val context: Context,
                            val cameraManager: CameraManager, val cameraId: String,
                            val timestampFn: () -> Long = System::currentTimeMillis) {
 
@@ -29,7 +28,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
 
     private val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
 
-    private var allocation: Allocation? = null
+    private var imageReader: ImageReader? = null
 
     // https://stackoverflow.com/questions/33902832/upside-down-camera-preview-byte-array
     // https://www.reddit.com/r/Android/comments/3rjbo8/nexus5x_marshmallow_camera_problem/cwqzqgh
@@ -147,25 +146,38 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
             val size = this.captureSize!!
             Log.i(TAG, "Using camera size: ${size}")
 
-            allocation = createRenderscriptAllocation(size)
-            allocation!!.setOnBufferAvailableListener({
-                if (it != allocation) {
-                    Log.i(TAG, "Got buffer for previous allocation, discarding")
-                    it.ioReceive()
-                    return@setOnBufferAvailableListener
+            imageReader = ImageReader.newInstance(size.width, size.height, ImageFormat.YUV_420_888, 4)
+            imageReader!!.setOnImageAvailableListener({
+                try {
+                    val image = it.acquireLatestImage()
+                    if (image != null) {
+                        if (captureSession != null) {
+                            // Extract image data immediately and close the image to free the buffer
+                            val cameraImage = CameraImage.fromImage(image, imageOrientation, status, timestampFn())
+                            image.close()
+                            
+                            this.imageAllocationCallback?.invoke(cameraImage)
+                        }
+                        else {
+                            Log.i(TAG, "captureSession is null, closing image")
+                            image.close()
+                        }
+                    }
+                } catch (e: IllegalStateException) {
+                    Log.w(TAG, "Failed to acquire image: ${e.message}")
+                    // Try to close any remaining images to free up the buffer
+                    try {
+                        val image = it.acquireNextImage()
+                        image?.close()
+                    } catch (cleanupException: Exception) {
+                        Log.d(TAG, "No images to clean up")
+                    }
                 }
-                if (captureSession != null) {
-                    this.imageAllocationCallback?.invoke(CameraImage.withAllocation(
-                                rs, it, imageOrientation, status, timestampFn()))
-                }
-                else {
-                    Log.i(TAG, "captureSession is null, closing image")
-                }
-            })
+            }, null)
 
             this.status = CameraStatus.CAPTURE_STARTING
             camera!!.createCaptureSession(
-                    listOf(allocation!!.surface),
+                    listOf(imageReader!!.surface),
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) {
                             Log.i(TAG, "capture session onConfigured, status=${status}")
@@ -210,7 +222,7 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
                 throw IllegalStateException("Invalid status: " + this.status)
             }
         }
-        request.addTarget(allocation!!.surface)
+        request.addTarget(imageReader!!.surface)
         if (this.zoomRatio > 0) {
             val cc = cameraCharacteristics
             val baseRect = cc.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)!!
@@ -257,18 +269,10 @@ class CameraImageGenerator(val context: Context, val rs: RenderScript,
     private fun stopCamera() {
         Log.i(TAG, "stopCamera")
         stopCaptureSession()
+        imageReader?.close()
+        imageReader = null
         camera?.close()
         camera = null
-    }
-
-    private fun createRenderscriptAllocation(size: Size): Allocation {
-        val yuvTypeBuilder = Type.Builder(rs, Element.YUV(rs))
-        yuvTypeBuilder.setX(size.width)
-        yuvTypeBuilder.setY(size.height)
-        yuvTypeBuilder.setYuvFormat(ImageFormat.YUV_420_888)
-        // yuvTypeBuilder.setYuvFormat(ImageFormat.NV21)
-        return Allocation.createTyped(rs, yuvTypeBuilder.create(),
-                Allocation.USAGE_IO_INPUT or Allocation.USAGE_SCRIPT)
     }
 
     companion object {

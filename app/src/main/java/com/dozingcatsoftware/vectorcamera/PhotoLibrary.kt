@@ -3,7 +3,7 @@ package com.dozingcatsoftware.vectorcamera
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Environment
-import android.renderscript.RenderScript
+
 import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.vectorcamera.effect.EffectMetadata
@@ -61,10 +61,6 @@ class PhotoLibrary(val rootDirectory: File) {
      */
     fun savePhoto(context: Context, processedBitmap: ProcessedBitmap): String {
         val t1 = System.currentTimeMillis()
-        if (processedBitmap.yuvBytes == null &&
-                processedBitmap.sourceImage.planarYuvAllocations == null) {
-            throw IllegalArgumentException("YUV bytes not set in ProcessedBitmap")
-        }
         Log.i(TAG, "savePhoto start")
         val sourceImage = processedBitmap.sourceImage
         val width = sourceImage.width()
@@ -79,19 +75,9 @@ class PhotoLibrary(val rootDirectory: File) {
         val t2 = System.currentTimeMillis()
         writeFileAtomicallyUsingTempDir(rawImageFile, getTempDirectory(), {fos ->
             GZIPOutputStream(fos, gzipBufferSize).use {
-                if (processedBitmap.yuvBytes != null) {
-                    it.write(processedBitmap.yuvBytes)
-                }
-                else {
-                    val allocBytes = ByteArray(width * height)
-                    val planarYuv = processedBitmap.sourceImage.planarYuvAllocations!!
-                    planarYuv.y.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height)
-                    planarYuv.u.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height / 4)
-                    planarYuv.v.copyTo(allocBytes)
-                    it.write(allocBytes, 0, width * height / 4)
-                }
+                it.write(processedBitmap.sourceImage.getYBytes())
+                it.write(processedBitmap.sourceImage.getUBytes())
+                it.write(processedBitmap.sourceImage.getVBytes())
             }
         })
         val t3 = System.currentTimeMillis()
@@ -251,8 +237,7 @@ class PhotoLibrary(val rootDirectory: File) {
         writeMetadata(metadata, itemId)
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.
-        val rs = RenderScript.create(context)
-        val videoReader = VideoReader(rs, this, itemId, getDisplaySize(context))
+        val videoReader = VideoReader(this, itemId, getDisplaySize(context))
         writeThumbnail(videoReader.bitmapForFrame(0), itemId)
     }
 

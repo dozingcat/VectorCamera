@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
 import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
 
 data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
     fun toJson() = mapOf("name" to name, "params" to parameters)
@@ -20,7 +21,7 @@ data class EffectMetadata(val name: String, val parameters: Map<String, Any>) {
 }
 
 interface Effect {
-    fun createBitmap(cameraImage: CameraImage): Bitmap
+    fun createBitmap(cameraImage: CameraImage): ProcessedBitmap
 
     fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {}
 
@@ -29,4 +30,12 @@ interface Effect {
     fun effectParameters(): Map<String, Any> = mapOf()
 
     fun effectMetadata(): EffectMetadata = EffectMetadata(effectName(), effectParameters())
+
+    companion object {
+        // Maximum thread counts based on performance characteristics
+        // Native code hits memory bandwidth limits quickly
+        const val MAX_NATIVE_THREADS = 2
+        // Kotlin code is more CPU-bound and benefits from more parallelism
+        const val MAX_KOTLIN_THREADS = 4
+    }
 }

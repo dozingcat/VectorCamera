@@ -9,7 +9,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
-import android.renderscript.RenderScript
+
 import androidx.core.content.FileProvider
 import android.view.MotionEvent
 import android.view.View
@@ -52,7 +52,7 @@ class ViewVideoActivity: AppCompatActivity() {
     private lateinit var binding: ViewVideoBinding
 
     private lateinit var photoLibrary: PhotoLibrary
-    private lateinit var rs : RenderScript
+
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
     private var originalEffect: Effect? = null
@@ -74,7 +74,6 @@ class ViewVideoActivity: AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ViewVideoBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        rs = RenderScript.create(this)
         photoLibrary = PhotoLibrary.defaultLibrary(this)
 
         binding.shareButton.setOnClickListener(this::doShare)
@@ -85,7 +84,7 @@ class ViewVideoActivity: AppCompatActivity() {
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")!!
-        videoReader = VideoReader(rs, photoLibrary, videoId, getLandscapeDisplaySize(this))
+        videoReader = VideoReader(photoLibrary, videoId, getLandscapeDisplaySize(this))
 
         binding.frameSeekBar.max = videoReader.numberOfFrames() - 1
         binding.frameSeekBar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
@@ -144,7 +143,7 @@ class ViewVideoActivity: AppCompatActivity() {
     private fun loadFrame(index: Int) {
         frameIndex = index
         val bitmap = videoReader.bitmapForFrame(index)
-        binding.overlayView.processedBitmap = bitmap
+        binding.overlayView.updateBitmap(bitmap)
         binding.overlayView.invalidate()
     }
 
@@ -158,7 +157,7 @@ class ViewVideoActivity: AppCompatActivity() {
         if (inEffectSelectionMode) {
             originalEffect = videoReader.effect
             videoReader.effect = CombinationEffect(
-                    effectRegistry.defaultEffectFunctions(rs, preferences.lookupFunction))
+                    effectRegistry.defaultEffectFunctions(preferences.lookupFunction))
             videoReader.forcePortrait = isPortraitOrientation()
             binding.controlBar.visibility = View.GONE
         }
@@ -226,8 +225,7 @@ class ViewVideoActivity: AppCompatActivity() {
     private fun showFrame(index: Int, pb: ProcessedBitmap) {
         if (isPlaying) {
             frameIndex = index
-            binding.overlayView.processedBitmap = pb
-            binding.overlayView.invalidate()
+            binding.overlayView.updateBitmap(pb)
             updateControls()
         }
     }
@@ -246,7 +244,7 @@ class ViewVideoActivity: AppCompatActivity() {
 
                 val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
                 val effect = effectRegistry.defaultEffectAtIndex(
-                        effectIndex, rs, preferences.lookupFunction)
+                        effectIndex, preferences.lookupFunction)
                 originalEffect = effect
                 videoReader.effect = effect
                 videoReader.forcePortrait = null

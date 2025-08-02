@@ -1,52 +1,211 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
-import android.renderscript.*
-import com.dozingcatsoftware.vectorcamera.*
-import com.dozingcatsoftware.util.reuseOrCreate2dAllocation
+import android.util.Log
+import com.dozingcatsoftware.util.YuvUtils
+import com.dozingcatsoftware.vectorcamera.CameraImage
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
+import com.dozingcatsoftware.vectorcamera.ProcessedBitmapMetadata
+import com.dozingcatsoftware.vectorcamera.CodeArchitecture
+import kotlin.math.roundToInt
+import kotlinx.coroutines.*
+import java.util.concurrent.Executors
+import kotlin.math.min
 
 /**
- * Effect that preserves the "color" of each pixel as given by its U and V values, but replaces its
+ * Pure Kotlin implementation of EdgeLuminanceEffect.
+ * Preserves the "color" of each pixel as given by its U and V values, but replaces its
  * brightness (Y value) with its edge strength.
  */
-class EdgeLuminanceEffect(val rs: RenderScript): Effect {
+class EdgeLuminanceEffect : Effect {
 
-    private var outputAllocation: Allocation? = null
-    private var script = ScriptC_edge_color(rs)
+    // Native method declarations
+    private external fun processRowsNative(
+        startY: Int, 
+        endY: Int, 
+        width: Int, 
+        height: Int, 
+        multiplier: Int,
+        yData: ByteArray, 
+        uData: ByteArray, 
+        vData: ByteArray, 
+        uvWidth: Int, 
+        pixels: IntArray
+    )
+    
+    // Optimized native method that handles threading internally
+    private external fun processImageNative(
+        width: Int,
+        height: Int,
+        multiplier: Int,
+        yData: ByteArray,
+        uData: ByteArray,
+        vData: ByteArray,
+        uvWidth: Int,
+        pixels: IntArray,
+        numThreads: Int
+    )
+    
+    private external fun isNativeAvailable(): Boolean
+
+    // Static block to load native library
+    companion object {
+        const val EFFECT_NAME = "edge_luminance"
+        
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                Log.i(EFFECT_NAME, "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(EFFECT_NAME, "Native library not available, using Kotlin implementation", e)
+                nativeLibraryLoaded = false
+            }
+        }
+
+        fun fromParameters(params: Map<String, Any>): EdgeLuminanceEffect {
+            return EdgeLuminanceEffect()
+        }
+    }
 
     override fun effectName() = EFFECT_NAME
 
-    override fun createBitmap(cameraImage: CameraImage): Bitmap {
-        outputAllocation = reuseOrCreate2dAllocation(outputAllocation,
-                rs, Element::RGBA_8888, cameraImage.width(), cameraImage.height())
-        script._gWidth = cameraImage.width()
-        script._gHeight = cameraImage.height()
-        script._gMultiplier = minOf(4, maxOf(2, Math.round(cameraImage.width() / 480f)))
-
-        if (cameraImage.planarYuvAllocations != null) {
-            script._gYInput = cameraImage.planarYuvAllocations.y
-            script._gUInput = cameraImage.planarYuvAllocations.u
-            script._gVInput = cameraImage.planarYuvAllocations.v
-            script.forEach_setBrightnessToEdgeStrength_planar(outputAllocation)
-        }
-        else {
-            script._gYuvInput = cameraImage.singleYuvAllocation!!
-            script.forEach_setBrightnessToEdgeStrength(outputAllocation)
-        }
-
-
-        val resultBitmap = Bitmap.createBitmap(
-                cameraImage.width(), cameraImage.height(), Bitmap.Config.ARGB_8888)
-        outputAllocation!!.copyTo(resultBitmap)
-
-        return resultBitmap
+    /**
+     * Calculate the optimal number of threads for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
     }
 
-    companion object {
-        const val EFFECT_NAME = "edge_luminance"
+    /**
+     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
+     */
+    private fun calculateOptimalKotlinThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
+        return maxOf(1, maxThreads)
+    }
 
-        fun fromParameters(rs: RenderScript, params: Map<String, Any>): EdgeLuminanceEffect {
-            return EdgeLuminanceEffect(rs)
+    override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
+        val startTime = System.nanoTime()
+        
+        val width = cameraImage.width()
+        val height = cameraImage.height()
+        val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
+
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
+        val actualThreads = if (nativeLibraryLoaded) nativeThreads else kotlinThreads
+
+        // Get individual plane data directly
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        val bitmap = createBitmapFromPlanes(yData, uData, vData, width, height, multiplier, actualThreads)
+        
+        val endTime = System.nanoTime()
+        val metadata = ProcessedBitmapMetadata(
+            codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
+            numThreads = actualThreads,
+            generationDurationNanos = endTime - startTime
+        )
+        
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
+    }
+
+    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, multiplier: Int, numThreads: Int): Bitmap {
+        val uvWidth = (width + 1) / 2
+
+        val pixels = IntArray(width * height)
+
+        val t1 = System.currentTimeMillis()
+        
+        if (nativeLibraryLoaded) {
+            // Use optimized native implementation that handles threading internally
+            processImageNative(width, height, multiplier, yData, uData, vData, uvWidth, pixels, numThreads)
+        } else {
+            // Fallback to Kotlin implementation with coroutines
+            if (numThreads == 1) {
+                processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+            } else {
+                runBlocking {
+                    val jobs = mutableListOf<Job>()
+                    val rowsPerThread = height / numThreads
+                    
+                    for (threadIndex in 0 until numThreads) {
+                        val startY = threadIndex * rowsPerThread
+                        val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
+                        
+                        val job = launch(Dispatchers.Default) {
+                            processRows(startY, endY, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
+                        }
+                        jobs.add(job)
+                    }
+                    
+                    // Wait for all threads to complete
+                    jobs.forEach { it.join() }
+                }
+            }
+        }
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return bitmap
+    }
+
+    private fun processRows(
+        startY: Int, 
+        endY: Int, 
+        width: Int, 
+        height: Int, 
+        multiplier: Int,
+        yData: ByteArray, 
+        uData: ByteArray, 
+        vData: ByteArray, 
+        uvWidth: Int, 
+        pixels: IntArray
+    ) {
+        for (y in startY until endY) {
+            for (x in 0 until width) {
+                val pixelIndex = y * width + x
+
+                // Calculate edge strength using Laplacian operator
+                val edgeStrength = if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
+                    val center = yData[pixelIndex].toInt() and 0xFF
+                    // Trying to optimize this by reducing multiplications doesn't help.
+                    val surroundingSum =
+                        (yData[(y - 1) * width + (x - 1)].toInt() and 0xFF) +
+                        (yData[(y - 1) * width + x].toInt() and 0xFF) +
+                        (yData[(y - 1) * width + (x + 1)].toInt() and 0xFF) +
+                        (yData[y * width + (x - 1)].toInt() and 0xFF) +
+                        (yData[y * width + (x + 1)].toInt() and 0xFF) +
+                        (yData[(y + 1) * width + (x - 1)].toInt() and 0xFF) +
+                        (yData[(y + 1) * width + x].toInt() and 0xFF) +
+                        (yData[(y + 1) * width + (x + 1)].toInt() and 0xFF)
+
+                    val edge = 8 * center - surroundingSum
+                    (multiplier * edge).coerceIn(0, 255)
+                } else {
+                    0
+                }
+
+                // Get U and V values (subsampled)
+                val uvX = x / 2
+                val uvY = y / 2
+                val uvIndex = uvY * uvWidth + uvX
+                val u = uData[uvIndex].toInt() and 0xFF
+                val v = vData[uvIndex].toInt() and 0xFF
+
+                // Convert YUV to RGB using edge strength as Y value
+                val rgb = YuvUtils.yuvToRgb(edgeStrength, u, v, includeAlpha = true)
+                pixels[pixelIndex] = rgb
+            }
         }
     }
- }
+} 
