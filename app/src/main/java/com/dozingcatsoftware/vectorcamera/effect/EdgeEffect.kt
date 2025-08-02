@@ -33,8 +33,8 @@ class EdgeEffect private constructor(
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
         // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
+        val yBytes = cameraImage.getYBytes()
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYBytes(yBytes, width, height, multiplier)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
@@ -48,12 +48,7 @@ class EdgeEffect private constructor(
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
-        val ySize = width * height
-        
-        // Extract Y plane from the flattened YUV bytes
-        val yData = yuvBytes.sliceArray(0 until ySize)
-
+    private fun createBitmapFromYBytes(yData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val pixels = IntArray(width * height)
 
         // Determine optimal number of threads based on CPU cores and image size.

@@ -45,7 +45,7 @@ class CartoonEffect(
 
     private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         // Determine optimal number of threads based on CPU cores and image size
-        val numCores = Runtime.getRuntime().availableProcessors()
+        val numCores = 1 // Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
         val maxThreads = minOf(numCores, height / minRowsPerThread)
         val numThreads = maxOf(1, maxThreads)

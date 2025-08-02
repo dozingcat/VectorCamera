@@ -79,14 +79,20 @@ class EdgeLuminanceEffect : Effect {
         val height = cameraImage.height()
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
-        // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val bitmap = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier)
+        // Determine optimal number of threads based on CPU cores and image size.
+        // On a Pixel 8a, using 9 threads renders in ~110ms and 1 thread takes ~330ms using Kotlin.
+        val numCores = 4 // Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = min(numCores, height / minRowsPerThread)
+        val numThreads = maxOf(1, maxThreads)
+
+        val yuvBytes = cameraImage.getYuvBytes()
+        val bitmap = createBitmapFromYuvBytes(yuvBytes, width, height, multiplier, numThreads)
         
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
-            codeArchitecture = CodeArchitecture.Kotlin,
-            numThreads = null, // Single-threaded Kotlin processing
+            codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
+            numThreads = numThreads, // Single-threaded Kotlin processing
             generationDurationNanos = endTime - startTime
         )
         
@@ -95,7 +101,7 @@ class EdgeLuminanceEffect : Effect {
 
     var numFrames: Int = 0
 
-    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int): Bitmap {
+    private fun createBitmapFromYuvBytes(yuvBytes: ByteArray, width: Int, height: Int, multiplier: Int, numThreads: Int): Bitmap {
         val ySize = width * height
         val uvWidth = (width + 1) / 2
         val uvHeight = (height + 1) / 2
@@ -107,13 +113,6 @@ class EdgeLuminanceEffect : Effect {
         val vData = yuvBytes.sliceArray(ySize + uvSize until ySize + 2 * uvSize)
 
         val pixels = IntArray(width * height)
-
-        // Determine optimal number of threads based on CPU cores and image size.
-        // On a Pixel 8a, using 9 threads renders in ~110ms and 1 thread takes ~330ms.
-        val numCores = Runtime.getRuntime().availableProcessors()
-        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = min(numCores, height / minRowsPerThread)
-        val numThreads = maxOf(1, maxThreads)
 
         val t1 = System.currentTimeMillis()
         
@@ -205,8 +204,4 @@ class EdgeLuminanceEffect : Effect {
             }
         }
     }
-    
-
-
-
 } 

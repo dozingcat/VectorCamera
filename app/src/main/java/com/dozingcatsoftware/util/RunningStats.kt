@@ -16,6 +16,7 @@ class RunningStats(val size: Int = 10) {
         if (numValuesRecorded < size) {
             return values.take(numValuesRecorded).sum().toDouble() / numValuesRecorded
         }
+        // android.util.Log.i("Stats", values.joinToString(" "))
         return values.sum().toDouble() / size        
     }
 

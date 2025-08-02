@@ -151,9 +151,7 @@ class AsciiEffect(
     private fun computeBlockAverages(cameraImage: CameraImage, metrics: TextMetricsKotlin): ByteArray {
         val width = cameraImage.width()
         val height = cameraImage.height()
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val ySize = width * height
-        val yData = yuvBytes.sliceArray(0 until ySize)
+        val yData = cameraImage.getYBytes()
         
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val blockAverages = ByteArray(numCells)
@@ -250,11 +248,9 @@ class AsciiEffect(
     private fun computeBlockColors(cameraImage: CameraImage, metrics: TextMetricsKotlin): IntArray {
         val width = cameraImage.width()
         val height = cameraImage.height()
-        val yuvBytes = cameraImage.getYuvBytes()!!
-        val ySize = width * height
-        val yData = yuvBytes.sliceArray(0 until ySize)
-        val uData = yuvBytes.sliceArray(ySize until ySize + ySize / 4)
-        val vData = yuvBytes.sliceArray(ySize + ySize / 4 until yuvBytes.size)
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
         
         val numCells = metrics.numCharacterColumns * metrics.numCharacterRows
         val blockColors = IntArray(numCells)
@@ -383,7 +379,7 @@ class AsciiEffect(
      * Render the final bitmap by drawing ASCII characters into a grid.
      * Uses high-performance native C++ implementation with threading.
      */
-        private fun renderFinalBitmap(
+    private fun renderFinalBitmap(
         cameraImage: CameraImage,
         metrics: TextMetricsKotlin,
         characterIndices: IntArray,

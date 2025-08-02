@@ -34,8 +34,7 @@ class PermuteColorEffect(
         val width = cameraImage.width()
         val height = cameraImage.height()
 
-        // Get YUV data directly from CameraImage
-        val yuvBytes = cameraImage.getYuvBytes()!!
+        val yuvBytes = cameraImage.getYuvBytes()
         val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYuvBytes(yuvBytes, width, height)
         
         val endTime = System.nanoTime()
