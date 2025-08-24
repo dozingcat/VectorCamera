@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera
 
 import RunningStats
 import android.app.ProgressDialog
+import androidx.appcompat.app.AlertDialog
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -170,19 +171,89 @@ class MainActivity : AppCompatActivity() {
 
         when (requestCode) {
             ACTIVITY_CHOOSE_PICTURE -> {
-                if (resultCode == RESULT_OK) {
-                    Log.i(TAG, "Selected photo: ${intent!!.data}")
-                    Thread({
-                        try {
-                            val imageId = ProcessImageOperation().processImage(this, intent.data!!)
-                            handler.post({
-                                ViewImageActivity.startActivityWithImageId(this, imageId)
-                            })
+                if (resultCode == RESULT_OK && intent != null && intent.data != null) {
+                    val uri = intent.data!!
+                    try {
+                        val takeFlags = intent.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                        contentResolver.takePersistableUriPermission(uri, takeFlags)
+                    }
+                    catch (_: Exception) {}
+
+                    val mime = try { contentResolver.getType(uri) } catch (_: Exception) { null }
+                    if (mime != null && mime.startsWith("video/")) {
+                        val op = ProcessVideoImportOperation()
+                        val pf = op.preflight(this, uri)
+                        val proceed = {
+                            val importDialog = ProgressDialog(this)
+                            importDialog.isIndeterminate = false
+                            importDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL)
+                            importDialog.setMax(pf.estimatedFrames)
+                            importDialog.progress = 0
+                            importDialog.setMessage("Importing video...")
+                            importDialog.setCancelable(true)
+                            importDialog.setButton(ProgressDialog.BUTTON_NEGATIVE, "Cancel") { d, _ ->
+                                d.cancel()
+                            }
+                            importDialog.show()
+                            Thread({
+                                try {
+                                    val videoId = op.process(
+                                            this, uri, pf.dstWidth, pf.dstHeight, pf.targetFps,
+                                            { processed, total ->
+                                                handler.post {
+                                                    importDialog.max = total
+                                                    importDialog.progress = processed
+                                                }
+                                            },
+                                            cancelChecker = { !importDialog.isShowing }
+                                    )
+                                    importDialog.dismiss()
+                                    handler.post {
+                                        ViewVideoActivity.startActivityWithVideoId(this, videoId)
+                                    }
+                                }
+                                catch (ex: InterruptedException) {
+                                    Log.i(TAG, "Video import cancelled")
+                                    importDialog.dismiss()
+                                    // Clean temp files for partial import
+                                    PhotoLibrary.defaultLibrary(this).clearTempDirectories()
+                                }
+                                catch (ex: Exception) {
+                                    Log.w(TAG, "Error importing video", ex)
+                                    importDialog.dismiss()
+                                }
+                            }).start()
                         }
-                        catch (ex: Exception) {
-                            Log.w(TAG, "Error processing image", ex)
+
+                        if (pf.estimatedTotalMB > 100.0) {
+                            val minutes = (pf.durationMs / 60000.0)
+                            val msg = "This import will use approximately %,.1f MB (%.1f minutes). Continue?"
+                                    .format(pf.estimatedTotalMB, minutes)
+                            AlertDialog.Builder(this)
+                                .setTitle("Large import")
+                                .setMessage(msg)
+                                .setPositiveButton("Continue") { _, _ -> proceed() }
+                                .setNegativeButton("Cancel", null)
+                                .show()
                         }
-                    }).start()
+                        else {
+                            proceed()
+                        }
+                    }
+                    else {
+                        Log.i(TAG, "Selected media (image): ${uri}")
+                        Thread({
+                            try {
+                                val imageId = ProcessImageOperation().processImage(this, uri)
+                                handler.post({
+                                    ViewImageActivity.startActivityWithImageId(this, imageId)
+                                })
+                            }
+                            catch (ex: Exception) {
+                                Log.w(TAG, "Error processing image", ex)
+                            }
+                        }).start()
+                    }
                 }
             }
         }
@@ -627,7 +698,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun convertExistingPicture(view: View) {
-        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
         this.startActivityForResult(intent, ACTIVITY_CHOOSE_PICTURE)
     }
 
