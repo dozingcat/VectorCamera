@@ -14,7 +14,8 @@ add_library(vectorcamera_native SHARED
     cartoon_effect_native.cpp
     convolve3x3_effect_native.cpp
     matrix_effect_native.cpp
-    ascii_effect.cpp)
+    ascii_effect.cpp
+    oil_painting_effect_native.cpp)
 
 # Set C++17 standard
 set_property(TARGET vectorcamera_native PROPERTY CXX_STANDARD 17)

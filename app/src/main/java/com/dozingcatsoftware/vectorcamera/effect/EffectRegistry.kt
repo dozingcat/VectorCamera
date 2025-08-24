@@ -382,6 +382,12 @@ class EffectRegistry {
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
 
+            // Oil Painting effect - optimized for real-time performance.
+        {prefsFn, context -> OilPaintingEffect.standard() },
+        {prefsFn, context -> OilPaintingEffect.subtle() },
+        {prefsFn, context -> OilPaintingEffect.heavy() },
+        {prefsFn, context -> OilPaintingEffect.impressionist() },
+
     // TODO: Customizable edge/solid effects.
     )
 
@@ -414,6 +420,7 @@ class EffectRegistry {
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
+            OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
