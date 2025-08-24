@@ -5,7 +5,6 @@
 #include <cstring>
 #include <thread>
 #include <vector>
-#include <unordered_map>
 
 #define LOG_TAG "OilPaintingEffectNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -93,7 +92,22 @@ int calculateAdaptiveBrushSize(
 }
 
 /**
- * Find the most dominant color in a circular neighborhood using efficient color counting.
+ * Fast hash function for quantized colors.
+ * Since colors are quantized, we can map them to a smaller space.
+ */
+FORCE_INLINE uint32_t hashQuantizedColor(uint32_t color) {
+    // Extract quantized RGB components (assume 8-step quantization = 32 levels)
+    // Take top 5 bits of each color channel for 15-bit hash (32K entries max)
+    uint32_t r = (color >> 19) & 0x1F;  // Red: bits 23-19
+    uint32_t g = (color >> 11) & 0x1F;  // Green: bits 15-11  
+    uint32_t b = (color >> 3) & 0x1F;   // Blue: bits 7-3
+    
+    return (r << 10) | (g << 5) | b;    // 15-bit hash: 5+5+5 bits
+}
+
+/**
+ * Ultra-fast dominant color detection using fixed array instead of hash map.
+ * This avoids expensive hash map operations and memory allocations.
  */
 uint32_t findDominantColorInRadius(
     const uint32_t* pixels,
@@ -103,36 +117,56 @@ uint32_t findDominantColorInRadius(
     int height,
     int radius
 ) {
-    std::unordered_map<uint32_t, int> colorCounts;
-    colorCounts.reserve(64); // Reserve space for common case
+    // Fixed array for color counting (32K entries for 15-bit hash)
+    // Use thread-local storage to avoid allocation overhead
+    static thread_local std::vector<uint16_t> colorCounts(32768, 0);
+    static thread_local std::vector<uint32_t> usedColors;
+    static thread_local std::vector<uint32_t> originalColors;
     
+    usedColors.clear();
+    originalColors.clear();
+    
+    uint32_t dominantColor = pixels[centerY * width + centerX];
+    int maxCount = 0;
     int radiusSquared = radius * radius;
     
-    // Sample pixels in circular area
-    for (int dy = -radius; dy <= radius; dy++) {
-        for (int dx = -radius; dx <= radius; dx++) {
-            int distanceSquared = dx * dx + dy * dy;
-            if (distanceSquared <= radiusSquared) {
-                int sampleX = centerX + dx;
-                int sampleY = centerY + dy;
-                
-                if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
-                    uint32_t samplePixel = pixels[sampleY * width + sampleX];
-                    colorCounts[samplePixel]++;
-                }
+    // Sample pixels in circular area with optimized bounds checking
+    int minY = std::max(-radius, -centerY);
+    int maxY = std::min(radius, height - 1 - centerY);
+    int minX = std::max(-radius, -centerX);
+    int maxX = std::min(radius, width - 1 - centerX);
+    
+    for (int dy = minY; dy <= maxY; dy++) {
+        int dySquared = dy * dy;
+        int maxDx = static_cast<int>(sqrt(radiusSquared - dySquared));
+        int clampedMinX = std::max(minX, -maxDx);
+        int clampedMaxX = std::min(maxX, maxDx);
+        
+        int rowOffset = (centerY + dy) * width;
+        
+        for (int dx = clampedMinX; dx <= clampedMaxX; dx++) {
+            int sampleX = centerX + dx;
+            uint32_t samplePixel = pixels[rowOffset + sampleX];
+            uint32_t colorHash = hashQuantizedColor(samplePixel);
+            
+            // Track first occurrence of this hash
+            if (colorCounts[colorHash] == 0) {
+                usedColors.push_back(colorHash);
+                originalColors.push_back(samplePixel);
+            }
+            
+            colorCounts[colorHash]++;
+            
+            if (colorCounts[colorHash] > maxCount) {
+                maxCount = colorCounts[colorHash];
+                dominantColor = samplePixel;
             }
         }
     }
     
-    // Find most frequent color
-    uint32_t dominantColor = pixels[centerY * width + centerX]; // fallback
-    int maxCount = 0;
-    
-    for (const auto& pair : colorCounts) {
-        if (pair.second > maxCount) {
-            maxCount = pair.second;
-            dominantColor = pair.first;
-        }
+    // Clear used entries for next pixel (much faster than clearing entire array)
+    for (uint32_t colorHash : usedColors) {
+        colorCounts[colorHash] = 0;
     }
     
     return dominantColor;

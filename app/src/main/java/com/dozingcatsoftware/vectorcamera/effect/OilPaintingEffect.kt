@@ -71,28 +71,66 @@ class OilPaintingEffect(
     }
 
     private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
-        val nativeThreads = calculateOptimalNativeThreads(height)
-        val kotlinThreads = calculateOptimalKotlinThreads(height)
-
-        // Try native implementation first
-        if (nativeLibraryLoaded) {
-            try {
-                val nativePixels = processImageNativeFromPlanes(
-                    yData, uData, vData, width, height, brushSize, levels, contrastSensitivity, nativeThreads
-                )
-                if (nativePixels != null) {
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
-                    return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
-                }
-            } catch (e: Exception) {
-                Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
-            }
-        }
+        // Scale down input image for better performance while maintaining quality
+        val (scaledWidth, scaledHeight, scaleFactor) = calculateOptimalSize(width, height)
         
-        // Fall back to Kotlin implementation
-        val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads)
-        return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+        val nativeThreads = calculateOptimalNativeThreads(scaledHeight)
+        val kotlinThreads = calculateOptimalKotlinThreads(scaledHeight)
+
+        // Process at scaled resolution if different from original
+        if (scaleFactor != 1.0f) {
+            Log.i(EFFECT_NAME, "Scaling input from ${width}x${height} to ${scaledWidth}x${scaledHeight} (factor: ${scaleFactor})")
+            val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
+            
+            // Try native implementation first
+            if (nativeLibraryLoaded) {
+                try {
+                    val nativePixels = processImageNativeFromPlanes(
+                        scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, brushSize, levels, contrastSensitivity, nativeThreads
+                    )
+                    if (nativePixels != null) {
+                        val scaledBitmap = Bitmap.createBitmap(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
+                        scaledBitmap.setPixels(nativePixels, 0, scaledWidth, 0, 0, scaledWidth, scaledHeight)
+                        
+                        // Scale back up to original size with smooth interpolation
+                        val finalBitmap = Bitmap.createScaledBitmap(scaledBitmap, width, height, true)
+                        scaledBitmap.recycle()
+                        
+                        return Triple(finalBitmap, nativeThreads, CodeArchitecture.Native)
+                    }
+                } catch (e: Exception) {
+                    Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
+                }
+            }
+            
+            // Fall back to Kotlin implementation with scaled data
+            val scaledKotlinBitmap = createBitmapFromPlanesKotlin(scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, kotlinThreads)
+            val finalBitmap = Bitmap.createScaledBitmap(scaledKotlinBitmap, width, height, true)
+            scaledKotlinBitmap.recycle()
+            
+            return Triple(finalBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+        } else {
+            // Process at original resolution
+            // Try native implementation first
+            if (nativeLibraryLoaded) {
+                try {
+                    val nativePixels = processImageNativeFromPlanes(
+                        yData, uData, vData, width, height, brushSize, levels, contrastSensitivity, nativeThreads
+                    )
+                    if (nativePixels != null) {
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
+                        return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
+                    }
+                } catch (e: Exception) {
+                    Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
+                }
+            }
+            
+            // Fall back to Kotlin implementation
+            val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads)
+            return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+        }
     }
     
     private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
@@ -105,6 +143,77 @@ class OilPaintingEffect(
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(oilPaintedPixels, 0, width, 0, 0, width, height)
         return bitmap
+    }
+
+    /**
+     * Calculate optimal processing size to keep largest dimension under 720 pixels
+     * for better performance while maintaining quality.
+     */
+    private fun calculateOptimalSize(width: Int, height: Int): Triple<Int, Int, Float> {
+        val maxDimension = 720
+        val currentMax = maxOf(width, height)
+        
+        if (currentMax <= maxDimension) {
+            // No scaling needed
+            return Triple(width, height, 1.0f)
+        }
+        
+        val scaleFactor = maxDimension.toFloat() / currentMax
+        val scaledWidth = (width * scaleFactor).roundToInt()
+        val scaledHeight = (height * scaleFactor).roundToInt()
+        
+        return Triple(scaledWidth, scaledHeight, scaleFactor)
+    }
+
+    /**
+     * Downsample YUV data to a smaller resolution using efficient sampling.
+     * Maintains aspect ratio and YUV 4:2:0 format.
+     */
+    private fun downsampleYuvData(
+        yData: ByteArray,
+        uData: ByteArray,
+        vData: ByteArray,
+        originalWidth: Int,
+        originalHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ): Triple<ByteArray, ByteArray, ByteArray> {
+        
+        val scaleX = originalWidth.toFloat() / targetWidth
+        val scaleY = originalHeight.toFloat() / targetHeight
+        
+        // Downsample Y plane
+        val scaledYData = ByteArray(targetWidth * targetHeight)
+        for (y in 0 until targetHeight) {
+            for (x in 0 until targetWidth) {
+                val srcX = (x * scaleX).roundToInt().coerceIn(0, originalWidth - 1)
+                val srcY = (y * scaleY).roundToInt().coerceIn(0, originalHeight - 1)
+                val srcIndex = srcY * originalWidth + srcX
+                val dstIndex = y * targetWidth + x
+                scaledYData[dstIndex] = yData[srcIndex]
+            }
+        }
+        
+        // Downsample U and V planes (half resolution of Y)
+        val targetUVWidth = (targetWidth + 1) / 2
+        val targetUVHeight = (targetHeight + 1) / 2
+        val originalUVWidth = (originalWidth + 1) / 2
+        
+        val scaledUData = ByteArray(targetUVWidth * targetUVHeight)
+        val scaledVData = ByteArray(targetUVWidth * targetUVHeight)
+        
+        for (y in 0 until targetUVHeight) {
+            for (x in 0 until targetUVWidth) {
+                val srcX = (x * scaleX).roundToInt().coerceIn(0, originalUVWidth - 1)
+                val srcY = (y * scaleY).roundToInt().coerceIn(0, (originalHeight + 1) / 2 - 1)
+                val srcIndex = srcY * originalUVWidth + srcX
+                val dstIndex = y * targetUVWidth + x
+                scaledUData[dstIndex] = uData[srcIndex]
+                scaledVData[dstIndex] = vData[srcIndex]
+            }
+        }
+        
+        return Triple(scaledYData, scaledUData, scaledVData)
     }
 
 
