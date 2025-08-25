@@ -14,6 +14,68 @@
 #define FORCE_INLINE __attribute__((always_inline)) inline
 
 /**
+ * Pre-computed brush pattern for different radii.
+ * Eliminates expensive distance calculations per pixel.
+ */
+struct BrushPattern {
+    std::vector<std::pair<int16_t, int16_t>> offsets;
+    int radius;
+    int pixelCount;
+};
+
+// Global brush pattern cache (thread-safe since read-only after initialization)
+static std::vector<BrushPattern> brushPatterns;
+static bool brushPatternsInitialized = false;
+
+/**
+ * Initialize pre-computed brush patterns for all possible radii.
+ * Called once at startup to avoid runtime overhead.
+ */
+void initializeBrushPatterns() {
+    if (brushPatternsInitialized) return;
+    
+    const int maxRadius = 20; // Support up to radius 20
+    brushPatterns.resize(maxRadius + 1);
+    
+    for (int radius = 0; radius <= maxRadius; radius++) {
+        BrushPattern& pattern = brushPatterns[radius];
+        pattern.radius = radius;
+        pattern.offsets.clear();
+        
+        if (radius == 0) {
+            // Special case: radius 0 means just the center pixel
+            pattern.offsets.push_back({0, 0});
+            pattern.pixelCount = 1;
+            continue;
+        }
+        
+        int radiusSquared = radius * radius;
+        
+        // Pre-compute all offsets within the circular brush
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                int distanceSquared = dx * dx + dy * dy;
+                if (distanceSquared <= radiusSquared) {
+                    pattern.offsets.push_back({static_cast<int16_t>(dx), static_cast<int16_t>(dy)});
+                }
+            }
+        }
+        
+        pattern.pixelCount = pattern.offsets.size();
+        
+        // Optimize for cache: sort offsets by memory access pattern (row-major order)
+        std::sort(pattern.offsets.begin(), pattern.offsets.end(), 
+                 [](const std::pair<int16_t, int16_t>& a, const std::pair<int16_t, int16_t>& b) {
+                     if (a.second != b.second) return a.second < b.second; // Sort by Y first
+                     return a.first < b.first; // Then by X
+                 });
+    }
+    
+    brushPatternsInitialized = true;
+    LOGI("Initialized brush patterns for radii 0-%d", maxRadius);
+}
+
+/**
  * Fast YUV to RGB conversion optimized for oil painting effect.
  */
 FORCE_INLINE uint32_t yuvToRgbQuantized(int y, int u, int v, int quantizationStep) {
@@ -106,8 +168,8 @@ FORCE_INLINE uint32_t hashQuantizedColor(uint32_t color) {
 }
 
 /**
- * Ultra-fast dominant color detection using fixed array instead of hash map.
- * This avoids expensive hash map operations and memory allocations.
+ * Ultra-fast dominant color detection using pre-computed brush patterns and fixed array.
+ * Eliminates distance calculations and optimizes memory access patterns.
  */
 uint32_t findDominantColorInRadius(
     const uint32_t* pixels,
@@ -117,42 +179,39 @@ uint32_t findDominantColorInRadius(
     int height,
     int radius
 ) {
+    // Ensure brush patterns are initialized
+    if (!brushPatternsInitialized) {
+        initializeBrushPatterns();
+    }
+    
+    // Clamp radius to supported range
+    radius = std::max(0, std::min(radius, static_cast<int>(brushPatterns.size()) - 1));
+    
     // Fixed array for color counting (32K entries for 15-bit hash)
     // Use thread-local storage to avoid allocation overhead
     static thread_local std::vector<uint16_t> colorCounts(32768, 0);
     static thread_local std::vector<uint32_t> usedColors;
-    static thread_local std::vector<uint32_t> originalColors;
     
     usedColors.clear();
-    originalColors.clear();
     
     uint32_t dominantColor = pixels[centerY * width + centerX];
     int maxCount = 0;
-    int radiusSquared = radius * radius;
     
-    // Sample pixels in circular area with optimized bounds checking
-    int minY = std::max(-radius, -centerY);
-    int maxY = std::min(radius, height - 1 - centerY);
-    int minX = std::max(-radius, -centerX);
-    int maxX = std::min(radius, width - 1 - centerX);
+    // Use pre-computed brush pattern - no distance calculations needed!
+    const BrushPattern& pattern = brushPatterns[radius];
     
-    for (int dy = minY; dy <= maxY; dy++) {
-        int dySquared = dy * dy;
-        int maxDx = static_cast<int>(sqrt(radiusSquared - dySquared));
-        int clampedMinX = std::max(minX, -maxDx);
-        int clampedMaxX = std::min(maxX, maxDx);
+    for (const auto& offset : pattern.offsets) {
+        int sampleX = centerX + offset.first;
+        int sampleY = centerY + offset.second;
         
-        int rowOffset = (centerY + dy) * width;
-        
-        for (int dx = clampedMinX; dx <= clampedMaxX; dx++) {
-            int sampleX = centerX + dx;
-            uint32_t samplePixel = pixels[rowOffset + sampleX];
+        // Bounds check - optimized for common case where most samples are valid
+        if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+            uint32_t samplePixel = pixels[sampleY * width + sampleX];
             uint32_t colorHash = hashQuantizedColor(samplePixel);
             
             // Track first occurrence of this hash
             if (colorCounts[colorHash] == 0) {
                 usedColors.push_back(colorHash);
-                originalColors.push_back(samplePixel);
             }
             
             colorCounts[colorHash]++;
@@ -270,6 +329,9 @@ Java_com_dozingcatsoftware_vectorcamera_effect_OilPaintingEffect_00024Companion_
     }
     
     try {
+        // Initialize brush patterns on first use
+        initializeBrushPatterns();
+        
         if (numThreads == 1) {
             // Single-threaded processing
             processOilPaintingRows(
