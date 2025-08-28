@@ -16,11 +16,13 @@
 /**
  * Pre-computed brush pattern for different radii.
  * Eliminates expensive distance calculations per pixel.
+ * Supports incremental updates when sliding horizontally.
  */
 struct BrushPattern {
     std::vector<std::pair<int16_t, int16_t>> offsets;
-    int radius;
-    int pixelCount;
+    // Incremental update patterns for horizontal sliding
+    std::vector<std::pair<int16_t, int16_t>> leftEdgeToRemove;   // Pixels to remove when moving right
+    std::vector<std::pair<int16_t, int16_t>> rightEdgeToAdd;  // Pixels to add when moving right
 };
 
 // Global brush pattern cache (thread-safe since read-only after initialization)
@@ -39,13 +41,11 @@ void initializeBrushPatterns() {
     
     for (int radius = 0; radius <= maxRadius; radius++) {
         BrushPattern& pattern = brushPatterns[radius];
-        pattern.radius = radius;
         pattern.offsets.clear();
         
         if (radius == 0) {
             // Special case: radius 0 means just the center pixel
-            pattern.offsets.push_back({0, 0});
-            pattern.pixelCount = 1;
+            pattern.offsets.emplace_back(0, 0);
             continue;
         }
         
@@ -56,12 +56,10 @@ void initializeBrushPatterns() {
             for (int dx = -radius; dx <= radius; dx++) {
                 int distanceSquared = dx * dx + dy * dy;
                 if (distanceSquared <= radiusSquared) {
-                    pattern.offsets.push_back({static_cast<int16_t>(dx), static_cast<int16_t>(dy)});
+                    pattern.offsets.emplace_back(static_cast<int16_t>(dx), static_cast<int16_t>(dy));
                 }
             }
         }
-        
-        pattern.pixelCount = pattern.offsets.size();
         
         // Optimize for cache: sort offsets by memory access pattern (row-major order)
         std::sort(pattern.offsets.begin(), pattern.offsets.end(), 
@@ -69,10 +67,33 @@ void initializeBrushPatterns() {
                      if (a.second != b.second) return a.second < b.second; // Sort by Y first
                      return a.first < b.first; // Then by X
                  });
+        
+        // Compute incremental update patterns for horizontal sliding
+        pattern.leftEdgeToRemove.clear();
+        pattern.rightEdgeToAdd.clear();
+        
+        if (radius > 0) {
+            for (const auto &p : pattern.offsets) {
+                int dx = p.first;
+                int dy = p.second;
+                // If going left one pixel would put this point outside the radius,
+                // the left-shifted point should be removed when sliding right.
+                int leftDistanceSquared = (dx - 1) * (dx - 1) + dy * dy;
+                if (leftDistanceSquared > radiusSquared) {
+                    pattern.leftEdgeToRemove.emplace_back(dx - 1, dy);
+                }
+                // If going right one pixel would put this point outside the radius,
+                // it's on the right edge and should be added when sliding right.
+                int rightDistanceSquared = (dx + 1) * (dx + 1) + dy * dy;
+                if (rightDistanceSquared > radiusSquared) {
+                    pattern.rightEdgeToAdd.emplace_back(dx, dy);
+                }
+            }
+        }
     }
     
     brushPatternsInitialized = true;
-    LOGI("Initialized brush patterns for radii 0-%d", maxRadius);
+    LOGI("Initialized brush patterns for radii 0-%d with incremental updates", maxRadius);
 }
 
 /**
@@ -167,65 +188,106 @@ FORCE_INLINE uint32_t hashQuantizedColor(uint32_t color) {
     return (r << 10) | (g << 5) | b;    // 15-bit hash: 5+5+5 bits
 }
 
+enum ColorCountUpdateType {Full, Incremental};
+
 /**
- * Ultra-fast dominant color detection using pre-computed brush patterns and fixed array.
- * Eliminates distance calculations and optimizes memory access patterns.
+ * Incrementally update color counts when sliding brush horizontally.
+ * Much faster than recalculating entire brush area.
  */
-uint32_t findDominantColorInRadius(
+void updateColorCounts(
     const uint32_t* pixels,
     int centerX,
     int centerY,
     int width,
     int height,
-    int radius
+    int radius,
+    std::vector<uint16_t>& colorCounts,
+    std::vector<uint32_t>& usedColors,
+    std::vector<uint32_t>& colorSamples,
+    ColorCountUpdateType updateType
 ) {
-    // Ensure brush patterns are initialized
     if (!brushPatternsInitialized) {
         initializeBrushPatterns();
     }
     
-    // Clamp radius to supported range
     radius = std::max(0, std::min(radius, static_cast<int>(brushPatterns.size()) - 1));
-    
-    // Fixed array for color counting (32K entries for 15-bit hash)
-    // Use thread-local storage to avoid allocation overhead
-    static thread_local std::vector<uint16_t> colorCounts(32768, 0);
-    static thread_local std::vector<uint32_t> usedColors;
-    
-    usedColors.clear();
-    
-    uint32_t dominantColor = pixels[centerY * width + centerX];
-    int maxCount = 0;
-    
-    // Use pre-computed brush pattern - no distance calculations needed!
     const BrushPattern& pattern = brushPatterns[radius];
     
-    for (const auto& offset : pattern.offsets) {
-        int sampleX = centerX + offset.first;
-        int sampleY = centerY + offset.second;
+    if (updateType == ColorCountUpdateType::Full) {
+        // Initialize with full brush pattern
+        usedColors.clear();
+        colorSamples.clear();
         
-        // Bounds check - optimized for common case where most samples are valid
-        if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
-            uint32_t samplePixel = pixels[sampleY * width + sampleX];
-            uint32_t colorHash = hashQuantizedColor(samplePixel);
+        for (const auto& offset : pattern.offsets) {
+            int sampleX = centerX + offset.first;
+            int sampleY = centerY + offset.second;
             
-            // Track first occurrence of this hash
-            if (colorCounts[colorHash] == 0) {
-                usedColors.push_back(colorHash);
+            if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+                uint32_t samplePixel = pixels[sampleY * width + sampleX];
+                uint32_t colorHash = hashQuantizedColor(samplePixel);
+                
+                if (colorCounts[colorHash] == 0) {
+                    usedColors.push_back(colorHash);
+                    colorSamples.push_back(samplePixel);
+                }
+                colorCounts[colorHash]++;
             }
+        }
+    } else {
+        // Remove left edge pixels
+        for (const auto& offset : pattern.leftEdgeToRemove) {
+            int sampleX = centerX + offset.first;
+            int sampleY = centerY + offset.second;
             
-            colorCounts[colorHash]++;
+            if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+                uint32_t samplePixel = pixels[sampleY * width + sampleX];
+                uint32_t colorHash = hashQuantizedColor(samplePixel);
+                
+                if (colorCounts[colorHash] > 0) {
+                    colorCounts[colorHash]--;
+                }
+            }
+        }
+        
+        // Add right edge pixels
+        for (const auto& offset : pattern.rightEdgeToAdd) {
+            int sampleX = centerX + offset.first;
+            int sampleY = centerY + offset.second;
             
-            if (colorCounts[colorHash] > maxCount) {
-                maxCount = colorCounts[colorHash];
-                dominantColor = samplePixel;
+            if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+                uint32_t samplePixel = pixels[sampleY * width + sampleX];
+                uint32_t colorHash = hashQuantizedColor(samplePixel);
+                
+                if (colorCounts[colorHash] == 0) {
+                    usedColors.push_back(colorHash);
+                    colorSamples.push_back(samplePixel);
+                }
+                colorCounts[colorHash]++;
             }
         }
     }
+}
+
+/**
+ * Find dominant color using current color counts (after incremental update).
+ * Also maintains a mapping from hash to actual color.
+ */
+uint32_t findDominantColorFromCounts(
+    const std::vector<uint16_t>& colorCounts,
+    const std::vector<uint32_t>& usedColors,
+    const std::vector<uint32_t>& colorSamples,
+    uint32_t fallbackColor
+) {
+    uint32_t dominantColor = fallbackColor;
+    int maxCount = 0;
     
-    // Clear used entries for next pixel (much faster than clearing entire array)
-    for (uint32_t colorHash : usedColors) {
-        colorCounts[colorHash] = 0;
+    // Find color with highest count
+    for (size_t i = 0; i < usedColors.size(); i++) {
+        uint32_t colorHash = usedColors[i];
+        if (colorCounts[colorHash] > maxCount) {
+            maxCount = colorCounts[colorHash];
+            dominantColor = colorSamples[i]; // Use stored sample
+        }
     }
     
     return dominantColor;
@@ -271,8 +333,22 @@ void processOilPaintingRows(
         }
     }
     
-    // Second pass: Apply oil painting effect
+    // Thread-local storage for incremental updates
+    std::vector<uint16_t> colorCounts(32768, 0);
+    std::vector<uint32_t> usedColors;
+    std::vector<uint32_t> colorSamples;
+    
+    // Second pass: Apply oil painting effect with incremental brush sliding
     for (int y = startRow; y < endRow; y++) {
+        // Clear color counts at start of each row
+        for (uint32_t colorHash : usedColors) {
+            colorCounts[colorHash] = 0;
+        }
+        usedColors.clear();
+        colorSamples.clear();
+        
+        int previousBrushSize = -1;
+        
         for (int x = 0; x < width; x++) {
             int pixelIndex = y * width + x;
             
@@ -281,12 +357,37 @@ void processOilPaintingRows(
                 rgbPixels.data(), x, y, width, height, brushSize, contrastSensitivity
             );
             
-            // Find dominant color in circular neighborhood
-            uint32_t dominantColor = findDominantColorInRadius(
-                rgbPixels.data(), x, y, width, height, localBrushSize
+            // Use incremental updates if brush size hasn't changed
+            if (localBrushSize == previousBrushSize && x > 0) {
+                // Incremental update: slide brush horizontally
+                updateColorCounts(
+                        rgbPixels.data(), x, y, width, height, localBrushSize,
+                        colorCounts, usedColors, colorSamples, ColorCountUpdateType::Incremental
+                );
+            } else {
+                // Full recalculation: brush size changed or first pixel in row
+                if (previousBrushSize != -1) {
+                    // Clear previous brush data
+                    for (uint32_t colorHash : usedColors) {
+                        colorCounts[colorHash] = 0;
+                    }
+                    usedColors.clear();
+                    colorSamples.clear();
+                }
+
+                updateColorCounts(
+                        rgbPixels.data(), x, y, width, height, localBrushSize,
+                        colorCounts, usedColors, colorSamples, ColorCountUpdateType::Full
+                );
+            }
+            
+            // Find dominant color using current counts
+            uint32_t dominantColor = findDominantColorFromCounts(
+                colorCounts, usedColors, colorSamples, rgbPixels[pixelIndex]
             );
             
             outputPixels[pixelIndex] = dominantColor;
+            previousBrushSize = localBrushSize;
         }
     }
 }

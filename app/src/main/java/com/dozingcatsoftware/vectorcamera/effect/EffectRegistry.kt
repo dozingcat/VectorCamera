@@ -369,6 +369,11 @@ class EffectRegistry {
                         )
                 ))
             },
+        
+            // Oil Painting effect.
+            {prefsFn, context -> OilPaintingEffect.standard() },
+            {prefsFn, context -> OilPaintingEffect.impressionist() },
+
             // Custom edge.
             {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom1",
@@ -381,14 +386,6 @@ class EffectRegistry {
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
-
-            // Oil Painting effect - optimized for real-time performance.
-        {prefsFn, context -> OilPaintingEffect.standard() },
-        {prefsFn, context -> OilPaintingEffect.subtle() },
-        {prefsFn, context -> OilPaintingEffect.heavy() },
-        {prefsFn, context -> OilPaintingEffect.impressionist() },
-
-    // TODO: Customizable edge/solid effects.
     )
 
     fun defaultEffectCount() = baseEffects.size
@@ -421,6 +418,7 @@ class EffectRegistry {
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
+            NeonEffect.EFFECT_NAME -> NeonEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
