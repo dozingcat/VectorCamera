@@ -369,6 +369,10 @@ class EffectRegistry {
                         )
                 ))
             },
+        
+            {prefsFn, context -> OilPaintingEffect.standard() },
+            {prefsFn, context -> OilPaintingEffect.impressionist() },
+
             // Custom edge.
             {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom1",
@@ -381,8 +385,6 @@ class EffectRegistry {
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
-
-    // TODO: Customizable edge/solid effects.
     )
 
     fun defaultEffectCount() = baseEffects.size
@@ -414,6 +416,7 @@ class EffectRegistry {
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
+            OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
