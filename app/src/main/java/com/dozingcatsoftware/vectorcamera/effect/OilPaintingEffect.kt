@@ -478,7 +478,7 @@ class OilPaintingEffect(
         init {
             try {
                 System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = false
+                nativeLibraryLoaded = true
             } catch (e: UnsatisfiedLinkError) {
                 Log.w(EFFECT_NAME, "Failed to load native library, using Kotlin implementation: ${e.message}")
                 nativeLibraryLoaded = false
