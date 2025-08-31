@@ -5,6 +5,7 @@
 #include <cstring>
 #include <thread>
 #include <vector>
+#include "yuv.h"
 
 #define LOG_TAG "OilPaintingEffectNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -61,13 +62,6 @@ void initializeBrushPatterns() {
             }
         }
         
-        // Optimize for cache: sort offsets by memory access pattern (row-major order)
-        std::sort(pattern.offsets.begin(), pattern.offsets.end(), 
-                 [](const std::pair<int16_t, int16_t>& a, const std::pair<int16_t, int16_t>& b) {
-                     if (a.second != b.second) return a.second < b.second; // Sort by Y first
-                     return a.first < b.first; // Then by X
-                 });
-        
         // Compute incremental update patterns for horizontal sliding
         pattern.leftEdgeToRemove.clear();
         pattern.rightEdgeToAdd.clear();
@@ -100,16 +94,11 @@ void initializeBrushPatterns() {
  * Fast YUV to RGB conversion optimized for oil painting effect.
  */
 FORCE_INLINE uint32_t yuvToRgbQuantized(int y, int u, int v, int quantizationStep) {
-    // Convert YUV to RGB using integer arithmetic
-    int r = y + ((359 * (v - 128)) >> 8);
-    int g = y - ((88 * (u - 128) + 183 * (v - 128)) >> 8);
-    int b = y + ((454 * (u - 128)) >> 8);
-    
-    // Clamp values
-    r = std::max(0, std::min(255, r));
-    g = std::max(0, std::min(255, g));
-    b = std::max(0, std::min(255, b));
-    
+    uint32_t rgb = YuvUtils::yuvToRgbFixed(y, u, v);
+    uint32_t r = rgb >> 16;
+    uint32_t g = (rgb >> 8) & 0xFF;
+    uint32_t b = rgb & 0xFF;
+
     // Quantize colors for oil painting effect
     r = (r / quantizationStep) * quantizationStep;
     g = (g / quantizationStep) * quantizationStep;
@@ -122,9 +111,9 @@ FORCE_INLINE uint32_t yuvToRgbQuantized(int y, int u, int v, int quantizationSte
  * Calculate brightness for contrast analysis.
  */
 FORCE_INLINE double calculateBrightness(uint32_t pixel) {
-    int r = (pixel >> 16) & 0xFF;
-    int g = (pixel >> 8) & 0xFF;
-    int b = pixel & 0xFF;
+    uint32_t r = (pixel >> 16) & 0xFF;
+    uint32_t g = (pixel >> 8) & 0xFF;
+    uint32_t b = pixel & 0xFF;
     return r * 0.299 + g * 0.587 + b * 0.114;
 }
 
@@ -214,10 +203,6 @@ void updateColorCounts(
     const BrushPattern& pattern = brushPatterns[radius];
     
     if (updateType == ColorCountUpdateType::Full) {
-        // Initialize with full brush pattern
-        usedColors.clear();
-        colorSamples.clear();
-        
         for (const auto& offset : pattern.offsets) {
             int sampleX = centerX + offset.first;
             int sampleY = centerY + offset.second;
@@ -234,7 +219,7 @@ void updateColorCounts(
             }
         }
     } else {
-        // Remove left edge pixels
+        // Remove left edge pixels.
         for (const auto& offset : pattern.leftEdgeToRemove) {
             int sampleX = centerX + offset.first;
             int sampleY = centerY + offset.second;
@@ -249,7 +234,7 @@ void updateColorCounts(
             }
         }
         
-        // Add right edge pixels
+        // Add right edge pixels.
         for (const auto& offset : pattern.rightEdgeToAdd) {
             int sampleX = centerX + offset.first;
             int sampleY = centerY + offset.second;
@@ -481,9 +466,8 @@ Java_com_dozingcatsoftware_vectorcamera_effect_OilPaintingEffect_00024Companion_
                 thread.join();
             }
         }
-        
-        LOGI("Oil painting effect processed successfully: %dx%d, brush=%d, levels=%d, threads=%d", 
-             width, height, brushSize, levels, numThreads);
+//        LOGI("Oil painting effect processed successfully: %dx%d, brush=%d, levels=%d, threads=%d",
+//             width, height, brushSize, levels, numThreads);
         
     } catch (const std::exception& e) {
         LOGE("Exception during oil painting processing: %s", e.what());

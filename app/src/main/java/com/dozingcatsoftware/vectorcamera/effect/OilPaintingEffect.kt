@@ -3,15 +3,13 @@ package com.dozingcatsoftware.vectorcamera.effect
 import android.graphics.*
 import android.util.Log
 import com.dozingcatsoftware.util.YuvUtils
+import com.dozingcatsoftware.util.resizeImageBytes
 import com.dozingcatsoftware.vectorcamera.*
 import kotlinx.coroutines.*
 import kotlin.math.*
 
 /**
- * Oil Painting Effect that creates a painterly appearance by averaging colors
- * in circular neighborhoods of varying sizes based on local image characteristics.
- * 
- * The effect simulates oil painting brush strokes by:
+ * This effect simulates oil painting brush strokes by:
  * 1. Analyzing local contrast to determine brush size
  * 2. Finding the most dominant color in circular neighborhoods
  * 3. Applying the dominant color with slight variations for texture
@@ -49,20 +47,11 @@ class OilPaintingEffect(
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    /**
-     * Calculate the optimal number of threads for native processing based on image dimensions.
-     */
     private fun calculateOptimalNativeThreads(height: Int): Int {
+        // More threads don't seem to help in C++.
         return 1
-        val numCores = Runtime.getRuntime().availableProcessors()
-        val minRowsPerThread = 64 // Larger minimum due to complex per-pixel operations
-        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
-        return maxOf(1, maxThreads)
     }
 
-    /**
-     * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
-     */
     private fun calculateOptimalKotlinThreads(height: Int): Int {
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 64 // Larger minimum due to complex per-pixel operations
@@ -73,69 +62,33 @@ class OilPaintingEffect(
     private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         // Scale down input image for better performance while maintaining quality
         val (scaledWidth, scaledHeight, scaleFactor) = calculateOptimalSize(width, height)
-        
-        val nativeThreads = calculateOptimalNativeThreads(scaledHeight)
-        val kotlinThreads = calculateOptimalKotlinThreads(scaledHeight)
+        val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
 
-        // Process at scaled resolution if different from original
-        if (scaleFactor != 1.0f) {
-            Log.i(EFFECT_NAME, "Scaling input from ${width}x${height} to ${scaledWidth}x${scaledHeight} (factor: ${scaleFactor})")
-            val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
-            
-            // Try native implementation first
-            if (nativeLibraryLoaded) {
-                try {
-                    val nativePixels = processImageNativeFromPlanes(
-                        scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, brushSize, levels, contrastSensitivity, nativeThreads
-                    )
-                    if (nativePixels != null) {
-                        val scaledBitmap = Bitmap.createBitmap(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
-                        scaledBitmap.setPixels(nativePixels, 0, scaledWidth, 0, 0, scaledWidth, scaledHeight)
-                        
-                        // Scale back up to original size with smooth interpolation
-                        val finalBitmap = Bitmap.createScaledBitmap(scaledBitmap, width, height, true)
-                        scaledBitmap.recycle()
-                        
-                        return Triple(finalBitmap, nativeThreads, CodeArchitecture.Native)
-                    }
-                } catch (e: Exception) {
-                    Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
+        if (nativeLibraryLoaded) {
+            val nativeThreads = calculateOptimalNativeThreads(scaledHeight)
+            try {
+                val nativePixels = processImageNativeFromPlanes(
+                    scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, brushSize, levels, contrastSensitivity, nativeThreads
+                )
+                if (nativePixels != null) {
+                    val resultBitmap = Bitmap.createBitmap(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
+                    resultBitmap.setPixels(nativePixels, 0, scaledWidth, 0, 0, scaledWidth, scaledHeight)
+                    return Triple(resultBitmap, nativeThreads, CodeArchitecture.Native)
                 }
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
             }
-            
-            // Fall back to Kotlin implementation with scaled data
-            val scaledKotlinBitmap = createBitmapFromPlanesKotlin(scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, kotlinThreads)
-            val finalBitmap = Bitmap.createScaledBitmap(scaledKotlinBitmap, width, height, true)
-            scaledKotlinBitmap.recycle()
-            
-            return Triple(finalBitmap, kotlinThreads, CodeArchitecture.Kotlin)
-        } else {
-            // Process at original resolution
-            // Try native implementation first
-            if (nativeLibraryLoaded) {
-                try {
-                    val nativePixels = processImageNativeFromPlanes(
-                        yData, uData, vData, width, height, brushSize, levels, contrastSensitivity, nativeThreads
-                    )
-                    if (nativePixels != null) {
-                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
-                        return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
-                    }
-                } catch (e: Exception) {
-                    Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
-                }
-            }
-            
-            // Fall back to Kotlin implementation
-            val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads)
-            return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
         }
+
+        // Fall back to Kotlin implementation with scaled data
+        val kotlinThreads = calculateOptimalKotlinThreads(scaledHeight)
+        val resultBitmap = createBitmapFromPlanesKotlin(scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, kotlinThreads)
+        return Triple(resultBitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
     private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
         // First pass: Convert YUV to RGB and quantize colors
-        val rgbPixels = convertYuvToRgbQuantized(yData, uData, vData, width, height, numThreads)
+        val rgbPixels = convertYuvToRgbQuantized(yData, uData, vData, width, height)
         
         // Second pass: Apply oil painting effect
         val oilPaintedPixels = applyOilPaintingEffect(rgbPixels, width, height, numThreads)
@@ -178,45 +131,20 @@ class OilPaintingEffect(
         targetWidth: Int,
         targetHeight: Int
     ): Triple<ByteArray, ByteArray, ByteArray> {
-        
-        val scaleX = originalWidth.toFloat() / targetWidth
-        val scaleY = originalHeight.toFloat() / targetHeight
-        
-        // Downsample Y plane
-        val scaledYData = ByteArray(targetWidth * targetHeight)
-        for (y in 0 until targetHeight) {
-            for (x in 0 until targetWidth) {
-                val srcX = (x * scaleX).roundToInt().coerceIn(0, originalWidth - 1)
-                val srcY = (y * scaleY).roundToInt().coerceIn(0, originalHeight - 1)
-                val srcIndex = srcY * originalWidth + srcX
-                val dstIndex = y * targetWidth + x
-                scaledYData[dstIndex] = yData[srcIndex]
-            }
+        if (originalWidth == targetWidth && originalHeight == targetHeight) {
+            return Triple(yData, uData, vData)
         }
-        
-        // Downsample U and V planes (half resolution of Y)
         val targetUVWidth = (targetWidth + 1) / 2
         val targetUVHeight = (targetHeight + 1) / 2
         val originalUVWidth = (originalWidth + 1) / 2
-        
-        val scaledUData = ByteArray(targetUVWidth * targetUVHeight)
-        val scaledVData = ByteArray(targetUVWidth * targetUVHeight)
-        
-        for (y in 0 until targetUVHeight) {
-            for (x in 0 until targetUVWidth) {
-                val srcX = (x * scaleX).roundToInt().coerceIn(0, originalUVWidth - 1)
-                val srcY = (y * scaleY).roundToInt().coerceIn(0, (originalHeight + 1) / 2 - 1)
-                val srcIndex = srcY * originalUVWidth + srcX
-                val dstIndex = y * targetUVWidth + x
-                scaledUData[dstIndex] = uData[srcIndex]
-                scaledVData[dstIndex] = vData[srcIndex]
-            }
-        }
-        
+        val originalUVHeight = (originalHeight + 1) / 2
+
+        val scaledYData = resizeImageBytes(yData, originalWidth, originalHeight, targetWidth, targetHeight)
+        val scaledUData = resizeImageBytes(uData, originalUVWidth, originalUVHeight, targetUVWidth, targetUVHeight)
+        val scaledVData = resizeImageBytes(vData, originalUVWidth, originalUVHeight, targetUVWidth, targetUVHeight)
+
         return Triple(scaledYData, scaledUData, scaledVData)
     }
-
-
 
     /**
      * Convert YUV to RGB with color quantization for oil painting look
@@ -226,35 +154,14 @@ class OilPaintingEffect(
         uData: ByteArray,
         vData: ByteArray,
         width: Int,
-        height: Int,
-        numThreads: Int
+        height: Int
     ): IntArray {
         val uvWidth = (width + 1) / 2
         val pixels = IntArray(width * height)
         val quantizationStep = 256 / levels
 
-        // Multi-threaded processing
-        if (numThreads == 1) {
-            processYuvToRgbRows(0, height, width, height, yData, uData, vData, uvWidth, pixels, quantizationStep)
-        } else {
-            runBlocking {
-                val jobs = mutableListOf<Job>()
-                val rowsPerThread = height / numThreads
-                
-                for (threadIndex in 0 until numThreads) {
-                    val startY = threadIndex * rowsPerThread
-                    val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
-                    
-                    val job = launch(Dispatchers.Default) {
-                        processYuvToRgbRows(startY, endY, width, height, yData, uData, vData, uvWidth, pixels, quantizationStep)
-                    }
-                    jobs.add(job)
-                }
-                
-                jobs.forEach { it.join() }
-            }
-        }
-
+        // Could use threads here but probably not worth it.
+        processYuvToRgbRows(0, height, width, height, yData, uData, vData, uvWidth, pixels, quantizationStep)
         return pixels
     }
 
@@ -344,19 +251,51 @@ class OilPaintingEffect(
         sourcePixels: IntArray,
         resultPixels: IntArray
     ) {
+        // Thread-local storage for incremental updates
+        val colorCounts = mutableMapOf<Int, Int>()
+        
         for (y in startY until endY) {
+            // Clear color counts at start of each row
+            colorCounts.clear()
+            var previousBrushSize = -1
+            
             for (x in 0 until width) {
                 val pixelIndex = y * width + x
                 
                 // Calculate adaptive brush size based on local contrast
                 val localBrushSize = calculateAdaptiveBrushSize(sourcePixels, x, y, width, height)
                 
-                // Find dominant color in circular neighborhood
-                val dominantColor = findDominantColorInRadius(sourcePixels, x, y, width, height, localBrushSize)
+                // Use incremental updates if brush size hasn't changed
+                if (localBrushSize == previousBrushSize && x > 0) {
+                    // Incremental update: slide brush horizontally
+                    updateColorCounts(
+                        sourcePixels, x, y, width, height, localBrushSize,
+                        colorCounts, ColorCountUpdateType.Incremental
+                    )
+                } else {
+                    // Full recalculation: brush size changed or first pixel in row
+                    updateColorCounts(
+                        sourcePixels, x, y, width, height, localBrushSize,
+                        colorCounts, ColorCountUpdateType.Full
+                    )
+                }
+                
+                // Find dominant color using current counts
+                val dominantColor = findDominantColorFromCounts(
+                    colorCounts, sourcePixels[pixelIndex]
+                )
                 
                 resultPixels[pixelIndex] = dominantColor
+                previousBrushSize = localBrushSize
             }
         }
+    }
+
+    private fun brightnessForRgb(rgb: Int): Double {
+        val r = (rgb shr 16) and 0xFF
+        val g = (rgb shr 8) and 0xFF
+        val b = rgb and 0xFF
+        return r * 0.299 + g * 0.587 + b * 0.114
     }
 
     /**
@@ -374,7 +313,7 @@ class OilPaintingEffect(
         var sampleCount = 0
 
         val centerPixel = pixels[centerY * width + centerX]
-        val centerBrightness = Color.red(centerPixel) * 0.299 + Color.green(centerPixel) * 0.587 + Color.blue(centerPixel) * 0.114
+        val centerBrightness = brightnessForRgb(centerPixel)
 
         // Sample surrounding pixels to measure local contrast
         for (dy in -sampleRadius..sampleRadius) {
@@ -384,7 +323,7 @@ class OilPaintingEffect(
                 
                 if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
                     val samplePixel = pixels[sampleY * width + sampleX]
-                    val sampleBrightness = Color.red(samplePixel) * 0.299 + Color.green(samplePixel) * 0.587 + Color.blue(samplePixel) * 0.114
+                    val sampleBrightness = brightnessForRgb(samplePixel)
                     
                     val diff = abs(sampleBrightness - centerBrightness)
                     totalVariance += diff * diff
@@ -401,42 +340,137 @@ class OilPaintingEffect(
         return (brushSize * adaptiveFactor).roundToInt().coerceIn(2, brushSize)
     }
 
+    enum class ColorCountUpdateType {Full, Incremental};
+
     /**
-     * Find the most dominant color in a circular neighborhood
+     * Incrementally update color counts when sliding brush horizontally
      */
-    private fun findDominantColorInRadius(
+    private fun updateColorCounts(
         pixels: IntArray,
         centerX: Int,
         centerY: Int,
         width: Int,
         height: Int,
-        radius: Int
-    ): Int {
-        val colorCounts = mutableMapOf<Int, Int>()
-        val radiusSquared = radius * radius
-
-        // Sample pixels in circular area
-        for (dy in -radius..radius) {
-            for (dx in -radius..radius) {
-                val distanceSquared = dx * dx + dy * dy
-                if (distanceSquared <= radiusSquared) {
-                    val sampleX = centerX + dx
-                    val sampleY = centerY + dy
-                    
-                    if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
-                        val samplePixel = pixels[sampleY * width + sampleX]
-                        colorCounts[samplePixel] = colorCounts.getOrDefault(samplePixel, 0) + 1
+        radius: Int,
+        colorCounts: MutableMap<Int, Int>,
+        updateType: ColorCountUpdateType
+    ) {
+        val pattern = getBrushPattern(radius)
+        
+        if (updateType == ColorCountUpdateType.Full) {
+            // Initialize with full brush pattern
+            colorCounts.clear()
+            for ((dx, dy) in pattern.offsets) {
+                val sampleX = centerX + dx
+                val sampleY = centerY + dy
+                
+                if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+                    val samplePixel = pixels[sampleY * width + sampleX]
+                    colorCounts[samplePixel] = colorCounts.getOrElse(samplePixel, {0}) + 1
+                }
+            }
+        } else {
+            // Remove left edge pixels
+            for ((dx, dy) in pattern.leftEdgeToRemove) {
+                val sampleX = centerX + dx
+                val sampleY = centerY + dy
+                
+                if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+                    val samplePixel = pixels[sampleY * width + sampleX]
+                    val currentCount = colorCounts.getOrElse(samplePixel, {0})
+                    if (currentCount > 1) {
+                        colorCounts[samplePixel] = currentCount - 1
+                    } else {
+                        colorCounts.remove(samplePixel)
                     }
                 }
             }
+            
+            // Add right edge pixels
+            for ((dx, dy) in pattern.rightEdgeToAdd) {
+                val sampleX = centerX + dx
+                val sampleY = centerY + dy
+                
+                if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+                    val samplePixel = pixels[sampleY * width + sampleX]
+                    colorCounts[samplePixel] = colorCounts.getOrElse(samplePixel, {0}) + 1
+                }
+            }
         }
-
-        // Find most frequent color
-        return colorCounts.maxByOrNull { it.value }?.key ?: pixels[centerY * width + centerX]
     }
-
+    
+    /**
+     * Find dominant color using current color counts (after incremental update)
+     */
+    private fun findDominantColorFromCounts(
+        colorCounts: Map<Int, Int>,
+        fallbackColor: Int
+    ): Int {
+        return colorCounts.maxByOrNull { it.value }?.key ?: fallbackColor
+    }
+    
+    /**
+     * Pre-computed brush pattern for incremental sliding optimization
+     */
+    private data class BrushPattern(
+        val offsets: List<Pair<Int, Int>>,
+        val leftEdgeToRemove: List<Pair<Int, Int>>,
+        val rightEdgeToAdd: List<Pair<Int, Int>>
+    )
+    
     companion object {
         const val EFFECT_NAME = "oil_painting"
+        
+        // Cache of pre-computed brush patterns for different radii
+        private val brushPatterns = mutableMapOf<Int, BrushPattern>()
+        
+        /**
+         * Initialize brush pattern for a given radius with incremental update patterns
+         */
+        private fun getBrushPattern(radius: Int): BrushPattern {
+            return brushPatterns.getOrPut(radius) {
+                if (radius == 0) {
+                    BrushPattern(
+                        offsets = listOf(Pair(0, 0)),
+                        leftEdgeToRemove = emptyList(),
+                        rightEdgeToAdd = emptyList()
+                    )
+                } else {
+                    val radiusSquared = radius * radius
+                    val offsets = mutableListOf<Pair<Int, Int>>()
+                    
+                    // Compute all offsets within the circular brush
+                    for (dy in -radius..radius) {
+                        for (dx in -radius..radius) {
+                            val distanceSquared = dx * dx + dy * dy
+                            if (distanceSquared <= radiusSquared) {
+                                offsets.add(Pair(dx, dy))
+                            }
+                        }
+                    }
+
+                    // Compute incremental update patterns
+                    val leftEdgeToRemove = mutableListOf<Pair<Int, Int>>()
+                    val rightEdgeToAdd = mutableListOf<Pair<Int, Int>>()
+                    
+                    for ((dx, dy) in offsets) {
+                        // Left edge: points that would go outside if shifted left
+                        val leftDistanceSquared = (dx - 1) * (dx - 1) + dy * dy
+                        if (leftDistanceSquared > radiusSquared) {
+                            leftEdgeToRemove.add(Pair(dx - 1, dy))
+                        }
+                        
+                        // Right edge: current points that are on the right boundary
+                        val rightDistanceSquared = (dx + 1) * (dx + 1) + dy * dy
+                        if (rightDistanceSquared > radiusSquared) {
+                            rightEdgeToAdd.add(Pair(dx, dy))
+                        }
+                    }
+                    
+                    BrushPattern(offsets, leftEdgeToRemove, rightEdgeToAdd)
+                }
+            }
+        }
         
         // Load native library
         private var nativeLibraryLoaded = false
@@ -444,8 +478,7 @@ class OilPaintingEffect(
         init {
             try {
                 System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = true
-                Log.i(EFFECT_NAME, "Native library loaded successfully")
+                nativeLibraryLoaded = false
             } catch (e: UnsatisfiedLinkError) {
                 Log.w(EFFECT_NAME, "Failed to load native library, using Kotlin implementation: ${e.message}")
                 nativeLibraryLoaded = false

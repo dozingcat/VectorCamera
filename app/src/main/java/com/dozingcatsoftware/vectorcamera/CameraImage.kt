@@ -4,6 +4,8 @@ import android.media.Image
 import android.util.Size
 import kotlin.math.ceil
 
+import com.dozingcatsoftware.util.resizeImageBytes
+
 /**
  * Data structure that holds YUV image data extracted from Android's Image class.
  */
@@ -228,55 +230,16 @@ data class CameraImage(
         val result = ByteArray(newYSize + 2 * newUvSize)
         
         // Resize Y plane
-        val newYData = resizePlane(yData, oldWidth, oldHeight, newWidth, newHeight)
+        val newYData = resizeImageBytes(yData, oldWidth, oldHeight, newWidth, newHeight)
         System.arraycopy(newYData, 0, result, 0, newYSize)
         
         // Resize U plane
-        val newUData = resizePlane(uData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
+        val newUData = resizeImageBytes(uData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
         System.arraycopy(newUData, 0, result, newYSize, newUvSize)
         
         // Resize V plane
-        val newVData = resizePlane(vData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
+        val newVData = resizeImageBytes(vData, oldUvWidth, oldUvHeight, newUvWidth, newUvHeight)
         System.arraycopy(newVData, 0, result, newYSize + newUvSize, newUvSize)
-        
-        return result
-    }
-
-    /**
-     * Resizes a single plane using bilinear interpolation.
-     */
-    private fun resizePlane(data: ByteArray, oldWidth: Int, oldHeight: Int, 
-                           newWidth: Int, newHeight: Int): ByteArray {
-        val result = ByteArray(newWidth * newHeight)
-        val xRatio = oldWidth.toFloat() / newWidth
-        val yRatio = oldHeight.toFloat() / newHeight
-        
-        for (y in 0 until newHeight) {
-            for (x in 0 until newWidth) {
-                val px = x * xRatio
-                val py = y * yRatio
-                
-                val x1 = px.toInt()
-                val y1 = py.toInt()
-                val x2 = kotlin.math.min(x1 + 1, oldWidth - 1)
-                val y2 = kotlin.math.min(y1 + 1, oldHeight - 1)
-                
-                val fx = px - x1
-                val fy = py - y1
-                
-                val p1 = data[y1 * oldWidth + x1].toInt() and 0xFF
-                val p2 = data[y1 * oldWidth + x2].toInt() and 0xFF
-                val p3 = data[y2 * oldWidth + x1].toInt() and 0xFF
-                val p4 = data[y2 * oldWidth + x2].toInt() and 0xFF
-                
-                val interpolated = (p1 * (1 - fx) * (1 - fy) +
-                                  p2 * fx * (1 - fy) +
-                                  p3 * (1 - fx) * fy +
-                                  p4 * fx * fy).toInt()
-                
-                result[y * newWidth + x] = interpolated.toByte()
-            }
-        }
         
         return result
     }
