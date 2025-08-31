@@ -385,6 +385,9 @@ class EffectRegistry {
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
+
+            // Stained glass effect - mosaic-like segmentation
+            {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
     )
 
     fun defaultEffectCount() = baseEffects.size
@@ -417,6 +420,7 @@ class EffectRegistry {
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
+            StainedGlassEffect.EFFECT_NAME -> StainedGlassEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
