@@ -370,7 +370,6 @@ class EffectRegistry {
                 ))
             },
         
-            // Oil Painting effect.
             {prefsFn, context -> OilPaintingEffect.standard() },
             {prefsFn, context -> OilPaintingEffect.impressionist() },
 
@@ -418,7 +417,6 @@ class EffectRegistry {
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
-            NeonEffect.EFFECT_NAME -> NeonEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
