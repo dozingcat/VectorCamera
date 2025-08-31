@@ -31,20 +31,36 @@ class StainedGlassEffect private constructor(
         val width = cameraImage.width()
         val height = cameraImage.height()
         
-        // Calculate optimal thread count for Kotlin processing
-        val threadsUsed = calculateOptimalKotlinThreads(height)
-        
-        // Create bitmap using region-based segmentation
-        val bitmap = createStainedGlassBitmap(cameraImage, width, height, threadsUsed)
+        // Create bitmap using region-based segmentation (hybrid native/Kotlin)
+        val bitmap = createStainedGlassBitmap(cameraImage, width, height, 0) // threads calculated internally
         
         val endTime = System.nanoTime()
+        
+        // Determine which implementation was used for metadata
+        val (architecture, threadsUsed) = if (nativeLibraryLoaded) {
+            Pair(CodeArchitecture.Native, calculateOptimalNativeThreads(height))
+        } else {
+            Pair(CodeArchitecture.Kotlin, calculateOptimalKotlinThreads(height))
+        }
+        
         val metadata = ProcessedBitmapMetadata(
-            codeArchitecture = CodeArchitecture.Kotlin,
+            codeArchitecture = architecture,
             numThreads = threadsUsed,
             generationDurationNanos = endTime - startTime
         )
         
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
+    }
+
+    /**
+     * Calculate optimal thread count for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        return 1
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
     }
 
     /**
@@ -62,6 +78,48 @@ class StainedGlassEffect private constructor(
      * Create the stained glass effect using region-based segmentation.
      */
     private fun createStainedGlassBitmap(
+        cameraImage: CameraImage, 
+        width: Int, 
+        height: Int, 
+        numThreads: Int
+    ): Bitmap {
+        // Extract YUV data for processing
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
+        
+        // Try native implementation first for better performance
+        val outputPixels = IntArray(width * height)
+        
+        val nativeSuccess = if (nativeLibraryLoaded) {
+            Log.i(EFFECT_NAME, "Using native implementation with $nativeThreads threads")
+            processStainedGlassNative(
+                yData, uData, vData, width, height, segmentSize,
+                edgeThickness, edgeColor, colorVariation, outputPixels, nativeThreads
+            )
+        } else {
+            false
+        }
+        
+        if (nativeSuccess) {
+            // Native processing succeeded
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.setPixels(outputPixels, 0, width, 0, 0, width, height)
+            return bitmap
+        } else {
+            // Fall back to Kotlin implementation
+            Log.i(EFFECT_NAME, "Native failed, using Kotlin fallback with $kotlinThreads threads")
+            return createStainedGlassBitmapKotlin(cameraImage, width, height, kotlinThreads)
+        }
+    }
+
+    /**
+     * Kotlin fallback implementation.
+     */
+    private fun createStainedGlassBitmapKotlin(
         cameraImage: CameraImage, 
         width: Int, 
         height: Int, 
@@ -326,6 +384,37 @@ class StainedGlassEffect private constructor(
 
     companion object {
         const val EFFECT_NAME = "stained_glass"
+        
+        // Native library loading
+        private var nativeLibraryLoaded = false
+        
+        init {
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                Log.i(EFFECT_NAME, "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(EFFECT_NAME, "Native library not available: ${e.message}")
+                nativeLibraryLoaded = false
+            }
+        }
+        
+        /**
+         * Native method for stained glass effect processing.
+         */
+        private external fun processStainedGlassNative(
+            yData: ByteArray,
+            uData: ByteArray,
+            vData: ByteArray,
+            width: Int,
+            height: Int,
+            segmentSize: Int,
+            edgeThickness: Int,
+            edgeColor: Int,
+            colorVariation: Float,
+            outputPixels: IntArray,
+            numThreads: Int
+        ): Boolean
         
         fun fromParameters(params: Map<String, Any>): StainedGlassEffect {
             val segmentSize = (params.getOrElse("segmentSize", { 200 }) as Number).toInt()
