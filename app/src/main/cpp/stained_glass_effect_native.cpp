@@ -105,20 +105,20 @@ void createSegmentMap(
 ) {
     for (int y = startY; y < endY; y++) {
         const int cellY = y / gridSpacing;
-        const int minCellY = std::max(0, cellY - 2);
-        const int maxCellY = std::min(static_cast<int>(seedGrid.size()) - 1, cellY + 2);
+        const int minCellY = std::max(0, cellY - 1);
+        const int maxCellY = std::min(static_cast<int>(seedGrid.size()) - 1, cellY + 1);
         
         for (int x = 0; x < width; x++) {
             const int cellX = x / gridSpacing;
-            const int minCellX = std::max(0, cellX - 2);
+            const int minCellX = std::max(0, cellX - 1);
             
             int minDistanceSquared = INT_MAX;
             int nearestSegment = 0;
             
-            // Search in nearby grid cells only
+            // Search in 3x3 neighborhood only (mathematically sufficient)
             for (int cy = minCellY; cy <= maxCellY; cy++) {
                 const auto& row = seedGrid[cy];
-                const int maxCellX = std::min(static_cast<int>(row.size()) - 1, cellX + 2);
+                const int maxCellX = std::min(static_cast<int>(row.size()) - 1, cellX + 1);
                 
                 for (int cx = minCellX; cx <= maxCellX; cx++) {
                     const SeedPoint& point = row[cx];

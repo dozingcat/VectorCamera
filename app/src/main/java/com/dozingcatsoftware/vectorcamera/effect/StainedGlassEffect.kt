@@ -16,8 +16,8 @@ import kotlin.random.Random
  */
 class StainedGlassEffect private constructor(
     private val effectParams: Map<String, Any> = mapOf(),
-    private val segmentSize: Int = 100,
-    private val edgeThickness: Int = 2,
+    private val sectionsPerRow: Int = 64,
+    private val edgeThickness: Double = 0.002,
     private val edgeColor: Int = Color.BLACK,
     private val colorVariation: Float = 0.1f
 ) : Effect {
@@ -93,12 +93,15 @@ class StainedGlassEffect private constructor(
         
         // Try native implementation first for better performance
         val outputPixels = IntArray(width * height)
+
+        val thicknessPixels = (edgeThickness * width).roundToInt().coerceAtLeast(1)
         
         val nativeSuccess = if (nativeLibraryLoaded) {
             Log.i(EFFECT_NAME, "Using native implementation with $nativeThreads threads")
+            val segmentSize = cameraImage.width() / sectionsPerRow
             processStainedGlassNative(
                 yData, uData, vData, width, height, segmentSize,
-                edgeThickness, edgeColor, colorVariation, outputPixels, nativeThreads
+                thicknessPixels, edgeColor, colorVariation, outputPixels, nativeThreads
             )
         } else {
             false
@@ -131,7 +134,7 @@ class StainedGlassEffect private constructor(
         val vData = cameraImage.getVBytes()
         
         // Create segment map - each pixel gets assigned to a segment ID
-        Log.i(EFFECT_NAME, "Creating segment map: $segmentSize")
+        val segmentSize = cameraImage.width() / sectionsPerRow
         val segmentMap = createSegmentMap(width, height, segmentSize)
         
         // Calculate average color for each segment
@@ -180,14 +183,13 @@ class StainedGlassEffect private constructor(
         for (y in 0 until height) {
             if (y % 20 == 0) Log.i(EFFECT_NAME, "y=$y")
             val cellY = y / gridSpacing
-            // We only need to check cells within two of the current pixel.
-            // (This can be optimized further but is ok for now).
-            val minCellY = (cellY - 2).coerceAtLeast(0)
-            val maxCellY = (cellY + 2).coerceAtMost(seedPoints.size - 1)
+            // Only need to check 3x3 neighborhood - mathematically sufficient
+            val minCellY = (cellY - 1).coerceAtLeast(0)
+            val maxCellY = (cellY + 1).coerceAtMost(seedPoints.size - 1)
             for (x in 0 until width) {
                 val cellX = x / gridSpacing
-                val minCellX = (cellX - 2).coerceAtLeast(0)
-                val maxCellX = (cellX + 2).coerceAtMost(seedPoints[0].size - 1)
+                val minCellX = (cellX - 1).coerceAtLeast(0)
+                val maxCellX = (cellX + 1).coerceAtMost(seedPoints[0].size - 1)
                 var minDistance = Int.MAX_VALUE
                 var nearestSegment = 0
 
@@ -344,12 +346,14 @@ class StainedGlassEffect private constructor(
             }
         }
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+
+        val thicknessPixels = (edgeThickness * width).roundToInt().coerceAtLeast(1)
         
         // Draw edges between segments
-        if (edgeThickness > 0) {
+        if (thicknessPixels > 0) {
             val edgePaint = Paint().apply {
                 color = edgeColor
-                strokeWidth = edgeThickness.toFloat()
+                strokeWidth = thicknessPixels.toFloat()
                 isAntiAlias = true
             }
             
@@ -417,9 +421,9 @@ class StainedGlassEffect private constructor(
         ): Boolean
         
         fun fromParameters(params: Map<String, Any>): StainedGlassEffect {
-            val segmentSize = (params.getOrElse("segmentSize", { 200 }) as Number).toInt()
-            Log.i(EFFECT_NAME, "fromParameters: $params segmentSize: $segmentSize")
-            val edgeThickness = (params.getOrElse("edgeThickness", { 2 }) as Number).toInt()
+            val sectionsPerRow = (params.getOrElse("sectionsPerRow", { 64 }) as Number).toInt()
+            // edgeThickness is fraction of image width.
+            val edgeThickness = (params.getOrElse("edgeThickness", { 0.002 }) as Number).toDouble()
             val edgeColor = if (params.containsKey("edgeColor")) {
                 intFromArgbList(params["edgeColor"] as List<Int>)
             } else {
@@ -427,27 +431,27 @@ class StainedGlassEffect private constructor(
             }
             val colorVariation = (params.getOrElse("colorVariation", { 0.1 }) as Number).toFloat()
             
-            return StainedGlassEffect(params, segmentSize, edgeThickness, edgeColor, colorVariation)
+            return StainedGlassEffect(params, sectionsPerRow, edgeThickness, edgeColor, colorVariation)
         }
         
         // Factory methods for different configurations
         fun defaultStainedGlass() = fromParameters(mapOf(
-            "segmentSize" to 100,
-            "edgeThickness" to 2,
+            "sectionsPerRow" to 64,
+            "edgeThickness" to 0.002,
             "edgeColor" to listOf(0, 0, 0),
             "colorVariation" to 0.1
         ))
         
         fun largeSegments() = fromParameters(mapOf(
-            "segmentSize" to 200,
-            "edgeThickness" to 3,
+            "sectionsPerRow" to 32,
+            "edgeThickness" to 0.003,
             "edgeColor" to listOf(64, 64, 64),
             "colorVariation" to 0.15
         ))
         
         fun fineDetail() = fromParameters(mapOf(
-            "segmentSize" to 50,
-            "edgeThickness" to 1,
+            "sectionsPerRow" to 128,
+            "edgeThickness" to 0.001,
             "edgeColor" to listOf(0, 0, 0),
             "colorVariation" to 0.05
         ))
