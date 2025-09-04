@@ -22,38 +22,11 @@ struct SeedPoint {
     int x;
     int y;
     int segmentId;
-    
+
     SeedPoint() : x(0), y(0), segmentId(0) {}
     SeedPoint(int x, int y, int segmentId) : x(x), y(y), segmentId(segmentId) {}
 };
 
-/**
- * Segment color accumulator for multi-threaded processing
- */
-struct SegmentAccumulator {
-    std::atomic<uint64_t> totalRed{0};
-    std::atomic<uint64_t> totalGreen{0};
-    std::atomic<uint64_t> totalBlue{0};
-    std::atomic<uint32_t> pixelCount{0};
-    
-    void addColor(uint32_t rgb) {
-        totalRed.fetch_add((rgb >> 16) & 0xFF, std::memory_order_relaxed);
-        totalGreen.fetch_add((rgb >> 8) & 0xFF, std::memory_order_relaxed);
-        totalBlue.fetch_add(rgb & 0xFF, std::memory_order_relaxed);
-        pixelCount.fetch_add(1, std::memory_order_relaxed);
-    }
-    
-    uint32_t getAverageColor() const {
-        uint32_t count = pixelCount.load(std::memory_order_relaxed);
-        if (count == 0) return 0x000000;
-        
-        uint32_t avgRed = static_cast<uint32_t>(totalRed.load(std::memory_order_relaxed) / count);
-        uint32_t avgGreen = static_cast<uint32_t>(totalGreen.load(std::memory_order_relaxed) / count);
-        uint32_t avgBlue = static_cast<uint32_t>(totalBlue.load(std::memory_order_relaxed) / count);
-        
-        return (avgRed << 16) | (avgGreen << 8) | avgBlue;
-    }
-};
 
 /**
  * Cache for segment map to avoid recomputing every frame
@@ -65,7 +38,7 @@ struct SegmentMapCache {
     std::vector<std::vector<SeedPoint>> seedGrid;
     std::vector<int> segmentMap;
     
-    bool isValid(int w, int h, int segSize) const {
+    [[nodiscard]] bool isValid(int w, int h, int segSize) const {
         return width == w && height == h && segmentSize == segSize && !segmentMap.empty();
     }
 };
@@ -195,7 +168,7 @@ void createSegmentMap(
 }
 
 /**
- * Calculate segment colors using YUV to RGB conversion
+ * Calculate segment colors using YUV to RGB conversion with parallel arrays
  */
 void calculateSegmentColors(
     const uint8_t* yData,
@@ -204,11 +177,13 @@ void calculateSegmentColors(
     int width,
     int height,
     const std::vector<int>& segmentMap,
-    std::vector<SegmentAccumulator>& segmentAccumulators,
-    int startY,
-    int endY
+    std::vector<uint64_t>& redTotals,
+    std::vector<uint64_t>& greenTotals,
+    std::vector<uint64_t>& blueTotals,
+    std::vector<uint32_t>& pixelCounts,
+    size_t totalSegments
 ) {
-    for (int y = startY; y < endY; y++) {
+    for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             const int pixelIndex = y * width + x;
             const int segmentId = segmentMap[pixelIndex];
@@ -221,9 +196,12 @@ void calculateSegmentColors(
             // Convert YUV to RGB using optimized fixed-point conversion
             const uint32_t rgb = yuvToRgbFixed(yVal, uVal, vVal, false);
             
-            // Add to segment accumulator (thread-safe)
-            if (segmentId < segmentAccumulators.size()) {
-                segmentAccumulators[segmentId].addColor(rgb);
+            // Add to parallel arrays
+            if (segmentId < totalSegments) {
+                redTotals[segmentId] += (rgb >> 16) & 0xFF;
+                greenTotals[segmentId] += (rgb >> 8) & 0xFF;
+                blueTotals[segmentId] += rgb & 0xFF;
+                pixelCounts[segmentId]++;
             }
         }
     }
@@ -328,51 +306,38 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
         }
         
         // Calculate total number of segments
-        int totalSegments = 0;
+        size_t totalSegments = 0;
         for (const auto& row : seedGrid) {
             totalSegments += row.size();
         }
         
-        LOGI("Using %d segments in %dx%d grid", totalSegments, (int)seedGrid.size(), 
-             seedGrid.empty() ? 0 : (int)seedGrid[0].size());
+        // Calculate segment colors using parallel arrays
+        std::vector<uint64_t> redTotals(totalSegments, 0);
+        std::vector<uint64_t> greenTotals(totalSegments, 0);
+        std::vector<uint64_t> blueTotals(totalSegments, 0);
+        std::vector<uint32_t> pixelCounts(totalSegments, 0);
         
-        // Calculate segment colors
-        std::vector<SegmentAccumulator> segmentAccumulators(totalSegments);
+        // Single-threaded color calculation for simplicity
+        calculateSegmentColors(yBytes, uBytes, vBytes, width, height, segmentMap,
+                             redTotals, greenTotals, blueTotals, pixelCounts, totalSegments);
         
-        if (numThreads == 1) {
-            // Single-threaded color calculation
-            calculateSegmentColors(yBytes, uBytes, vBytes, width, height, segmentMap, 
-                                 segmentAccumulators, 0, height);
-        } else {
-            // Multi-threaded color calculation
-            std::vector<std::thread> threads;
-            const int rowsPerThread = height / numThreads;
-            
-            for (int i = 0; i < numThreads; i++) {
-                const int startY = i * rowsPerThread;
-                const int endY = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-                
-                threads.emplace_back([&, startY, endY]() {
-                    calculateSegmentColors(yBytes, uBytes, vBytes, width, height, segmentMap,
-                                         segmentAccumulators, startY, endY);
-                });
-            }
-            
-            for (auto& thread : threads) {
-                thread.join();
-            }
-        }
-        
-        // Convert accumulators to final colors with variation
+        // Convert totals to final colors with variation
         std::vector<uint32_t> segmentColors(totalSegments);
         std::mt19937 colorRng(width * height + segmentSize + 42); // Different seed for color variation
         std::uniform_int_distribution<int> variationDist(-static_cast<int>(colorVariation * 128), 
                                                         static_cast<int>(colorVariation * 128));
         
         for (int i = 0; i < totalSegments; i++) {
-            uint32_t baseColor = segmentAccumulators[i].getAverageColor();
+            uint32_t baseColor = 0x000000; // Black fallback
             
-            if (colorVariation > 0.0f) {
+            if (pixelCounts[i] > 0) {
+                uint32_t avgRed = static_cast<uint32_t>(redTotals[i] / pixelCounts[i]);
+                uint32_t avgGreen = static_cast<uint32_t>(greenTotals[i] / pixelCounts[i]);
+                uint32_t avgBlue = static_cast<uint32_t>(blueTotals[i] / pixelCounts[i]);
+                baseColor = (avgRed << 16) | (avgGreen << 8) | avgBlue;
+            }
+            
+            if (colorVariation > 0.0f && pixelCounts[i] > 0) {
                 int r = std::clamp(static_cast<int>((baseColor >> 16) & 0xFF) + variationDist(colorRng), 0, 255);
                 int g = std::clamp(static_cast<int>((baseColor >> 8) & 0xFF) + variationDist(colorRng), 0, 255);
                 int b = std::clamp(static_cast<int>(baseColor & 0xFF) + variationDist(colorRng), 0, 255);
@@ -382,30 +347,9 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
             }
         }
         
-        // Render final bitmap
-        if (numThreads == 1) {
-            // Single-threaded rendering
-            renderStainedGlass(width, height, segmentMap, segmentColors, outputBuffer,
-                             edgeThickness, static_cast<uint32_t>(edgeColor), 0, height);
-        } else {
-            // Multi-threaded rendering
-            std::vector<std::thread> threads;
-            const int rowsPerThread = height / numThreads;
-            
-            for (int i = 0; i < numThreads; i++) {
-                const int startY = i * rowsPerThread;
-                const int endY = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-                
-                threads.emplace_back([&, startY, endY]() {
-                    renderStainedGlass(width, height, segmentMap, segmentColors, outputBuffer,
-                                     edgeThickness, static_cast<uint32_t>(edgeColor), startY, endY);
-                });
-            }
-            
-            for (auto& thread : threads) {
-                thread.join();
-            }
-        }
+        // Render final bitmap (single-threaded for simplicity)
+        renderStainedGlass(width, height, segmentMap, segmentColors, outputBuffer,
+                         edgeThickness, static_cast<uint32_t>(edgeColor), 0, height);
     } catch (const std::exception& e) {
         LOGE("Exception in stained glass processing: %s", e.what());
         return JNI_FALSE;

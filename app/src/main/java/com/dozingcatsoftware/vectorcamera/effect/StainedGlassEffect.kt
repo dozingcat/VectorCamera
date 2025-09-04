@@ -49,42 +49,17 @@ class StainedGlassEffect private constructor(
         val endTime = System.nanoTime()
         
         // Determine which implementation was used for metadata
-        val (architecture, threadsUsed) = if (nativeLibraryLoaded) {
-            Pair(CodeArchitecture.Native, calculateOptimalNativeThreads(height))
-        } else {
-            Pair(CodeArchitecture.Kotlin, calculateOptimalKotlinThreads(height))
-        }
+        val architecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin
         
         val metadata = ProcessedBitmapMetadata(
             codeArchitecture = architecture,
-            numThreads = threadsUsed,
+            numThreads = 1, // Single-threaded for simplicity
             generationDurationNanos = endTime - startTime
         )
         
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    /**
-     * Calculate optimal thread count for native processing based on image dimensions.
-     */
-    private fun calculateOptimalNativeThreads(height: Int): Int {
-        return 1
-        val numCores = Runtime.getRuntime().availableProcessors()
-        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
-        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
-        return maxOf(1, maxThreads)
-    }
-
-    /**
-     * Calculate optimal thread count for Kotlin processing based on image dimensions.
-     */
-    private fun calculateOptimalKotlinThreads(height: Int): Int {
-        return 1
-        val numCores = Runtime.getRuntime().availableProcessors()
-        val minRowsPerThread = 64 // Larger minimum for complex operations
-        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
-        return maxOf(1, maxThreads)
-    }
 
     private fun segmentSizeForWidth(w: Int) = (w / sectionsPerRow).coerceAtLeast(10)
 
@@ -102,19 +77,15 @@ class StainedGlassEffect private constructor(
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
         
-        val nativeThreads = calculateOptimalNativeThreads(height)
-        val kotlinThreads = calculateOptimalKotlinThreads(height)
-        
         // Try native implementation first for better performance
         val outputPixels = IntArray(width * height)
-
         val thicknessPixels = (edgeThickness * width).roundToInt().coerceAtLeast(1)
         
         val nativeSuccess = if (nativeLibraryLoaded) {
             val segmentSize = segmentSizeForWidth(cameraImage.width())
             processStainedGlassNative(
                 yData, uData, vData, width, height, segmentSize,
-                thicknessPixels, edgeColor, colorVariation, outputPixels, nativeThreads
+                thicknessPixels, edgeColor, colorVariation, outputPixels, 1
             )
         } else {
             false
@@ -127,8 +98,8 @@ class StainedGlassEffect private constructor(
             return bitmap
         } else {
             // Fall back to Kotlin implementation
-            Log.i(EFFECT_NAME, "Native failed, using Kotlin fallback with $kotlinThreads threads")
-            return createStainedGlassBitmapKotlin(cameraImage, width, height, kotlinThreads)
+            Log.i(EFFECT_NAME, "Native failed, using Kotlin fallback")
+            return createStainedGlassBitmapKotlin(cameraImage, width, height)
         }
     }
 
@@ -138,8 +109,7 @@ class StainedGlassEffect private constructor(
     private fun createStainedGlassBitmapKotlin(
         cameraImage: CameraImage, 
         width: Int, 
-        height: Int, 
-        numThreads: Int
+        height: Int
     ): Bitmap {
         // Extract YUV data for processing
         val yData = cameraImage.getYBytes()
@@ -151,7 +121,7 @@ class StainedGlassEffect private constructor(
         
         // Calculate average color for each segment
         val segmentColors = calculateSegmentColors(
-            yData, uData, vData, width, height, segmentMap, numThreads
+            yData, uData, vData, width, height, segmentMap
         )
         
         // Render final bitmap with segments and edges
@@ -257,47 +227,14 @@ class StainedGlassEffect private constructor(
         vData: ByteArray,
         width: Int,
         height: Int,
-        segmentMap: Array<IntArray>,
-        numThreads: Int
+        segmentMap: Array<IntArray>
     ): Map<Int, Int> {
         
         // Collect pixel data for each segment
         val segmentPixels = mutableMapOf<Int, MutableList<Int>>()
         
-        if (numThreads == 1) {
-            // Single-threaded processing
-            processColorRows(0, height, width, height, yData, uData, vData, segmentMap, segmentPixels)
-        } else {
-            // Multi-threaded processing with synchronized map access
-            val segmentPixelsSynced = java.util.concurrent.ConcurrentHashMap<Int, MutableList<Int>>()
-            
-            runBlocking {
-                val jobs = mutableListOf<Job>()
-                val rowsPerThread = height / numThreads
-                
-                for (threadIndex in 0 until numThreads) {
-                    val startY = threadIndex * rowsPerThread
-                    val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
-                    
-                    val job = launch(Dispatchers.Default) {
-                        val localSegmentPixels = mutableMapOf<Int, MutableList<Int>>()
-                        processColorRows(startY, endY, width, height, yData, uData, vData, segmentMap, localSegmentPixels)
-                        
-                        // Merge results
-                        synchronized(segmentPixelsSynced) {
-                            for ((segmentId, pixels) in localSegmentPixels) {
-                                segmentPixelsSynced.computeIfAbsent(segmentId) { mutableListOf() }.addAll(pixels)
-                            }
-                        }
-                    }
-                    jobs.add(job)
-                }
-                
-                jobs.forEach { it.join() }
-            }
-            
-            segmentPixels.putAll(segmentPixelsSynced)
-        }
+        // Single-threaded processing for simplicity
+        processColorRows(0, height, width, height, yData, uData, vData, segmentMap, segmentPixels)
         
         // Calculate average color for each segment
         val segmentColors = mutableMapOf<Int, Int>()
