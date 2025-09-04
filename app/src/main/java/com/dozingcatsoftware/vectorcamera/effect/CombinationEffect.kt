@@ -43,6 +43,7 @@ class CombinationEffect(
         val tileSize = Size(
                 originalCameraImage.displaySize.width / gridSize,
                 originalCameraImage.displaySize.height / gridSize)
+        Log.i("Combo", "tileSize=$tileSize")
         val cameraImage = originalCameraImage.copy(displaySize=tileSize)
         // We're rendering several subeffects at low resolution; use the full display resolution
         // for the combined image.

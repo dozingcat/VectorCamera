@@ -22,6 +22,18 @@ class StainedGlassEffect private constructor(
     private val colorVariation: Float = 0.1f
 ) : Effect {
 
+    // Cache for segment map to avoid recomputing every frame
+    private data class SegmentMapCache(
+        val width: Int,
+        val height: Int,
+        val sectionsPerRow: Int,
+        val segmentMap: Array<IntArray>,
+        val seedPoints: List<List<SeedPoint>>
+    )
+    
+    @Volatile
+    private var cachedSegmentMap: SegmentMapCache? = null
+
     override fun effectName() = EFFECT_NAME
     override fun effectParameters() = effectParams
 
@@ -74,6 +86,8 @@ class StainedGlassEffect private constructor(
         return maxOf(1, maxThreads)
     }
 
+    private fun segmentSizeForWidth(w: Int) = (w / sectionsPerRow).coerceAtLeast(10)
+
     /**
      * Create the stained glass effect using region-based segmentation.
      */
@@ -97,8 +111,7 @@ class StainedGlassEffect private constructor(
         val thicknessPixels = (edgeThickness * width).roundToInt().coerceAtLeast(1)
         
         val nativeSuccess = if (nativeLibraryLoaded) {
-            Log.i(EFFECT_NAME, "Using native implementation with $nativeThreads threads")
-            val segmentSize = cameraImage.width() / sectionsPerRow
+            val segmentSize = segmentSizeForWidth(cameraImage.width())
             processStainedGlassNative(
                 yData, uData, vData, width, height, segmentSize,
                 thicknessPixels, edgeColor, colorVariation, outputPixels, nativeThreads
@@ -133,37 +146,51 @@ class StainedGlassEffect private constructor(
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
         
-        // Create segment map - each pixel gets assigned to a segment ID
-        val segmentSize = cameraImage.width() / sectionsPerRow
-        val segmentMap = createSegmentMap(width, height, segmentSize)
+        // Get or create cached segment map
+        val (segmentMap, seedPoints) = getCachedSegmentMap(width, height, sectionsPerRow)
         
         // Calculate average color for each segment
-        Log.i(EFFECT_NAME, "Calculating segment colors")
         val segmentColors = calculateSegmentColors(
             yData, uData, vData, width, height, segmentMap, numThreads
         )
         
         // Render final bitmap with segments and edges
-        Log.i(EFFECT_NAME, "Rendering bitmap")
         return renderStainedGlass(width, height, segmentMap, segmentColors)
     }
 
     class SeedPoint(val x: Int, val y: Int, val segmentId: Int)
 
     /**
-     * Create a segment map using a grid-based approach with random variation.
-     * Each segment represents an irregular region that will be filled with a single color.
+     * Get cached segment map or create new one if cache is invalid.
      */
-    private fun createSegmentMap(width: Int, height: Int, avgSegmentSize: Int): Array<IntArray> {
-        val segmentMap = Array(height) { IntArray(width) }
+    private fun getCachedSegmentMap(width: Int, height: Int, sectionsPerRow: Int): Pair<Array<IntArray>, List<List<SeedPoint>>> {
+        val cache = cachedSegmentMap
         
-        // Create initial seed points in a rough grid pattern
-        val seedPoints = mutableListOf<MutableList<SeedPoint>>()
-        val gridSpacing = avgSegmentSize
-        val variation = avgSegmentSize / 3
+        // Check if cache is valid
+        if (cache != null && cache.width == width && cache.height == height && cache.sectionsPerRow == sectionsPerRow) {
+            return Pair(cache.segmentMap, cache.seedPoints)
+        }
+        
+        // Cache is invalid, create new segment map
+        Log.i(EFFECT_NAME, "Creating new segment map for ${width}x${height}, sectionsPerRow=$sectionsPerRow")
+        val segmentSize = segmentSizeForWidth(width)
+        val seedPoints = createSeedPoints(width, height, segmentSize)
+        val segmentMap = createSegmentMapFromSeeds(width, height, segmentSize, seedPoints)
+        
+        // Update cache
+        cachedSegmentMap = SegmentMapCache(width, height, sectionsPerRow, segmentMap, seedPoints)
+        
+        return Pair(segmentMap, seedPoints)
+    }
 
-        Log.i(EFFECT_NAME, "gridSpacing: $gridSpacing")
-        
+    /**
+     * Create seed points in a grid pattern with random variation.
+     */
+    private fun createSeedPoints(width: Int, height: Int, segmentSize: Int): List<List<SeedPoint>> {
+        val seedPoints = mutableListOf<MutableList<SeedPoint>>()
+        val gridSpacing = segmentSize
+        val variation = segmentSize / 3
+
         var segmentId = 0
         for (y in gridSpacing/2 until height step gridSpacing) {
             seedPoints.add(mutableListOf<SeedPoint>())
@@ -177,11 +204,18 @@ class StainedGlassEffect private constructor(
             }
         }
 
-        Log.i(EFFECT_NAME, "seedPoints.size: ${seedPoints.size}")
+        return seedPoints
+    }
+
+    /**
+     * Create segment map from seed points using optimized Voronoi-like algorithm.
+     */
+    private fun createSegmentMapFromSeeds(width: Int, height: Int, segmentSize: Int, seedPoints: List<List<SeedPoint>>): Array<IntArray> {
+        val segmentMap = Array(height) { IntArray(width) }
+        val gridSpacing = segmentSize
         
         // Use a simplified Voronoi-like algorithm to assign pixels to nearest seed
         for (y in 0 until height) {
-            if (y % 20 == 0) Log.i(EFFECT_NAME, "y=$y")
             val cellY = y / gridSpacing
             // Only need to check 3x3 neighborhood - mathematically sufficient
             val minCellY = (cellY - 1).coerceAtLeast(0)
@@ -211,6 +245,8 @@ class StainedGlassEffect private constructor(
         
         return segmentMap
     }
+
+
 
     /**
      * Calculate the average color for each segment using YUV to RGB conversion.
@@ -396,7 +432,6 @@ class StainedGlassEffect private constructor(
             try {
                 System.loadLibrary("vectorcamera_native")
                 nativeLibraryLoaded = true
-                Log.i(EFFECT_NAME, "Native library loaded successfully")
             } catch (e: UnsatisfiedLinkError) {
                 Log.w(EFFECT_NAME, "Native library not available: ${e.message}")
                 nativeLibraryLoaded = false

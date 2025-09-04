@@ -56,6 +56,62 @@ struct SegmentAccumulator {
 };
 
 /**
+ * Cache for segment map to avoid recomputing every frame
+ */
+struct SegmentMapCache {
+    int width = 0;
+    int height = 0;
+    int segmentSize = 0;
+    std::vector<std::vector<SeedPoint>> seedGrid;
+    std::vector<int> segmentMap;
+    
+    bool isValid(int w, int h, int segSize) const {
+        return width == w && height == h && segmentSize == segSize && !segmentMap.empty();
+    }
+};
+
+// Global cache (thread-safe since we only read/write on main thread)
+static SegmentMapCache g_segmentCache;
+
+// Forward declarations
+std::vector<std::vector<SeedPoint>> generateSeedPoints(int width, int height, int avgSegmentSize, std::mt19937& rng);
+void createSegmentMap(int width, int height, const std::vector<std::vector<SeedPoint>>& seedGrid, int gridSpacing, std::vector<int>& segmentMap, int startY, int endY);
+
+/**
+ * Get cached segment map or create new one if cache is invalid
+ */
+std::pair<std::vector<int>, std::vector<std::vector<SeedPoint>>> getCachedSegmentMap(
+    int width, 
+    int height, 
+    int segmentSize
+) {
+    // Check if cache is valid
+    if (g_segmentCache.isValid(width, height, segmentSize)) {
+        return std::make_pair(g_segmentCache.segmentMap, g_segmentCache.seedGrid);
+    }
+    
+    // Cache is invalid, create new segment map
+    LOGI("Creating new segment map for %dx%d, segmentSize=%d", width, height, segmentSize);
+    
+    // Generate seed points with deterministic randomization
+    std::mt19937 rng(width * height + segmentSize);
+    auto seedGrid = generateSeedPoints(width, height, segmentSize, rng);
+    
+    // Create segment map
+    std::vector<int> segmentMap(width * height);
+    createSegmentMap(width, height, seedGrid, segmentSize, segmentMap, 0, height);
+    
+    // Update cache
+    g_segmentCache.width = width;
+    g_segmentCache.height = height;
+    g_segmentCache.segmentSize = segmentSize;
+    g_segmentCache.seedGrid = seedGrid;
+    g_segmentCache.segmentMap = segmentMap;
+    
+    return std::make_pair(segmentMap, seedGrid);
+}
+
+/**
  * Generate seed points in a grid pattern with random variation
  */
 std::vector<std::vector<SeedPoint>> generateSeedPoints(
@@ -261,12 +317,13 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
     uint32_t* outputBuffer = reinterpret_cast<uint32_t*>(outputPixelsPtr);
     
     try {
-        // Generate seed points with deterministic randomization (using image dimensions as seed)
-        std::mt19937 rng(width * height + segmentSize);
-        auto seedGrid = generateSeedPoints(width, height, segmentSize, rng);
+        // Get cached segment map or create new one
+        auto segmentMapPair = getCachedSegmentMap(width, height, segmentSize);
+        std::vector<int> segmentMap = segmentMapPair.first;
+        std::vector<std::vector<SeedPoint>> seedGrid = segmentMapPair.second;
         
         if (seedGrid.empty()) {
-            LOGE("Failed to generate seed points");
+            LOGE("Failed to get segment map");
             return JNI_FALSE;
         }
         
@@ -276,34 +333,8 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
             totalSegments += row.size();
         }
         
-        LOGI("Generated %d segments in %dx%d grid", totalSegments, (int)seedGrid.size(), 
+        LOGI("Using %d segments in %dx%d grid", totalSegments, (int)seedGrid.size(), 
              seedGrid.empty() ? 0 : (int)seedGrid[0].size());
-        
-        // Create segment map
-        std::vector<int> segmentMap(width * height);
-        const int gridSpacing = segmentSize;
-        
-        if (numThreads == 1) {
-            // Single-threaded segment map creation
-            createSegmentMap(width, height, seedGrid, gridSpacing, segmentMap, 0, height);
-        } else {
-            // Multi-threaded segment map creation
-            std::vector<std::thread> threads;
-            const int rowsPerThread = height / numThreads;
-            
-            for (int i = 0; i < numThreads; i++) {
-                const int startY = i * rowsPerThread;
-                const int endY = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-                
-                threads.emplace_back([&, startY, endY]() {
-                    createSegmentMap(width, height, seedGrid, gridSpacing, segmentMap, startY, endY);
-                });
-            }
-            
-            for (auto& thread : threads) {
-                thread.join();
-            }
-        }
         
         // Calculate segment colors
         std::vector<SegmentAccumulator> segmentAccumulators(totalSegments);
@@ -334,6 +365,7 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
         
         // Convert accumulators to final colors with variation
         std::vector<uint32_t> segmentColors(totalSegments);
+        std::mt19937 colorRng(width * height + segmentSize + 42); // Different seed for color variation
         std::uniform_int_distribution<int> variationDist(-static_cast<int>(colorVariation * 128), 
                                                         static_cast<int>(colorVariation * 128));
         
@@ -341,9 +373,9 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
             uint32_t baseColor = segmentAccumulators[i].getAverageColor();
             
             if (colorVariation > 0.0f) {
-                int r = std::clamp(static_cast<int>((baseColor >> 16) & 0xFF) + variationDist(rng), 0, 255);
-                int g = std::clamp(static_cast<int>((baseColor >> 8) & 0xFF) + variationDist(rng), 0, 255);
-                int b = std::clamp(static_cast<int>(baseColor & 0xFF) + variationDist(rng), 0, 255);
+                int r = std::clamp(static_cast<int>((baseColor >> 16) & 0xFF) + variationDist(colorRng), 0, 255);
+                int g = std::clamp(static_cast<int>((baseColor >> 8) & 0xFF) + variationDist(colorRng), 0, 255);
+                int b = std::clamp(static_cast<int>(baseColor & 0xFF) + variationDist(colorRng), 0, 255);
                 segmentColors[i] = (r << 16) | (g << 8) | b;
             } else {
                 segmentColors[i] = baseColor;
@@ -374,9 +406,6 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StainedGlassEffect_00024Companion
                 thread.join();
             }
         }
-        
-        LOGI("Successfully processed stained glass effect");
-        
     } catch (const std::exception& e) {
         LOGE("Exception in stained glass processing: %s", e.what());
         return JNI_FALSE;
