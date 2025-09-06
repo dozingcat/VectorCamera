@@ -291,7 +291,11 @@ class StainedGlassEffect private constructor(
                 val rgb = yuvToRgb(yVal, uVal, vVal)
 
                 // Add to segment's pixel collection
-                segmentPixels.computeIfAbsent(segmentId) { mutableListOf() }.add(rgb)
+                var pixelsForSegment = segmentPixels[segmentId]
+                if (pixelsForSegment == null) {
+                    pixelsForSegment = mutableListOf()
+                }
+                pixelsForSegment.add(rgb)
             }
         }
     }
