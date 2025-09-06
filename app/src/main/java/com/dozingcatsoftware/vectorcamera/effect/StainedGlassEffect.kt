@@ -118,9 +118,12 @@ class StainedGlassEffect private constructor(
         // Get or create cached segment map
         val (segmentMap, seedPoints) = getCachedSegmentMap(width, height, segmentSize)
         
+        // Calculate total number of segments
+        val totalSegments = seedPoints.sumOf { it.size }
+        
         // Calculate average color for each segment
         val segmentColors = calculateSegmentColors(
-            yData, uData, vData, width, height, segmentMap
+            yData, uData, vData, width, height, segmentMap, totalSegments
         )
         
         // Render final bitmap with segments and edges
@@ -217,7 +220,7 @@ class StainedGlassEffect private constructor(
 
 
     /**
-     * Calculate the average color for each segment using YUV to RGB conversion.
+     * Calculate the average color for each segment using YUV to RGB conversion with parallel arrays.
      */
     private fun calculateSegmentColors(
         yData: ByteArray,
@@ -225,31 +228,27 @@ class StainedGlassEffect private constructor(
         vData: ByteArray,
         width: Int,
         height: Int,
-        segmentMap: Array<IntArray>
+        segmentMap: Array<IntArray>,
+        totalSegments: Int
     ): Map<Int, Int> {
         
-        // Collect pixel data for each segment
-        val segmentPixels = mutableMapOf<Int, MutableList<Int>>()
+        // Use parallel arrays for better cache locality and performance
+        val redTotals = LongArray(totalSegments)
+        val greenTotals = LongArray(totalSegments)
+        val blueTotals = LongArray(totalSegments)
+        val pixelCounts = IntArray(totalSegments)
         
         // Single-threaded processing for simplicity
-        processColorRows(0, height, width, height, yData, uData, vData, segmentMap, segmentPixels)
+        processColorRowsWithArrays(yData, uData, vData, width, height, segmentMap, 
+                                 redTotals, greenTotals, blueTotals, pixelCounts)
         
         // Calculate average color for each segment
         val segmentColors = mutableMapOf<Int, Int>()
-        for ((segmentId, pixels) in segmentPixels) {
-            if (pixels.isNotEmpty()) {
-                var totalRed = 0L
-                var totalGreen = 0L
-                var totalBlue = 0L
-
-                for (rgb in pixels) {
-                    totalRed += (rgb shr 16)
-                    totalGreen += (rgb shr 8) and 0xFF
-                    totalBlue += rgb and 0xFF
-                }
-                val avgR = (totalRed / pixels.size).toInt()
-                val avgG = (totalGreen / pixels.size).toInt()
-                val avgB = (totalBlue / pixels.size).toInt()
+        for (segmentId in 0 until totalSegments) {
+            if (pixelCounts[segmentId] > 0) {
+                val avgR = (redTotals[segmentId] / pixelCounts[segmentId]).toInt()
+                val avgG = (greenTotals[segmentId] / pixelCounts[segmentId]).toInt()
+                val avgB = (blueTotals[segmentId] / pixelCounts[segmentId]).toInt()
                 
                 // Add slight color variation for more interesting appearance
                 val variation = (colorVariation * 128).toInt()
@@ -265,20 +264,21 @@ class StainedGlassEffect private constructor(
     }
 
     /**
-     * Process a range of rows for color calculation.
+     * Process color calculation using parallel arrays for better performance.
      */
-    private fun processColorRows(
-        startY: Int,
-        endY: Int, 
-        width: Int,
-        height: Int,
+    private fun processColorRowsWithArrays(
         yData: ByteArray,
         uData: ByteArray,
         vData: ByteArray,
+        width: Int,
+        height: Int,
         segmentMap: Array<IntArray>,
-        segmentPixels: MutableMap<Int, MutableList<Int>>
+        redTotals: LongArray,
+        greenTotals: LongArray,
+        blueTotals: LongArray,
+        pixelCounts: IntArray
     ) {
-        for (y in startY until endY) {
+        for (y in 0 until height) {
             for (x in 0 until width) {
                 val segmentId = segmentMap[y][x]
                 
@@ -289,13 +289,14 @@ class StainedGlassEffect private constructor(
                 
                 // Convert YUV to RGB
                 val rgb = yuvToRgb(yVal, uVal, vVal)
-
-                // Add to segment's pixel collection
-                var pixelsForSegment = segmentPixels[segmentId]
-                if (pixelsForSegment == null) {
-                    pixelsForSegment = mutableListOf()
+                
+                // Add to parallel arrays (bounds check for safety)
+                if (segmentId < redTotals.size) {
+                    redTotals[segmentId] += (rgb shr 16) and 0xFF
+                    greenTotals[segmentId] += (rgb shr 8) and 0xFF
+                    blueTotals[segmentId] += rgb and 0xFF
+                    pixelCounts[segmentId]++
                 }
-                pixelsForSegment.add(rgb)
             }
         }
     }
@@ -370,7 +371,7 @@ class StainedGlassEffect private constructor(
         init {
             try {
                 System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = true
+                nativeLibraryLoaded = false
             } catch (e: UnsatisfiedLinkError) {
                 Log.w(EFFECT_NAME, "Native library not available: ${e.message}")
                 nativeLibraryLoaded = false
