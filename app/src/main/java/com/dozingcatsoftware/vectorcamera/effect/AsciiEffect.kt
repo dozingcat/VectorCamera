@@ -93,7 +93,7 @@ class AsciiEffect(
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
         
-        val nativeResult = Companion.computeAsciiDataNativeFromPlanes(
+        val nativeResult = if (nativeLibraryLoaded) Companion.computeAsciiDataNativeFromPlanes(
             yData, uData, vData,
             cameraImage.width(),
             cameraImage.height(),
@@ -103,7 +103,7 @@ class AsciiEffect(
             colorMode.id,
             pixelChars.length,
             textColor
-        )
+        ) else null
         
         if (nativeResult == null || nativeResult.size != metrics.numCharacterColumns * metrics.numCharacterRows * 2) {
             Log.e(EFFECT_NAME, "Native ASCII computation failed, falling back to Kotlin")
@@ -410,34 +410,39 @@ class AsciiEffect(
         val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
         
         // Try native C++ rendering first for maximum performance
+        var nativeSuccess = false
         try {
             val templatePixels = IntArray(template.width * template.height)
             template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
             
-            
-            Companion.renderCharacterGridNative(
-                templatePixels,
-                template.width,
-                template.height,
-                charWidth,
-                charHeight,
-                characterIndices,
-                characterColors,
-                metrics.numCharacterColumns,
-                metrics.numCharacterRows,
-                metrics.isPortrait,
-                metrics.outputSize.width,
-                metrics.outputSize.height,
-                outputPixels,
-                backgroundColor,
-                numThreads
-            )
+            if (nativeLibraryLoaded) {
+                Companion.renderCharacterGridNative(
+                    templatePixels,
+                    template.width,
+                    template.height,
+                    charWidth,
+                    charHeight,
+                    characterIndices,
+                    characterColors,
+                    metrics.numCharacterColumns,
+                    metrics.numCharacterRows,
+                    metrics.isPortrait,
+                    metrics.outputSize.width,
+                    metrics.outputSize.height,
+                    outputPixels,
+                    backgroundColor,
+                    numThreads
+                )
+                nativeSuccess = true
+            }
             
         } catch (e: Exception) {
             Log.e(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
-            // Fallback to Kotlin implementation
+        }
+
+        if (!nativeSuccess) {
             renderCharacterGridKotlin(
-                cameraImage, metrics, template, charWidth, charHeight, 
+                cameraImage, metrics, template, charWidth, charHeight,
                 characterIndices, characterColors, outputPixels
             )
         }
@@ -684,9 +689,10 @@ class AsciiEffect(
         const val EFFECT_NAME = "ascii"
         const val DEFAULT_CHARACTER_COLUMNS = 120
         val EFFECTIVE_SIZE_FOR_TEXT_OUTPUT = Size(2560, 1600)
+        private var nativeLibraryLoaded = false
         
         init {
-            System.loadLibrary("vectorcamera_native")
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
         /**

@@ -62,15 +62,15 @@ inline int extractPrimaryColor(int argb) {
     int r = (argb >> 16) & 0xFF;
     int g = (argb >> 8) & 0xFF;
     int b = argb & 0xFF;
-    
-    // Find dominant component and enhance it
-    if (r >= g && r >= b) {
-        return (0xFF << 24) | (std::min(255, r * 3 / 2) << 16) | (g / 2 << 8) | (b / 2);
-    } else if (g >= r && g >= b) {
-        return (0xFF << 24) | (r / 2 << 16) | (std::min(255, g * 3 / 2) << 8) | (b / 2);
-    } else {
-        return (0xFF << 24) | (r / 2 << 16) | (g / 2 << 8) | std::min(255, b * 3 / 2);
-    }
+
+    int maxComponent = (r >= g && r >= b)
+            ? r : (g >= r && g >= b)
+            ? g : b;
+    int threshold = maxComponent * 0.875;
+    int primaryRed = (r >= threshold) ? 255 : 0;
+    int primaryGreen = (g >= threshold) ? 255 : 0;
+    int primaryBlue = (b >= threshold) ? 255 : 0;
+    return (0xFF << 24 | (primaryRed << 16) | (primaryGreen << 8) | primaryBlue);
 }
 
 /**

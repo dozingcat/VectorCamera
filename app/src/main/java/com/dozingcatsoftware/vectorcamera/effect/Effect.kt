@@ -3,6 +3,7 @@ package com.dozingcatsoftware.vectorcamera.effect
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
+import android.util.Log
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
 
@@ -37,5 +38,25 @@ interface Effect {
         const val MAX_NATIVE_THREADS = 2
         // Kotlin code is more CPU-bound and benefits from more parallelism
         const val MAX_KOTLIN_THREADS = 4
+
+        const val DISABLE_NATIVE_CODE = false
+        var nativeLibraryLoaded = false
+
+        fun loadNativeLibrary(): Boolean {
+            if (DISABLE_NATIVE_CODE) {
+                return false
+            }
+            if (nativeLibraryLoaded) {
+                return true
+            }
+            try {
+                System.loadLibrary("vectorcamera_native")
+                nativeLibraryLoaded = true
+                return true
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w("Effect", "Failed to load native library, using Kotlin implementation: ${e.message}")
+                return false
+            }
+        }
     }
 }

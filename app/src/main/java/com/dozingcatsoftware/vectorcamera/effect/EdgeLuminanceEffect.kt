@@ -55,14 +55,7 @@ class EdgeLuminanceEffect : Effect {
         private var nativeLibraryLoaded = false
         
         init {
-            try {
-                System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = true
-                Log.i(EFFECT_NAME, "Native library loaded successfully")
-            } catch (e: UnsatisfiedLinkError) {
-                Log.w(EFFECT_NAME, "Native library not available, using Kotlin implementation", e)
-                nativeLibraryLoaded = false
-            }
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
 
         fun fromParameters(params: Map<String, Any>): EdgeLuminanceEffect {

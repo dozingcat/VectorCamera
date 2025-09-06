@@ -141,14 +141,7 @@ class MatrixEffect(
         private var nativeLibraryLoaded = false
         
         init {
-            try {
-                System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = true
-                Log.i("MatrixEffect", "Native library loaded successfully")
-            } catch (e: UnsatisfiedLinkError) {
-                Log.w("MatrixEffect", "Native library not available, using Kotlin implementation")
-                nativeLibraryLoaded = false
-            }
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
         const val EFFECT_NAME = "matrix"
