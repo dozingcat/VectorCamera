@@ -43,7 +43,8 @@ class CombinationEffect(
         val tileSize = Size(
                 originalCameraImage.displaySize.width / gridSize,
                 originalCameraImage.displaySize.height / gridSize)
-        val cameraImage = originalCameraImage.copy(displaySize=tileSize)
+        Log.i("Combo", "tileSize=$tileSize")
+        val cameraImage = originalCameraImage.resizedTo(tileSize).copy(displaySize=tileSize)
         // We're rendering several subeffects at low resolution; use the full display resolution
         // for the combined image.
         val outputWidth = originalCameraImage.displaySize.width
@@ -108,8 +109,11 @@ class CombinationEffect(
             numThreads = 1, // Single-threaded combination rendering (subeffects have their own threading)
             generationDurationNanos = endTime - startTime
         )
-        
-        return ProcessedBitmap(this, originalCameraImage, resultBitmap, metadata)
+
+        // Return an immutable copy of the result bitmap to avoid artifacts that could happen if
+        // tiles for the next frame draw into the same bitmap that's being displayed.
+        val resultBitmapCopy = resultBitmap.copy(resultBitmap.config!!, false)
+        return ProcessedBitmap(this, originalCameraImage, resultBitmapCopy, metadata)
     }
 
     companion object {

@@ -51,16 +51,6 @@ class EffectRegistry {
                     )
                 ))
             },
-            // Blue
-            {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
-                        "colors" to mapOf(
-                                "type" to "fixed",
-                                "minColor" to listOf(0, 0, 0),
-                                "maxColor" to listOf(0, 0, 255)
-                        )
-                ))
-            },
             // Cyan
             {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
@@ -68,17 +58,6 @@ class EffectRegistry {
                         "type" to "fixed",
                         "minColor" to listOf(0, 0, 0),
                         "maxColor" to listOf(0, 255, 255)
-                    )
-                ))
-            },
-            // Row 2
-            // Purple
-            {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
-                    "colors" to mapOf(
-                        "type" to "fixed",
-                        "minColor" to listOf(0, 0, 0),
-                        "maxColor" to listOf(255, 0, 255)
                     )
                 ))
             },
@@ -92,6 +71,8 @@ class EffectRegistry {
                         )
                 ))
             },
+
+            // Row 2: Edges on light background.
             // Black on white.
             {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
@@ -132,7 +113,28 @@ class EffectRegistry {
                     )
                 ))
             },
-            // Row 3
+
+            // Rainbow, animated vertically on white background.
+            {prefsFn, context ->
+                EdgeEffect.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "grid_gradient",
+                        "minColor" to listOf(255, 255, 255),
+                        "grid" to listOf(
+                            listOf(listOf(128,0,0, 128,0,0, 96,96,0, 96,96,0)),
+                            listOf(listOf(96,96,0, 96,96,0, 0,128,0, 0,128,0)),
+                            listOf(listOf(0,128,0, 0,128,0, 0,96,96, 0,96,96)),
+                            listOf(listOf(0,96,96, 0,96,96, 0,0,128, 0,0,128)),
+                            listOf(listOf(0,0,128, 0,0,128, 96,0,96, 96,0,96)),
+                            listOf(listOf(96,0,96, 96,0,96, 128,0,0, 128,0,0))
+                        ),
+                        "sizeY" to 3.0,
+                        "speedY" to 500,
+                        "pixelsPerCell" to gradientPixelsPerCell(context)
+                    )
+                ))
+            },
+
             // Yellow background, 2d gradient colors.
             {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
@@ -148,6 +150,8 @@ class EffectRegistry {
                     )
                 ))
             },
+
+            // Row 3: Gradients
             // Pink background, 2d gradient colors.
             {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
@@ -163,7 +167,6 @@ class EffectRegistry {
                     )
                 ))
             },
-            // Animated colors.
             // Blue-green edges on black.
             {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
@@ -175,7 +178,7 @@ class EffectRegistry {
                     )
                 ))
             },
-            // Radial gradient background.
+            // Radial gradient, yellow in center to orange in edges.
             {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
@@ -224,29 +227,7 @@ class EffectRegistry {
                     )
                 ))
             },
-            // Row 4
-            // Rainbow, animated vertically on white background.
-            {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
-                    "colors" to mapOf(
-                        "type" to "grid_gradient",
-                        "minColor" to listOf(255, 255, 255),
-                        "grid" to listOf(
-                            listOf(listOf(128,0,0, 128,0,0, 96,96,0, 96,96,0)),
-                            listOf(listOf(96,96,0, 96,96,0, 0,128,0, 0,128,0)),
-                            listOf(listOf(0,128,0, 0,128,0, 0,96,96, 0,96,96)),
-                            listOf(listOf(0,96,96, 0,96,96, 0,0,128, 0,0,128)),
-                            listOf(listOf(0,0,128, 0,0,128, 96,0,96, 96,0,96)),
-                            listOf(listOf(96,0,96, 96,0,96, 128,0,0, 128,0,0))
-                        ),
-                        "sizeY" to 3.0, 
-                        "speedY" to 500,
-                        "pixelsPerCell" to gradientPixelsPerCell(context)
-                    )
-                ))
-            },
-            // Solid effects
-            // Rainbow 2d gradient.
+            // Solid rainbow 2d gradient.
             {prefsFn, context ->
                 SolidColorEffect.fromParameters(mapOf(
                     "colors" to mapOf(
@@ -259,6 +240,24 @@ class EffectRegistry {
                     )
                 ))
             },
+
+           // Row 4: Solid color effects.
+            {prefsFn, context -> PermuteColorEffect.noOp() },
+            // Grayscale negative.
+            {prefsFn, context ->
+                SolidColorEffect.fromParameters(mapOf(
+                    "colors" to mapOf(
+                        "type" to "fixed",
+                        "minColor" to listOf(255, 255, 255),
+                        "maxColor" to listOf(0, 0, 0)
+                    )
+                ))
+            },
+
+            {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
+            {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
+            {prefsFn, context -> PermuteColorEffect.flipUV() },
+
             // Cyan background, purple/red/yellow foreground.
             {prefsFn, context ->
                 SolidColorEffect.fromParameters(mapOf(
@@ -279,24 +278,7 @@ class EffectRegistry {
                 ))
             },
 
-            {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
-            {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
-            {prefsFn, context -> PermuteColorEffect.flipUV() },
-
-            // Row 5. Text effects.
-            // White text on black background.
-            {prefsFn, context ->
-                AsciiEffect.fromParameters(mapOf(
-                    "colorMode" to "fixed",
-                    "colors" to mapOf(
-                        "text" to listOf(255, 255, 255),
-                        "background" to listOf(0, 0, 0)
-                    ),
-                    "pixelChars" to asciiChars(prefsFn, "pixelChars.WHITE_ON_BLACK", " .:oO8#"),
-                    "numColumns" to numAsciiColumns(prefsFn),
-                    "prefId" to "pixelChars.WHITE_ON_BLACK"
-                ))
-            },
+            // Row 5: Text effects.
             // Black text on white background.
             {prefsFn, context ->
                 AsciiEffect.fromParameters(mapOf(
@@ -308,6 +290,19 @@ class EffectRegistry {
                     "pixelChars" to asciiChars(prefsFn, "pixelChars.BLACK_ON_WHITE", "#o:..  "),
                     "numColumns" to numAsciiColumns(prefsFn),
                     "prefId" to "pixelChars.BLACK_ON_WHITE"
+                ))
+            },
+            // White text on black background.
+            {prefsFn, context ->
+                AsciiEffect.fromParameters(mapOf(
+                    "colorMode" to "fixed",
+                    "colors" to mapOf(
+                        "text" to listOf(255, 255, 255),
+                        "background" to listOf(0, 0, 0)
+                    ),
+                    "pixelChars" to asciiChars(prefsFn, "pixelChars.WHITE_ON_BLACK", " .:oO8#"),
+                    "numColumns" to numAsciiColumns(prefsFn),
+                    "prefId" to "pixelChars.WHITE_ON_BLACK"
                 ))
             },
             // ANSI color mode.
@@ -344,21 +339,10 @@ class EffectRegistry {
                         "edges" to false
                 ))
             },
-            // Row 6
-            {prefsFn, context -> PermuteColorEffect.noOp() },
-            // Grayscale negative.
-            {prefsFn, context ->
-                SolidColorEffect.fromParameters(mapOf(
-                        "colors" to mapOf(
-                                "type" to "fixed",
-                                "minColor" to listOf(255, 255, 255),
-                                "maxColor" to listOf(0, 0, 0)
-                        )
-                ))
-            },
-            // Cartoon effect.
+            // Row 6: Miscellaneous and custom effects.
+            // Cartoon
             {prefsFn, context -> CartoonEffect.fromParameters(mapOf()) },
-            // Emboss grayscale.
+            // Emboss grayscale
             {prefsFn, context ->
                 Convolve3x3Effect.fromParameters(mapOf(
                         "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
@@ -371,7 +355,8 @@ class EffectRegistry {
             },
         
             {prefsFn, context -> OilPaintingEffect.standard() },
-            {prefsFn, context -> OilPaintingEffect.impressionist() },
+
+            {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
             // Custom edge.
             {prefsFn, context ->
@@ -389,7 +374,7 @@ class EffectRegistry {
 
     fun defaultEffectCount() = baseEffects.size
 
-    // The smallest N such that a N*N grid can show all the effects, e.g. 5 for 25.
+    // The smallest N such that a N*N grid can show all the effects, e.g. 5 for 25, 6 for 26.
     fun gridSizeForDefaultEffects() = Math.ceil(Math.sqrt(defaultEffectCount().toDouble())).toInt()
 
     fun defaultEffectAtIndex(index: Int, prefsFn: (String, Any) -> Any,
@@ -417,6 +402,7 @@ class EffectRegistry {
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
+            StainedGlassEffect.EFFECT_NAME -> StainedGlassEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
