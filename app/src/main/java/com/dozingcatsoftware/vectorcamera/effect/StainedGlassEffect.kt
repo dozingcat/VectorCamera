@@ -365,17 +365,10 @@ class StainedGlassEffect private constructor(
     companion object {
         const val EFFECT_NAME = "stained_glass"
         
-        // Native library loading
         private var nativeLibraryLoaded = false
         
         init {
-            try {
-                System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = false
-            } catch (e: UnsatisfiedLinkError) {
-                Log.w(EFFECT_NAME, "Native library not available: ${e.message}")
-                nativeLibraryLoaded = false
-            }
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
         /**

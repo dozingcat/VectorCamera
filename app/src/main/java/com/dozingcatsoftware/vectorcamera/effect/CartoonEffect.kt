@@ -324,14 +324,7 @@ class CartoonEffect(
         private var nativeLibraryLoaded = false
         
         init {
-            try {
-                System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = true
-                Log.i(EFFECT_NAME, "Native library loaded successfully")
-            } catch (e: UnsatisfiedLinkError) {
-                Log.w(EFFECT_NAME, "Failed to load native library, using Kotlin implementation: ${e.message}")
-                nativeLibraryLoaded = false
-            }
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
         private external fun processImageNativeFromPlanes(

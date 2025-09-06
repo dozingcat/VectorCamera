@@ -472,17 +472,10 @@ class OilPaintingEffect(
             }
         }
         
-        // Load native library
         private var nativeLibraryLoaded = false
         
         init {
-            try {
-                System.loadLibrary("vectorcamera_native")
-                nativeLibraryLoaded = true
-            } catch (e: UnsatisfiedLinkError) {
-                Log.w(EFFECT_NAME, "Failed to load native library, using Kotlin implementation: ${e.message}")
-                nativeLibraryLoaded = false
-            }
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
         private external fun processImageNativeFromPlanes(
