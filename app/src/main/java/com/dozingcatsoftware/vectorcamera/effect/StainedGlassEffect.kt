@@ -26,7 +26,7 @@ class StainedGlassEffect private constructor(
     private data class SegmentMapCache(
         val width: Int,
         val height: Int,
-        val sectionsPerRow: Int,
+        val segmentSize: Int,
         val segmentMap: Array<IntArray>,
         val seedPoints: List<List<SeedPoint>>
     )
@@ -39,13 +39,16 @@ class StainedGlassEffect private constructor(
 
     override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
         val startTime = System.nanoTime()
-        
-        val width = cameraImage.width()
-        val height = cameraImage.height()
-        
+
+        // Enforce minimum segment size, and if we're scaling down for display the minimum size
+        // needs to be larger so that when scaled down it will be normal.
+        val segmentScale = if (cameraImage.displaySize.width == 0) 1.0 else (cameraImage.width().toDouble() / cameraImage.displaySize.width).coerceAtLeast(1.0)
+        val minSegmentSize = (16 * segmentScale).roundToInt()
+        val segmentSize = (cameraImage.width() / sectionsPerRow).coerceAtLeast(minSegmentSize)
+
         // Create bitmap using region-based segmentation (hybrid native/Kotlin)
-        val bitmap = createStainedGlassBitmap(cameraImage, width, height, 0) // threads calculated internally
-        
+        val bitmap = createStainedGlassBitmap(cameraImage, segmentSize)
+
         val endTime = System.nanoTime()
         
         // Determine which implementation was used for metadata
@@ -60,19 +63,15 @@ class StainedGlassEffect private constructor(
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-
-    private fun segmentSizeForWidth(w: Int) = (w / sectionsPerRow).coerceAtLeast(10)
-
     /**
      * Create the stained glass effect using region-based segmentation.
      */
     private fun createStainedGlassBitmap(
-        cameraImage: CameraImage, 
-        width: Int, 
-        height: Int, 
-        numThreads: Int
+        cameraImage: CameraImage,
+        segmentSize: Int,
     ): Bitmap {
-        // Extract YUV data for processing
+        val width = cameraImage.width()
+        val height = cameraImage.height()
         val yData = cameraImage.getYBytes()
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
@@ -82,7 +81,6 @@ class StainedGlassEffect private constructor(
         val thicknessPixels = (edgeThickness * width).roundToInt().coerceAtLeast(1)
         
         val nativeSuccess = if (nativeLibraryLoaded) {
-            val segmentSize = segmentSizeForWidth(cameraImage.width())
             processStainedGlassNative(
                 yData, uData, vData, width, height, segmentSize,
                 thicknessPixels, edgeColor, colorVariation, outputPixels, 1
@@ -99,7 +97,7 @@ class StainedGlassEffect private constructor(
         } else {
             // Fall back to Kotlin implementation
             Log.i(EFFECT_NAME, "Native failed, using Kotlin fallback")
-            return createStainedGlassBitmapKotlin(cameraImage, width, height)
+            return createStainedGlassBitmapKotlin(cameraImage, width, height, segmentSize)
         }
     }
 
@@ -109,7 +107,8 @@ class StainedGlassEffect private constructor(
     private fun createStainedGlassBitmapKotlin(
         cameraImage: CameraImage, 
         width: Int, 
-        height: Int
+        height: Int,
+        segmentSize: Int,
     ): Bitmap {
         // Extract YUV data for processing
         val yData = cameraImage.getYBytes()
@@ -117,7 +116,7 @@ class StainedGlassEffect private constructor(
         val vData = cameraImage.getVBytes()
         
         // Get or create cached segment map
-        val (segmentMap, seedPoints) = getCachedSegmentMap(width, height, sectionsPerRow)
+        val (segmentMap, seedPoints) = getCachedSegmentMap(width, height, segmentSize)
         
         // Calculate average color for each segment
         val segmentColors = calculateSegmentColors(
@@ -133,17 +132,16 @@ class StainedGlassEffect private constructor(
     /**
      * Get cached segment map or create new one if cache is invalid.
      */
-    private fun getCachedSegmentMap(width: Int, height: Int, sectionsPerRow: Int): Pair<Array<IntArray>, List<List<SeedPoint>>> {
+    private fun getCachedSegmentMap(width: Int, height: Int, segmentSize: Int): Pair<Array<IntArray>, List<List<SeedPoint>>> {
         val cache = cachedSegmentMap
         
         // Check if cache is valid
-        if (cache != null && cache.width == width && cache.height == height && cache.sectionsPerRow == sectionsPerRow) {
+        if (cache != null && cache.width == width && cache.height == height && cache.segmentSize == segmentSize) {
             return Pair(cache.segmentMap, cache.seedPoints)
         }
         
         // Cache is invalid, create new segment map
         Log.i(EFFECT_NAME, "Creating new segment map for ${width}x${height}, sectionsPerRow=$sectionsPerRow")
-        val segmentSize = segmentSizeForWidth(width)
         val seedPoints = createSeedPoints(width, height, segmentSize)
         val segmentMap = createSegmentMapFromSeeds(width, height, segmentSize, seedPoints)
         
