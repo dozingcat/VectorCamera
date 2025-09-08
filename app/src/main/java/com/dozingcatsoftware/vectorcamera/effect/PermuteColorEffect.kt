@@ -160,9 +160,9 @@ class PermuteColorEffect(
                 val u = uData[uvIndex].toInt() and 0xFF
                 val v = vData[uvIndex].toInt() and 0xFF
 
-                // Apply UV flipping if requested
-                val uu = if (flipUV) v else u
-                val vv = if (flipUV) u else v
+                // flipUV rotates the color 180 degrees in UV space.
+                val uu = if (flipUV) (-u and 0xFF) else u
+                val vv = if (flipUV) (-v and 0xFF) else v
 
                 // Convert YUV to RGB
                 val rgb = YuvUtils.yuvToRgb(yy, uu, vv, includeAlpha = false)

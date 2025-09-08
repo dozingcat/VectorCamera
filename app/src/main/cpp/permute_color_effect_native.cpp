@@ -51,9 +51,9 @@ void processRows(
             int u = uData[uvIndex] & 0xFF;
             int v = vData[uvIndex] & 0xFF;
 
-            // Apply UV flipping if requested
-            int uu = flipUV ? v : u;
-            int vv = flipUV ? u : v;
+            // flipUV rotates the color 180 degrees in UV space.
+            int uu = flipUV ? (-u & 0xFF) : u;
+            int vv = flipUV ? (-v & 0xFF) : v;
 
             // Convert YUV to RGB
             int rgb = YuvUtils::yuvToRgb(yy, uu, vv, false);
