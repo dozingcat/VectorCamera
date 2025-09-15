@@ -7,8 +7,8 @@ android {
         applicationId "com.dozingcatsoftware.vectorcamera"
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode 14
-        versionName "1.7.0"
+        versionCode 15
+        versionName "2.0.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         
         ndk {
@@ -59,7 +59,7 @@ dependencies {
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
     // Avoids duplicate class errors: https://stackoverflow.com/questions/69817925/problem-duplicate-class-androidx-lifecycle-viewmodel-found-in-modules
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.3'
     implementation 'com.jaredrummler:colorpicker:1.1.0'
     // The xiph.org Vorbis encoding library is included as source, in src/main/java/org/xiph.
     // It was downloaded from https://xiph.org/downloads/
