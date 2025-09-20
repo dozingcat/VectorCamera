@@ -15,6 +15,10 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.dozingcatsoftware.util.adjustPaddingForSystemUi
 
+// The functionality to automatically import pictures taken with the standard camera app is disabled
+// because it requires the READ_MEDIA_IMAGES permission which Google restricts.
+const val AUTO_CONVERT_ENABLED = false
+
 class VCPreferencesActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,12 +52,14 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
         setPreferencesFromResource(R.xml.preferences, rootKey)
         val pm = this.preferenceManager
 
-        val autoConvertPref: Preference? = findPreference(getString(R.string.autoConvertPicturesPrefsKey))
-        autoConvertPref!!.setOnPreferenceChangeListener { pref, value ->
-            // Update broadcast receivers immediately so the change takes effect even if the user
-            // doesn't go back to the main activity.
-            setAutoConvertEnabled(this.requireContext(), java.lang.Boolean.TRUE == value)
-            true
+        if (AUTO_CONVERT_ENABLED) {
+            val autoConvertPref: Preference? = findPreference(getString(R.string.autoConvertPicturesPrefsKey))
+            autoConvertPref?.setOnPreferenceChangeListener { pref, value ->
+                // Update broadcast receivers immediately so the change takes effect even if the user
+                // doesn't go back to the main activity.
+                setAutoConvertEnabled(this.requireContext(), java.lang.Boolean.TRUE == value)
+                true
+            }
         }
 
         // HACK: when the user updates the character set of an ASCII effect, update the current
@@ -114,6 +120,7 @@ class VCPreferencesFragment : PreferenceFragmentCompat() {
      * Sets whether pictures saved by the camera app (or other apps which broadcast the appropriate
      * intent) should automatically be imported and processed. If necessary, requests permissions
      * needed to read the pictures.
+     * (As noted above this functionality is currently disabled due to permission restrictions).
      */
     private fun setAutoConvertEnabled(context: Context, enabled: Boolean) {
         if (enabled && !PermissionsChecker.hasStoragePermissions(requireActivity())) {
