@@ -1,4 +1,5 @@
 - Added video import.
-- Added "oil painting" and "stained glass" effects.
+- Added oil painting and stained glass effects.
 - Added support for edge-to-edge display and predictive back navigation.
+- Removed permissions to read all media files, and removed auto-import feature.
 - Switched effect code from RenderScript to C++.
