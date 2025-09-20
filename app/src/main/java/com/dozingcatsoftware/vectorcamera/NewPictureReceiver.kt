@@ -10,6 +10,7 @@ import android.util.Log
  * Receiver for the Camera.ACTION_NEW_PICTURE broadcast message sent when the camera app saves
  * a new picture. Calls ProcessImageOperation to import the picture.
  */
+// Currently this code is not enabled due to permission restrictions; see comments in AndroidManifest.xml
 class NewPictureReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         // On Android N and later we use a JobService and shouldn't get this notification.

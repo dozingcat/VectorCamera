@@ -7,9 +7,11 @@
         <CheckBoxPreference android:key="@string/takePictureWithVolumeButtonPrefsKey"
             android:enabled="true"
             android:title="@string/takePictureWithVolumeButtonPrefsTitle" />
-        <CheckBoxPreference android:key="@string/autoConvertPicturesPrefsKey"
-            android:enabled="true"
-            android:title="@string/autoConvertPicturesPrefsTitle" />
+        <!-- Auto-convert functionality is disabled due to Google Play permission restrictions -->
+        <CheckBoxPreference
+            android:key="@string/autoConvertPicturesPrefsKey"
+            android:title="@string/autoConvertPicturesPrefsTitle"
+            app:isPreferenceVisible="false" />
         <CheckBoxPreference android:key="@string/showDebugInfoPrefsKey"
             android:enabled="true"
             android:title="@string/showDebugInfoPrefsTitle" />
