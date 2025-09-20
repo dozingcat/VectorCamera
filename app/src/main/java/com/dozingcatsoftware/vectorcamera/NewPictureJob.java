@@ -19,6 +19,7 @@ import android.provider.MediaStore;
 import android.util.Log;
 
 // Based on https://developer.android.com/reference/android/app/job/JobInfo.Builder.html#addTriggerContentUri(android.app.job.JobInfo.TriggerContentUri)
+// Currently this code is not enabled due to permission restrictions; see comments in AndroidManifest.xml
 @TargetApi(24)
 public class NewPictureJob extends JobService {
     // The root URI of the media provider, to monitor for generic changes to its content.

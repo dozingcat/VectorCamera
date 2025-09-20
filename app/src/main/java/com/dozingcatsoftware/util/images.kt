@@ -8,6 +8,8 @@ import android.net.Uri
 import android.util.DisplayMetrics
 import android.util.Size
 import android.view.WindowManager
+import com.dozingcatsoftware.util.YuvUtils.rgbToY
+import com.dozingcatsoftware.util.YuvUtils.rgbToYuv
 import kotlin.math.roundToInt
 
 
@@ -180,21 +182,20 @@ class YuvImageBuffers(
             for (r2 in 0 until height / 2) {
                 bitmap.getPixels(pixBuffer, 0, width, 0, 2 * r2, width, 2)
                 for (i in pixBuffer.indices) {
-                    rb[i] = (pixBuffer[i] and 0xff0000) shr 16
-                    gb[i] = (pixBuffer[i] and 0x00ff00) shr 8
-                    bb[i] = (pixBuffer[i] and 0x0000ff)
-                    yBuffer[yIndex++] =
-                            clampToUnsignedByte(0.299 * rb[i] + 0.587 * gb[i] + 0.114 * bb[i])
+                    rb[i] = (pixBuffer[i] shr 16) and 0xFF
+                    gb[i] = (pixBuffer[i] shr 8) and 0xFF
+                    bb[i] = pixBuffer[i] and 0xFF
+                    yBuffer[yIndex++] = rgbToY(rb[i], gb[i], bb[i]).toByte()
                 }
                 // For U and V planes, average the pixels in 2x2 blocks.
                 for (i in 0 until width / 2) {
                     val x = 2 * i
-                    val ra = (rb[x] + rb[x + 1] + rb[x + width] + rb[x + width + 1]) / 4
-                    val ga = (gb[x] + gb[x + 1] + gb[x + width] + gb[x + width + 1]) / 4
-                    val ba = (bb[x] + rb[x + 1] + bb[x + width] + bb[x + width + 1]) / 4
-                    val y = 0.299 * ra + 0.587 * ga + 0.114 * ba
-                    uBuffer[uvIndex] = clampToUnsignedByte((ba - y) * 0.565 + 128)
-                    vBuffer[uvIndex] = clampToUnsignedByte((ra - y) * 0.713 + 128)
+                    val ra = (2 + rb[x] + rb[x + 1] + rb[x + width] + rb[x + width + 1]) / 4
+                    val ga = (2 + gb[x] + gb[x + 1] + gb[x + width] + gb[x + width + 1]) / 4
+                    val ba = (2 + bb[x] + rb[x + 1] + bb[x + width] + bb[x + width + 1]) / 4
+                    val yuv = rgbToYuv(ra, ga, ba)
+                    uBuffer[uvIndex] = (yuv shr 8).toByte()
+                    vBuffer[uvIndex] = yuv.toByte()
                     uvIndex += 1
                 }
             }
@@ -202,8 +203,4 @@ class YuvImageBuffers(
             return YuvImageBuffers(width, height, yBuffer, uBuffer, vBuffer)
         }
     }
-}
-
-private fun clampToUnsignedByte(v: Double): Byte {
-    return (Math.max(0, Math.min(255, v.toInt())) and 0xff).toByte()
 }
