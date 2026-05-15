@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Vector Camera</string>
     <string name="noImagesFound">No pictures found.</string>
+    <string name="no_app_to_open_link">No app available to open this link</string>
 
     <string name="takePictureWithVolumeButtonPrefsKey">takePictureWithVolumeButton</string>
     <string name="takePictureWithVolumeButtonPrefsTitle">Take picture with volume button</string>
