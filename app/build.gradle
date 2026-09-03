@@ -1,12 +1,11 @@
 apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 36
+    compileSdk 36
     defaultConfig {
         applicationId "com.dozingcatsoftware.vectorcamera"
-        minSdkVersion 23
-        targetSdkVersion 36
+        minSdk 23
+        targetSdk 36
         versionCode 15
         versionName "2.0.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
@@ -25,7 +24,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     namespace 'com.dozingcatsoftware.vectorcamera'
@@ -42,9 +41,13 @@ android {
     // https://developer.android.com/topic/libraries/view-binding/migration#groovy
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
-    kotlinOptions {
-        jvmTarget = '21'
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }
 
