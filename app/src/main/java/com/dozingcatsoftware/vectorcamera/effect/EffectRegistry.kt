@@ -13,7 +13,7 @@ enum class EffectContext {
 
 class EffectRegistry {
 
-    // 36 effects, shown in 6x6 grid.
+    // 38 effects, shown in 7x7 grid.
     // See Animated2dGradient.kt for description of gradient grids.
     val baseEffects = listOf<((String, Any) -> Any, EffectContext) -> Effect>(
 
@@ -362,6 +362,10 @@ class EffectRegistry {
 
             {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
+            // Stippling: black dots on white, and colored dots.
+            {prefsFn, context -> StippleEffect.blackOnWhite() },
+            {prefsFn, context -> StippleEffect.color() },
+
             // Custom edge.
             {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom1",
@@ -407,6 +411,7 @@ class EffectRegistry {
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
             StainedGlassEffect.EFFECT_NAME -> StainedGlassEffect.fromParameters(params)
+            StippleEffect.EFFECT_NAME -> StippleEffect.fromParameters(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }

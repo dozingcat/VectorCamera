@@ -38,6 +38,10 @@ android {
         sourceCompatibility 21
         targetCompatibility 21
     }
+    testOptions {
+        // Let JVM unit tests call into android.* stubs (e.g. Log) without throwing.
+        unitTests.returnDefaultValues = true
+    }
     // https://developer.android.com/topic/libraries/view-binding/migration#groovy
     buildFeatures {
         viewBinding true
