@@ -5,21 +5,18 @@ import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
-import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 
 import androidx.core.content.FileProvider
 import android.util.Log
-import android.util.Size
-import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.vectorcamera.effect.AsciiEffect
-import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
+import com.dozingcatsoftware.vectorcamera.effect.EffectInfo
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
@@ -34,7 +31,7 @@ class ViewImageActivity : AppCompatActivity() {
 
     private lateinit var imageId: String
     private var inEffectSelectionMode = false
-    private var effectSelectionIsPortrait = false
+    private var thumbnailRenderer: StaticThumbnailRenderer? = null
     private val effectRegistry = EffectRegistry()
     private val preferences = VCPreferences(this)
     private val handler = Handler()
@@ -50,7 +47,11 @@ class ViewImageActivity : AppCompatActivity() {
         binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         binding.shareButton.setOnClickListener(this::shareImage)
         binding.deleteButton.setOnClickListener(this::deleteImage)
-        binding.overlayView.touchEventHandler = this::handleOverlayViewTouch
+        binding.effectPickerView.setEffects(effectRegistry.effectInfos)
+        binding.effectPickerView.onEffectSelected = this::handleEffectSelected
+        binding.effectPickerView.onThumbnailNeeded = {info ->
+            thumbnailRenderer?.requestThumbnail(info.id)
+        }
 
         onBackPressedCallback = object: OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
@@ -65,19 +66,10 @@ class ViewImageActivity : AppCompatActivity() {
         loadImage()
     }
 
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        if (inEffectSelectionMode) {
-            val isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
-            if (isPortrait != effectSelectionIsPortrait) {
-                Log.i(TAG, "Switching portrait: " + isPortraitOrientation())
-                showModeSelectionGrid(isPortrait)
-            }
-        }
-    }
-
-    private fun isPortraitOrientation(): Boolean {
-        return binding.overlayView.height > binding.overlayView.width
+    override fun onDestroy() {
+        thumbnailRenderer?.shutdown()
+        thumbnailRenderer = null
+        super.onDestroy()
     }
 
     private fun loadImage() {
@@ -86,17 +78,37 @@ class ViewImageActivity : AppCompatActivity() {
         showImage(effect, metadata)
     }
 
-    private fun showModeSelectionGrid(isPortrait: Boolean) {
-        val comboEffect = CombinationEffect(
-                effectRegistry.defaultEffectFunctions(preferences.lookupFunction))
-        // Shrink the image so each combo grid cell doesn't have to process the full size.
-        // May want to incrementally show the grid as cells are rendered, like for the live view.
+    private fun showEffectPicker() {
+        val picker = binding.effectPickerView
         val metadata = photoLibrary.metadataForItemId(imageId)
-        val gridSize = effectRegistry.gridSizeForDefaultEffects()
-        val perCellSize = Size(metadata.width / gridSize, metadata.height / gridSize)
-        showImage(comboEffect, metadata, isPortrait, perCellSize)
+        var renderer: StaticThumbnailRenderer? = null
+        renderer = StaticThumbnailRenderer(
+                effectRegistry, preferences.lookupFunction, createCameraImage(metadata),
+                {picker.thumbnailSize},
+                {id, bitmap ->
+                    handler.post {
+                        // Ignore thumbnails that arrive after the picker was closed.
+                        if (renderer === thumbnailRenderer) {
+                            picker.setThumbnail(id, bitmap)
+                        }
+                    }
+                })
+        thumbnailRenderer?.shutdown()
+        thumbnailRenderer = renderer
+        picker.clearThumbnails()
+        picker.setSourceShape(metadata.width, metadata.height, metadata.orientation.portrait)
+        picker.selectedEffectId = metadata.effectId
+        picker.visibility = View.VISIBLE
+        picker.scrollToEffect(metadata.effectId)
         binding.controlBar.visibility = View.GONE
-        effectSelectionIsPortrait = isPortrait
+    }
+
+    private fun hideEffectPicker() {
+        thumbnailRenderer?.shutdown()
+        thumbnailRenderer = null
+        binding.effectPickerView.visibility = View.GONE
+        binding.effectPickerView.clearThumbnails()
+        binding.controlBar.visibility = View.VISIBLE
     }
 
     private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
@@ -107,11 +119,10 @@ class ViewImageActivity : AppCompatActivity() {
     private fun toggleEffectSelectionMode(view: View?) {
         updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (inEffectSelectionMode) {
-            showModeSelectionGrid(isPortraitOrientation())
+            showEffectPicker()
         }
         else {
-            loadImage()
-            binding.controlBar.visibility = View.VISIBLE
+            hideEffectPicker()
         }
     }
 
@@ -124,53 +135,26 @@ class ViewImageActivity : AppCompatActivity() {
                 CameraStatus.CAPTURING_PHOTO, metadata.timestamp, getLandscapeDisplaySize(this))
     }
 
-    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata,
-                                      forcePortrait: Boolean? = null,
-                                      newSize: Size? = null): ProcessedBitmap {
-        var inputImage = createCameraImage(metadata)
-        if (forcePortrait != null) {
-            inputImage = inputImage.copy(
-                    displaySize=inputImage.displaySize,
-                    orientation=inputImage.orientation.withPortrait(forcePortrait))
-        }
-        if (newSize != null) {
-            inputImage = inputImage.resizedTo(newSize)
-        }
-        return effect.createBitmap(inputImage)
+    private fun createProcessedBitmap(effect: Effect, metadata: MediaMetadata): ProcessedBitmap {
+        return effect.createBitmap(createCameraImage(metadata))
     }
 
-    private fun showImage(effect: Effect, metadata: MediaMetadata, forcePortrait: Boolean? = null,
-                          newSize: Size? = null) {
-        val pb = createProcessedBitmap(effect, metadata, forcePortrait, newSize)
+    private fun showImage(effect: Effect, metadata: MediaMetadata) {
+        val pb = createProcessedBitmap(effect, metadata)
         binding.overlayView.updateBitmap(pb)
     }
 
-    private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
-        // Mostly duplicated from MainActivity.
-        if (event.action == MotionEvent.ACTION_UP) {
-            if (inEffectSelectionMode) {
-                val numEffects = effectRegistry.defaultEffectCount()
-                val gridSize = effectRegistry.gridSizeForDefaultEffects()
-                val tileWidth = view.width / gridSize
-                val tileHeight = view.height / gridSize
-                val tileX = (event.x / tileWidth).toInt()
-                val tileY = (event.y / tileHeight).toInt()
-                val index = gridSize * tileY + tileX
-
-                val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
-                val effect = effectRegistry.defaultEffectAtIndex(
-                        effectIndex, preferences.lookupFunction)
-                // Update metadata and thumbnail, *not* the full size image because that's slow.
-                val newMetadata = photoLibrary.metadataForItemId(imageId)
-                        .withEffectMetadata(effect.effectMetadata())
-                val pb = createProcessedBitmap(effect, newMetadata)
-                photoLibrary.writeMetadata(newMetadata, imageId)
-                photoLibrary.writeThumbnail(pb, imageId)
-                binding.overlayView.updateBitmap(pb)
-                updateInEffectSelectionModeFlag(false)
-                binding.controlBar.visibility = View.VISIBLE
-            }
-        }
+    private fun handleEffectSelected(info: EffectInfo) {
+        val effect = effectRegistry.createEffect(info.id, preferences.lookupFunction)
+        // Update metadata and thumbnail, *not* the full size image because that's slow.
+        val newMetadata = photoLibrary.metadataForItemId(imageId)
+                .withEffectMetadata(effect.effectMetadata(), info.id)
+        val pb = createProcessedBitmap(effect, newMetadata)
+        photoLibrary.writeMetadata(newMetadata, imageId)
+        photoLibrary.writeThumbnail(pb, imageId)
+        binding.overlayView.updateBitmap(pb)
+        updateInEffectSelectionModeFlag(false)
+        hideEffectPicker()
     }
 
     private fun shareImage(view: View) {

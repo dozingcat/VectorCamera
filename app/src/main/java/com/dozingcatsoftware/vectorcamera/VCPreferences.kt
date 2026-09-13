@@ -40,11 +40,18 @@ class VCPreferences(val context: Context) {
         throw IllegalArgumentException("Unsupported type: ${defaultValue.javaClass}")
     }
 
-    fun saveEffectInfo(effectName: String, params: Map<String, Any>) {
+    fun saveEffectInfo(effectName: String, params: Map<String, Any>, effectId: String? = null) {
         withPrefsEditor {
             it.putString(EFFECT_NAME_KEY, effectName)
             it.putString(EFFECT_PARAMETERS_KEY, mapToJsonString(params))
+            it.putString(EFFECT_ID_KEY, effectId ?: "")
         }
+    }
+
+    /** ID of the effect selected in the picker, or null if not known (e.g. before first use). */
+    fun effectId(): String? {
+        val id = sharedPrefs().getString(EFFECT_ID_KEY, "")!!
+        return if (id.isEmpty()) null else id
     }
 
     fun effectParameters(): Map<String, Any> {
@@ -84,6 +91,7 @@ class VCPreferences(val context: Context) {
     companion object {
         const val TAG = "VCPreferences"
         const val EFFECT_NAME_KEY = "effectName"
+        const val EFFECT_ID_KEY = "effectId"
         const val EFFECT_PARAMETERS_KEY = "effectParams"
         const val HIGH_QUALITY_PREVIEW_KEY = "highQualityPreview"
     }
