@@ -12,14 +12,20 @@ class CameraImageProcessor() {
     private val threadLock = ReentrantLock()
     private val allocationLock = ReentrantLock()
     private val allocationAvailable = allocationLock.newCondition()
-    private lateinit var effect: Effect
+    @Volatile private var processFn: ((CameraImage) -> Unit)? = null
 
+    /** Applies `effect` to each camera image and passes the result to `callback`. */
     fun start(effect: Effect, callback: (ProcessedBitmap) -> Unit) {
+        start({cameraImage -> callback(effect.createBitmap(cameraImage))})
+    }
+
+    /** Calls `processFn` with each camera image on the processing thread. */
+    fun start(processFn: (CameraImage) -> Unit) {
         this.pause()
-        this.effect = effect
+        this.processFn = processFn
         threadLock.withLock({
             if (consumerThread == null) {
-                consumerThread = Thread({this.threadEntry(callback)})
+                consumerThread = Thread({this.threadEntry()})
                 consumerThread!!.start()
             }
         })
@@ -50,7 +56,7 @@ class CameraImageProcessor() {
         })
     }
 
-    private fun threadEntry(callback: (ProcessedBitmap) -> Unit) {
+    private fun threadEntry() {
         var currentCamAllocation: CameraImage? = null
         while (true) {
             while (currentCamAllocation == null) {
@@ -69,9 +75,7 @@ class CameraImageProcessor() {
                 })
             }
 
-            val processedBitmap = effect.createBitmap(currentCamAllocation)
-            
-            callback(processedBitmap)
+            processFn?.invoke(currentCamAllocation)
             currentCamAllocation = null
         }
     }

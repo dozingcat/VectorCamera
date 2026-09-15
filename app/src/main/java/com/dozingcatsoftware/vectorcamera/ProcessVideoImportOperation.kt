@@ -160,7 +160,7 @@ class ProcessVideoImportOperation(val timeFn: (() -> Long) = System::currentTime
                 // Store actual stored frame dimensions (landscape)
                 max(dstWidth, dstHeight),
                 min(dstWidth, dstHeight),
-                orientation, timeFn())
+                orientation, timeFn(), effectId = prefs.effectId())
 
         PhotoLibrary.defaultLibrary(context).saveVideo(
                 context, videoId, md, frameTimestampsMs, audioStartTimestampMs)

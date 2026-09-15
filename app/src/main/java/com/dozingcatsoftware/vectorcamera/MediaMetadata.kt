@@ -5,17 +5,20 @@ import java.util.Locale
 
 enum class MediaType {IMAGE, VIDEO}
 
+// effectId is the EffectRegistry ID of the effect chosen in the picker, if known. It's used to
+// highlight the effect in the picker; effectMetadata is what's used to recreate the effect.
 data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMetadata,
                          val width: Int, val height: Int,
                          val orientation: ImageOrientation, val timestamp: Long,
                          val frameTimestamps: List<Long> = listOf(),
                          val audioStartTimestamp: Long = 0,
-                         val exportedEffectMetadata: Map<String, EffectMetadata> = mapOf()) {
+                         val exportedEffectMetadata: Map<String, EffectMetadata> = mapOf(),
+                         val effectId: String? = null) {
 
     fun toJson(): Map<String, Any> {
         val exportedEffectDict =
                 exportedEffectMetadata.mapValues({entry -> entry.value.toJson()})
-        return mapOf(
+        val json = mutableMapOf<String, Any>(
                 "type" to mediaType.name.lowercase(Locale.getDefault()),
                 "width" to width,
                 "height" to height,
@@ -27,12 +30,17 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                 "audioStartTimestamp" to audioStartTimestamp,
                 "effect" to effectMetadata.toJson(),
                 "exportedEffects" to exportedEffectDict)
+        if (effectId != null) {
+            json["effectId"] = effectId
+        }
+        return json
     }
 
-    fun withEffectMetadata(em: EffectMetadata): MediaMetadata {
+    fun withEffectMetadata(em: EffectMetadata, effectId: String?): MediaMetadata {
         return MediaMetadata(
                 mediaType, em, width, height, orientation,
-                timestamp, frameTimestamps, audioStartTimestamp, exportedEffectMetadata)
+                timestamp, frameTimestamps, audioStartTimestamp, exportedEffectMetadata,
+                effectId)
     }
 
     fun withExportedEffectMetadata(em: EffectMetadata, exportType: String): MediaMetadata {
@@ -40,7 +48,8 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
         newExportedEffects[exportType] = em
         return MediaMetadata(
                 mediaType, effectMetadata, width, height, orientation,
-                timestamp, frameTimestamps, audioStartTimestamp, newExportedEffects)
+                timestamp, frameTimestamps, audioStartTimestamp, newExportedEffects,
+                effectId)
     }
 
     companion object {
@@ -62,7 +71,8 @@ data class MediaMetadata(val mediaType: MediaType, val effectMetadata: EffectMet
                     json["timestamp"] as Long,
                     frameTimestamps as List<Long>,
                     audioStartTimestamp.toLong(),
-                    exportedEffectMetadata)
+                    exportedEffectMetadata,
+                    json["effectId"] as String?)
         }
     }
 }

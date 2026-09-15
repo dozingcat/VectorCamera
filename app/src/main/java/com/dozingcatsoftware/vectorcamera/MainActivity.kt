@@ -42,13 +42,14 @@ class MainActivity : AppCompatActivity() {
 
     private val effectRegistry = EffectRegistry()
     private var currentEffect: Effect? = null
-    private var previousEffect: Effect? = null
     private var inEffectSelectionMode = false
+    // Renders picker thumbnails while in effect selection mode.
+    private var thumbnailRenderer: LiveThumbnailRenderer? = null
     private var lastBitmapTimestamp = 0L
     private var previousFingerSpacing = 0.0
 
-    // For updating custom schemes, we need to keep the effect index and scheme ID.
-    private var effectIndex = 0
+    // For updating custom schemes, we need to keep the effect ID and scheme ID.
+    private var selectedEffectId: String? = null
     private var customSchemeId = ""
 
     private var videoRecorder: VideoRecorder? = null
@@ -84,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         imageProcessor = CameraImageProcessor()
 
         currentEffect = effectFromPreferences()
+        selectedEffectId = preferences.effectId()
         preferredImageSize =
                 if (preferences.useHighQualityPreview()) ImageSize.FULL_SCREEN
                 else ImageSize.HALF_SCREEN
@@ -104,6 +106,8 @@ class MainActivity : AppCompatActivity() {
         binding.cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+        binding.effectPickerView.setEffects(effectRegistry.effectInfos)
+        binding.effectPickerView.onEffectSelected = this::handleEffectSelected
 
         // If the effect selection grid is visible, a back navigation should hide
         // the grid without changing the effect, and should remain in this activity.
@@ -119,9 +123,8 @@ class MainActivity : AppCompatActivity() {
         // Preload the effect classes so there's not a delay when switching to the effect grid.
         Thread({
             Log.i(TAG, "Starting effect loading thread")
-            for (i in 0 until effectRegistry.defaultEffectCount()) {
-                effectRegistry.defaultEffectAtIndex(
-                    i, preferences.lookupFunction, EffectContext.PRELOAD)
+            for (info in effectRegistry.effectInfos) {
+                info.factory(preferences.lookupFunction, EffectContext.PRELOAD)
             }
             Log.i(TAG, "Done loading effects")
         }).start()
@@ -308,6 +311,8 @@ class MainActivity : AppCompatActivity() {
     private fun updateLayout(isPortrait: Boolean) {
         Log.i(TAG, "updateLayout: ${isPortrait}")
         layoutIsPortrait = isPortrait
+        val ds = getLandscapeDisplaySize(this)
+        binding.effectPickerView.setSourceShape(ds.width, ds.height, isPortrait)
         val match = FrameLayout.LayoutParams.MATCH_PARENT
         val wrap = FrameLayout.LayoutParams.WRAP_CONTENT
         val layoutWidth = if (isPortrait) match else wrap
@@ -419,7 +424,7 @@ class MainActivity : AppCompatActivity() {
         saveIndicator.show()
         (Thread {
             try {
-                val photoId = photoLibrary.savePhoto(this, pb)
+                val photoId = photoLibrary.savePhoto(this, pb, selectedEffectId)
                 saveIndicator.dismiss()
                 handler.post {
                     ViewImageActivity.startActivityWithImageId(this, photoId)
@@ -445,7 +450,8 @@ class MainActivity : AppCompatActivity() {
                         source.width(),
                         source.height(),
                         source.orientation,
-                        source.timestamp)
+                        source.timestamp,
+                        effectId = selectedEffectId)
             }
             vr.recordFrame(source.timestamp, listOf(
                 source.getYBytes(), source.getUBytes(), source.getVBytes()
@@ -483,7 +489,19 @@ class MainActivity : AppCompatActivity() {
                 cameraStatus,
                 this.targetCameraImageSize(),
                 this::handleAllocationFromCamera)
-        this.imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+        startImageProcessor()
+    }
+
+    // In effect selection mode, camera images are used to render picker thumbnails rather than
+    // being displayed directly.
+    private fun startImageProcessor() {
+        val renderer = thumbnailRenderer
+        if (inEffectSelectionMode && renderer != null) {
+            imageProcessor.start(renderer::processCameraImage)
+        }
+        else {
+            imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
+        }
     }
 
     private fun toggleVideoMode(view: View) {
@@ -530,36 +548,59 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleEffectSelectionMode(view: View?) {
         if (videoRecorder != null) {
-            Log.i(TAG, "Video recording in progress, not toggling effect grid")
+            Log.i(TAG, "Video recording in progress, not toggling effect picker")
+            return
+        }
+        if (!cameraImageGenerator.status.isCapturing()) {
+            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect picker")
             return
         }
         updateInEffectSelectionModeFlag(!inEffectSelectionMode)
-        if (!cameraImageGenerator.status.isCapturing()) {
-            Log.i(TAG, "Status is ${cameraImageGenerator.status}, not toggling effect grid")
-            return
-        }
         if (inEffectSelectionMode) {
-            previousEffect = currentEffect
-            val comboEffects = effectRegistry.defaultEffectFunctions(
-                    preferences.lookupFunction, EffectContext.COMBO_GRID)
-            currentEffect = CombinationEffect(comboEffects, 50)
-            preferredImageSize = ImageSize.EFFECT_GRID
-            binding.controlLayout.visibility = View.GONE
-            Log.i(TAG, "Showing combo grid")
+            showEffectPicker()
         }
         else {
-            currentEffect = previousEffect
-            preferredImageSize = previewImageSizeFromPrefs()
-            Log.i(TAG, "Exiting combo grid")
+            hideEffectPicker()
         }
         restartCameraImageGenerator()
-        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
-        binding.controlLayout.visibility = if (inEffectSelectionMode) View.GONE else View.VISIBLE
+    }
+
+    private fun showEffectPicker() {
+        val picker = binding.effectPickerView
+        var renderer: LiveThumbnailRenderer? = null
+        renderer = LiveThumbnailRenderer(
+                effectRegistry, preferences.lookupFunction, THUMBNAIL_MILLIS_PER_FRAME,
+                {picker.visibleEffectIds}, {picker.thumbnailSize},
+                {id, bitmap ->
+                    handler.post {
+                        // Ignore thumbnails that arrive after the picker was closed.
+                        if (renderer === thumbnailRenderer) {
+                            picker.setThumbnail(id, bitmap)
+                        }
+                    }
+                })
+        thumbnailRenderer = renderer
+        picker.clearThumbnails()
+        picker.selectedEffectId = selectedEffectId
+        picker.visibility = View.VISIBLE
+        picker.scrollToEffect(selectedEffectId)
+        preferredImageSize = ImageSize.EFFECT_GRID
+        binding.controlLayout.visibility = View.GONE
         binding.editSchemeView.visibility = View.GONE
+        Log.i(TAG, "Showing effect picker")
+    }
+
+    private fun hideEffectPicker() {
+        thumbnailRenderer = null
+        binding.effectPickerView.visibility = View.GONE
+        binding.effectPickerView.clearThumbnails()
+        binding.controlLayout.visibility = View.VISIBLE
+        preferredImageSize = previewImageSizeFromPrefs()
+        Log.i(TAG, "Hiding effect picker")
     }
 
     private fun handleOverlayViewTouchEvent(view: OverlayView, event: MotionEvent) {
-        if (event.pointerCount > 1 && !inEffectSelectionMode) {
+        if (event.pointerCount > 1) {
             // Zoom in or out if we've gotten repeated multitouch events.
             val dx = event.getX(0) - event.getX(1)
             val dy = event.getY(1) - event.getY(1)
@@ -578,47 +619,29 @@ class MainActivity : AppCompatActivity() {
         }
         else {
             if (event.action == MotionEvent.ACTION_DOWN) {
-                if (!inEffectSelectionMode) {
-                    binding.controlLayout.visibility =
-                            if (binding.controlLayout.visibility == View.VISIBLE) View.GONE
-                            else View.VISIBLE
-                }
+                binding.controlLayout.visibility =
+                        if (binding.controlLayout.visibility == View.VISIBLE) View.GONE
+                        else View.VISIBLE
             }
         }
         if (event.action == MotionEvent.ACTION_UP) {
             previousFingerSpacing = 0.0
-            // Handle effect selection with ACTION_UP rather than ACTION_DOWN so that
-            // it won't be inadvertently triggered at the start of a back gesture.
-            if (inEffectSelectionMode) {
-                handleEffectGridTouch(view, event)
-            }
         }
     }
 
-    private fun handleEffectGridTouch(view: View, event: MotionEvent) {
+    private fun handleEffectSelected(info: EffectInfo) {
         if (!cameraImageGenerator.status.isCapturing()) {
             Log.i(TAG, "Status is ${cameraImageGenerator.status}, not selecting effect")
             return
         }
-        val gridSize = Math.ceil(
-                Math.sqrt(effectRegistry.defaultEffectCount().toDouble())).toInt()
-        val tileWidth = view.width / gridSize
-        val tileHeight = view.height / gridSize
-        val tileX = (event.x / tileWidth).toInt()
-        val tileY = (event.y / tileHeight).toInt()
-        var index = gridSize * tileY + tileX
-        index = Math.min(Math.max(0, index), effectRegistry.defaultEffectCount() - 1)
-        effectIndex = index
-        Log.i(TAG, "Selected effect ${index}")
-
-        val eff = effectRegistry.defaultEffectAtIndex(index, preferences.lookupFunction)
-        preferences.saveEffectInfo(eff.effectName(), eff.effectParameters())
+        Log.i(TAG, "Selected effect ${info.id}")
+        selectedEffectId = info.id
+        val eff = effectRegistry.createEffect(info.id, preferences.lookupFunction)
+        preferences.saveEffectInfo(eff.effectName(), eff.effectParameters(), info.id)
         updateInEffectSelectionModeFlag(false)
-        binding.overlayView.visibility = View.VISIBLE
-        binding.controlLayout.visibility = View.VISIBLE
-        preferredImageSize = previewImageSizeFromPrefs()
+        hideEffectPicker()
+        // This reads the new effect from preferences.
         restartCameraImageGenerator()
-        imageProcessor.start(currentEffect!!, this::handleGeneratedBitmap)
 
         if (eff is CustomEffect) {
             binding.editSchemeView.setScheme(eff.colorScheme)
@@ -664,13 +687,13 @@ class MainActivity : AppCompatActivity() {
         }
         // The order matters here because `defaultEffectAtIndex` reads from the preferences.
         preferences.saveCustomScheme(customSchemeId, cs)
-        // Keeping customSchemeId and effectIndex as instance variables is ugly. The problem is that
-        // when the user selects a custom effect, `currentEffect` gets set to the underlying effect
-        // rather than the "wrapper" CustomEffect.
-        val newEffect = effectRegistry.defaultEffectAtIndex(
-                effectIndex, preferences.lookupFunction)
+        // Keeping customSchemeId and selectedEffectId as instance variables is ugly. The problem
+        // is that when the user selects a custom effect, `currentEffect` gets set to the
+        // underlying effect rather than the "wrapper" CustomEffect.
+        val effectId = selectedEffectId ?: return
+        val newEffect = effectRegistry.createEffect(effectId, preferences.lookupFunction)
         // Save the resulting effect so that it will restore correctly.
-        preferences.saveEffectInfo(newEffect.effectName(), newEffect.effectParameters())
+        preferences.saveEffectInfo(newEffect.effectName(), newEffect.effectParameters(), effectId)
         restartCameraImageGenerator()
     }
 
@@ -846,6 +869,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val TAG = "MainActivity"
+        // Time budget per camera frame for rendering picker thumbnails.
+        const val THUMBNAIL_MILLIS_PER_FRAME = 50L
 
         const val ACTIVITY_CHOOSE_PICTURE = 1
     }

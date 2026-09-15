@@ -13,11 +13,8 @@ class VideoReader(photoLibrary: PhotoLibrary, videoId: String,
     private val videoFile = photoLibrary.rawVideoRandomAccessFileForItemId(videoId)!!
     private val metadata = photoLibrary.metadataForItemId(videoId)
     private val frameBuffer: ByteArray
-    // effect and displaySize can be changed after creation.
-    // forcePortrait is for when we're showing the effect selection grid and always want to fill
-    // the screen, so we enable portrait when the device is vertical regardless of the metadata.
+    // effect can be changed after creation.
     var effect: Effect
-    var forcePortrait: Boolean? = null
 
     init {
         // It would be better to pass in the EffectRegistry.
@@ -34,7 +31,8 @@ class VideoReader(photoLibrary: PhotoLibrary, videoId: String,
 
     private fun bytesPerFrame() = metadata.width * metadata.height * 3 / 2
 
-    fun bitmapForFrame(frameIndex: Int): ProcessedBitmap {
+    /** Reads the raw frame at `frameIndex` without applying an effect. */
+    fun cameraImageForFrame(frameIndex: Int): CameraImage {
         if (frameIndex < 0 || frameIndex >= numberOfFrames()) {
             throw IllegalArgumentException("Invalid frame index: ${frameIndex}")
         }
@@ -42,15 +40,13 @@ class VideoReader(photoLibrary: PhotoLibrary, videoId: String,
         videoFile.seek(frameIndex * bpf)
         videoFile.readFully(frameBuffer)
         val imageData = ImageData.fromYuvBytes(frameBuffer, metadata.width, metadata.height)
-        var cameraImage = CameraImage(
+        return CameraImage(
                 imageData, metadata.orientation, CameraStatus.CAPTURING_VIDEO,
                 metadata.frameTimestamps[frameIndex], displaySize)
-        val fp = forcePortrait
-        if (fp != null) {
-            cameraImage = cameraImage.copy(
-                    displaySize=displaySize, orientation=cameraImage.orientation.withPortrait(fp))
-        }
-        return effect.createBitmap(cameraImage)
+    }
+
+    fun bitmapForFrame(frameIndex: Int): ProcessedBitmap {
+        return effect.createBitmap(cameraImageForFrame(frameIndex))
     }
 
     fun millisBetweenFrames(frame1Index: Int, frame2Index: Int): Long {

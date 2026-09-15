@@ -58,8 +58,10 @@ class PhotoLibrary(val rootDirectory: File) {
     /**
      * Saves picture data as a compressed bytestream of Y/U/V image planes. Also creates a
      * metadata file and thumbnail image. Does not create a full-size PNG image.
+     * `effectId` is the picker ID of the effect, if known.
      */
-    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap): String {
+    fun savePhoto(context: Context, processedBitmap: ProcessedBitmap,
+                  effectId: String? = null): String {
         val t1 = System.currentTimeMillis()
         Log.i(TAG, "savePhoto start")
         val sourceImage = processedBitmap.sourceImage
@@ -89,7 +91,7 @@ class PhotoLibrary(val rootDirectory: File) {
         val effectMetadata = EffectMetadata(
                 processedBitmap.effect.effectName(), processedBitmap.effect.effectParameters())
         val metadata = MediaMetadata(MediaType.IMAGE, effectMetadata, width, height,
-                sourceImage.orientation, sourceImage.timestamp)
+                sourceImage.orientation, sourceImage.timestamp, effectId = effectId)
         writeMetadata(metadata, photoId)
 
         writeThumbnail(processedBitmap, photoId)
@@ -233,7 +235,8 @@ class PhotoLibrary(val rootDirectory: File) {
         }
         val metadata = MediaMetadata(
                 MediaType.VIDEO, imageInfo.effectMetadata, imageInfo.width, imageInfo.height,
-                imageInfo.orientation, imageInfo.timestamp, frameTimestamps, audioStartTimestamp)
+                imageInfo.orientation, imageInfo.timestamp, frameTimestamps, audioStartTimestamp,
+                effectId = imageInfo.effectId)
         writeMetadata(metadata, itemId)
         // Create thumbnail by rendering the first frame.
         // Circular dependency, ick.
