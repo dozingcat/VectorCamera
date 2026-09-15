@@ -65,6 +65,8 @@ class LiveThumbnailRenderer(
     private val renderer = ThumbnailRenderer(effectRegistry, prefsFn)
     private var nextId: String? = null
 
+    private var frameCounter = 0;
+
     fun processCameraImage(cameraImage: CameraImage) {
         val ids = visibleIdsFn()
         if (ids.isEmpty()) {
@@ -83,7 +85,9 @@ class LiveThumbnailRenderer(
             }
         }
         nextId = ids[(startIndex + numUpdated) % ids.size]
-        Log.i(TAG, "Thumbnail time: ${timeFn() - t0}, updated: $numUpdated of ${ids.size}")
+        if (frameCounter++ % 30 == 0) {
+            Log.i(TAG, "Thumbnail time: ${timeFn() - t0}, updated: $numUpdated of ${ids.size}")
+        }
     }
 
     companion object {

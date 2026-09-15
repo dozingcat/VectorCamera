@@ -279,8 +279,8 @@ class EffectRegistry {
                 ))
             },
 
-            EffectInfo("permute_brg", "Swapped colors", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
-            EffectInfo("permute_gbr", "Swapped colors 2", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
+            EffectInfo("permute_brg", "Swapped colors RGB->BRG", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
+            EffectInfo("permute_gbr", "Swapped colors RGB->GBR", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
             EffectInfo("flip_uv", "Complementary colors", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.flipUV() },
 
             // Cyan background, purple/red/yellow foreground.
@@ -384,13 +384,13 @@ class EffectRegistry {
             EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
             // Custom edge.
-            EffectInfo("custom1", "Custom edges", EffectCategory.CUSTOM) {prefsFn, context ->
+            EffectInfo("custom1", "Custom 1", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom1",
                         CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
             // Custom solid.
-            EffectInfo("custom2", "Custom solid", EffectCategory.CUSTOM) {prefsFn, context ->
+            EffectInfo("custom2", "Custom 2", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom2",
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))

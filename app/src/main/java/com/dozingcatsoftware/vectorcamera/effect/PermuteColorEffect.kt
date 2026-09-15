@@ -233,16 +233,19 @@ class PermuteColorEffect(
             "blue" to ColorComponentSource.BLUE.toString()
         ))
 
+        // The map is "backwards" in that it defines where the red/green/blue components of the
+        // output image come from. So if we want to go from RGB to GBR, red comes from blue,
+        // green comes from red, and blue comes from green.
         fun rgbToGbr() = fromParameters(mapOf(
-            "red" to ColorComponentSource.GREEN.toString(),
-            "green" to ColorComponentSource.BLUE.toString(),
-            "blue" to ColorComponentSource.RED.toString()
-        ))
-
-        fun rgbToBrg() = fromParameters(mapOf(
             "red" to ColorComponentSource.BLUE.toString(),
             "green" to ColorComponentSource.RED.toString(),
             "blue" to ColorComponentSource.GREEN.toString()
+        ))
+
+        fun rgbToBrg() = fromParameters(mapOf(
+            "red" to ColorComponentSource.GREEN.toString(),
+            "green" to ColorComponentSource.BLUE.toString(),
+            "blue" to ColorComponentSource.RED.toString()
         ))
 
         fun flipUV() = fromParameters(mapOf(
