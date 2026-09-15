@@ -282,6 +282,7 @@ class EffectRegistry {
             EffectInfo("permute_brg", "Swapped colors RGB->BRG", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
             EffectInfo("permute_gbr", "Swapped colors RGB->GBR", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
             EffectInfo("flip_uv", "Complementary colors", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.flipUV() },
+            EffectInfo("color_negative", "Color negative", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.colorNegative() },
 
             // Cyan background, purple/red/yellow foreground.
             EffectInfo("solid_warm_on_cyan", "Warm on cyan", EffectCategory.COLORS) {prefsFn, context ->
