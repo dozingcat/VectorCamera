@@ -5,20 +5,17 @@ import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.content.Intent
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
 
 import androidx.core.content.FileProvider
-import android.view.MotionEvent
 import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import com.dozingcatsoftware.vectorcamera.effect.CombinationEffect
-import com.dozingcatsoftware.vectorcamera.effect.Effect
+import com.dozingcatsoftware.vectorcamera.effect.EffectInfo
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
@@ -55,7 +52,7 @@ class ViewVideoActivity: AppCompatActivity() {
 
     private lateinit var videoId: String
     private var inEffectSelectionMode = false
-    private var originalEffect: Effect? = null
+    private var thumbnailRenderer: StaticThumbnailRenderer? = null
     private val effectRegistry = EffectRegistry()
     private lateinit var videoReader: VideoReader
     private val preferences = VCPreferences(this)
@@ -80,7 +77,11 @@ class ViewVideoActivity: AppCompatActivity() {
         binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
         binding.playPauseButton.setOnClickListener(this::togglePlay)
         binding.deleteButton.setOnClickListener(this::deleteVideo)
-        binding.overlayView.touchEventHandler = this::handleOverlayViewTouch
+        binding.effectPickerView.setEffects(effectRegistry.effectInfos)
+        binding.effectPickerView.onEffectSelected = this::handleEffectSelected
+        binding.effectPickerView.onThumbnailNeeded = {info ->
+            thumbnailRenderer?.requestThumbnail(info.id)
+        }
 
         // Yes, this does I/O.
         videoId = intent.getStringExtra("videoId")!!
@@ -119,14 +120,10 @@ class ViewVideoActivity: AppCompatActivity() {
         super.onPause()
     }
 
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        if (inEffectSelectionMode) {
-            videoReader.forcePortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
-            if (!isPlaying) {
-                loadFrame(frameIndex)
-            }
-        }
+    override fun onDestroy() {
+        thumbnailRenderer?.shutdown()
+        thumbnailRenderer = null
+        super.onDestroy()
     }
 
     private fun updateControls() {
@@ -134,10 +131,6 @@ class ViewVideoActivity: AppCompatActivity() {
         binding.playPauseButton.setImageResource(
                 if (isPlaying) R.drawable.ic_pause_white_36dp
                 else R.drawable.ic_play_arrow_white_36dp)
-    }
-
-    private fun isPortraitOrientation(): Boolean {
-        return binding.overlayView.height > binding.overlayView.width
     }
 
     private fun loadFrame(index: Int) {
@@ -155,20 +148,49 @@ class ViewVideoActivity: AppCompatActivity() {
     private fun toggleEffectSelectionMode(view: View?) {
         updateInEffectSelectionModeFlag(!inEffectSelectionMode)
         if (inEffectSelectionMode) {
-            originalEffect = videoReader.effect
-            videoReader.effect = CombinationEffect(
-                    effectRegistry.defaultEffectFunctions(preferences.lookupFunction))
-            videoReader.forcePortrait = isPortraitOrientation()
-            binding.controlBar.visibility = View.GONE
+            showEffectPicker()
         }
         else {
-            videoReader.effect = originalEffect!!
-            videoReader.forcePortrait = null
-            binding.controlBar.visibility = View.VISIBLE
+            hideEffectPicker()
         }
-        if (!isPlaying) {
-            loadFrame(frameIndex)
-        }
+    }
+
+    // Shows thumbnails of the current frame with each effect applied.
+    private fun showEffectPicker() {
+        stopPlaying()
+        val picker = binding.effectPickerView
+        var renderer: StaticThumbnailRenderer? = null
+        renderer = StaticThumbnailRenderer(
+                effectRegistry, preferences.lookupFunction,
+                videoReader.cameraImageForFrame(frameIndex),
+                {picker.thumbnailSize},
+                {id, bitmap ->
+                    handler.post {
+                        // Ignore thumbnails that arrive after the picker was closed.
+                        if (renderer === thumbnailRenderer) {
+                            picker.setThumbnail(id, bitmap)
+                        }
+                    }
+                })
+        thumbnailRenderer?.shutdown()
+        thumbnailRenderer = renderer
+        picker.clearThumbnails()
+        picker.setSourceShape(
+                videoReader.landscapeVideoWidth(), videoReader.landscapeVideoHeight(),
+                videoReader.isPortrait())
+        val effectId = photoLibrary.metadataForItemId(videoId).effectId
+        picker.selectedEffectId = effectId
+        picker.visibility = View.VISIBLE
+        picker.scrollToEffect(effectId)
+        binding.controlBar.visibility = View.GONE
+    }
+
+    private fun hideEffectPicker() {
+        thumbnailRenderer?.shutdown()
+        thumbnailRenderer = null
+        binding.effectPickerView.visibility = View.GONE
+        binding.effectPickerView.clearThumbnails()
+        binding.controlBar.visibility = View.VISIBLE
     }
 
     private fun togglePlay(view: View) {
@@ -230,39 +252,20 @@ class ViewVideoActivity: AppCompatActivity() {
         }
     }
 
-    private fun handleOverlayViewTouch(view: OverlayView, event: MotionEvent) {
-        // Mostly duplicated from MainActivity.
-        if (event.action == MotionEvent.ACTION_UP) {
-            if (inEffectSelectionMode) {
-                val numEffects = effectRegistry.defaultEffectCount()
-                val gridSize = Math.ceil(Math.sqrt(numEffects.toDouble())).toInt()
-                val tileWidth = view.width / gridSize
-                val tileHeight = view.height / gridSize
-                val tileX = (event.x / tileWidth).toInt()
-                val tileY = (event.y / tileHeight).toInt()
-                val index = gridSize * tileY + tileX
+    private fun handleEffectSelected(info: EffectInfo) {
+        val effect = effectRegistry.createEffect(info.id, preferences.lookupFunction)
+        videoReader.effect = effect
 
-                val effectIndex = Math.min(Math.max(0, index), numEffects - 1)
-                val effect = effectRegistry.defaultEffectAtIndex(
-                        effectIndex, preferences.lookupFunction)
-                originalEffect = effect
-                videoReader.effect = effect
-                videoReader.forcePortrait = null
+        // Update thumbnail and metadata with effect.
+        val newMetadata = photoLibrary.metadataForItemId(videoId)
+                .withEffectMetadata(effect.effectMetadata(), info.id)
+        val firstFrame = videoReader.bitmapForFrame(0)
+        photoLibrary.writeMetadata(newMetadata, videoId)
+        photoLibrary.writeThumbnail(firstFrame, videoId)
 
-                // Update thumbnail and metadata with effect.
-                val newMetadata = photoLibrary.metadataForItemId(videoId)
-                        .withEffectMetadata(effect.effectMetadata())
-                val firstFrame = videoReader.bitmapForFrame(0)
-                photoLibrary.writeMetadata(newMetadata, videoId)
-                photoLibrary.writeThumbnail(firstFrame, videoId)
-
-                if (!isPlaying) {
-                    loadFrame(frameIndex)
-                }
-                updateInEffectSelectionModeFlag(false)
-                binding.controlBar.visibility = View.VISIBLE
-            }
-        }
+        loadFrame(frameIndex)
+        updateInEffectSelectionModeFlag(false)
+        hideEffectPicker()
     }
 
     private fun doShare(view: View) {

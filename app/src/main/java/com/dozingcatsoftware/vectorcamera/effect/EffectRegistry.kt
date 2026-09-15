@@ -7,22 +7,43 @@ import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
 
 enum class EffectContext {
     NORMAL,
-    COMBO_GRID,
+    // Rendering a small preview in the effect picker.
+    THUMBNAIL,
     PRELOAD,
 }
 
+enum class EffectCategory(val displayName: String) {
+    EDGES("Edges"),
+    GRADIENTS("Gradients"),
+    COLORS("Colors"),
+    TEXT("Text"),
+    ARTISTIC("Artistic"),
+    CUSTOM("Custom"),
+}
+
+/**
+ * Describes an effect that the user can select. `id` is a stable identifier that is safe to
+ * store; `name` is shown in the effect picker. `factory` creates the effect using the current
+ * preferences (via `prefsFn`) and the context it will be rendered in.
+ */
+data class EffectInfo(
+        val id: String,
+        val name: String,
+        val category: EffectCategory,
+        val factory: ((String, Any) -> Any, EffectContext) -> Effect)
+
 class EffectRegistry {
 
-    // 36 effects, shown in 6x6 grid.
+    // The effects available in the picker, in display order.
     // See Animated2dGradient.kt for description of gradient grids.
-    val baseEffects = listOf<((String, Any) -> Any, EffectContext) -> Effect>(
+    val effectInfos = listOf<EffectInfo>(
 
-            // Row 1, edges on black.
+            // Edges on black.
             // Edge strength->brightness, preserve colors.
-            {prefsFn, context -> EdgeLuminanceEffect() },
+            EffectInfo("edge_luminance", "Color edges", EffectCategory.EDGES) {prefsFn, context -> EdgeLuminanceEffect() },
 
             // White
-            {prefsFn, context ->
+            EffectInfo("edge_white", "White edges", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -32,7 +53,7 @@ class EffectRegistry {
                 ))
             },
             // Green
-            {prefsFn, context ->
+            EffectInfo("edge_green", "Green edges", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -42,7 +63,7 @@ class EffectRegistry {
                 ))
             },
             // Red
-            {prefsFn, context ->
+            EffectInfo("edge_red", "Red edges", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -52,7 +73,7 @@ class EffectRegistry {
                 ))
             },
             // Cyan
-            {prefsFn, context ->
+            EffectInfo("edge_cyan", "Cyan edges", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -62,7 +83,7 @@ class EffectRegistry {
                 ))
             },
             // Yellow
-            {prefsFn, context ->
+            EffectInfo("edge_yellow", "Yellow edges", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
@@ -72,9 +93,9 @@ class EffectRegistry {
                 ))
             },
 
-            // Row 2: Edges on light background.
+            // Edges on light background.
             // Black on white.
-            {prefsFn, context ->
+            EffectInfo("edge_black_on_white", "Black on white", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -84,7 +105,7 @@ class EffectRegistry {
                 ))
             },
             // Green on white.
-            {prefsFn, context ->
+            EffectInfo("edge_green_on_white", "Green on white", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -94,7 +115,7 @@ class EffectRegistry {
                 ))
             },
             // Red on white.
-            {prefsFn, context ->
+            EffectInfo("edge_red_on_white", "Red on white", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -104,7 +125,7 @@ class EffectRegistry {
                 ))
             },
             // Blue on white.
-            {prefsFn, context ->
+            EffectInfo("edge_blue_on_white", "Blue on white", EffectCategory.EDGES) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -115,7 +136,7 @@ class EffectRegistry {
             },
 
             // Rainbow, animated vertically on white background.
-            {prefsFn, context ->
+            EffectInfo("edge_rainbow_on_white", "Rainbow on white", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
@@ -136,7 +157,7 @@ class EffectRegistry {
             },
 
             // Yellow background, 2d gradient colors.
-            {prefsFn, context ->
+            EffectInfo("edge_gradient_on_yellow", "Gradient on yellow", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
@@ -151,9 +172,9 @@ class EffectRegistry {
                 ))
             },
 
-            // Row 3: Gradients
+            // Gradients.
             // Pink background, 2d gradient colors.
-            {prefsFn, context ->
+            EffectInfo("edge_gradient_on_pink", "Gradient on pink", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
@@ -168,7 +189,7 @@ class EffectRegistry {
                 ))
             },
             // Blue-green edges on black.
-            {prefsFn, context ->
+            EffectInfo("edge_blue_green", "Blue-green edges", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "linear_gradient",
@@ -179,7 +200,7 @@ class EffectRegistry {
                 ))
             },
             // Radial gradient, yellow in center to orange in edges.
-            {prefsFn, context ->
+            EffectInfo("edge_radial", "Radial glow", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "radial_gradient",
@@ -191,7 +212,7 @@ class EffectRegistry {
             },
 
             // Red-green horizontally animated colors.
-            {prefsFn, context ->
+            EffectInfo("edge_red_green_animated", "Red-green waves", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
@@ -208,7 +229,7 @@ class EffectRegistry {
                 ))
             },
             // Animated colors with 2d sliding window.
-            {prefsFn, context ->
+            EffectInfo("edge_rainbow_animated", "Sliding rainbow", EffectCategory.GRADIENTS) {prefsFn, context ->
                 EdgeEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
@@ -232,7 +253,7 @@ class EffectRegistry {
                 ))
             },
             // Solid rainbow 2d gradient.
-            {prefsFn, context ->
+            EffectInfo("solid_rainbow", "Rainbow", EffectCategory.GRADIENTS) {prefsFn, context ->
                 SolidColorEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
@@ -245,10 +266,10 @@ class EffectRegistry {
                 ))
             },
 
-           // Row 4: Solid color effects.
-            {prefsFn, context -> PermuteColorEffect.noOp() },
+           // Solid color effects.
+            EffectInfo("normal", "Normal", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.noOp() },
             // Grayscale negative.
-            {prefsFn, context ->
+            EffectInfo("grayscale_negative", "Grayscale negative", EffectCategory.COLORS) {prefsFn, context ->
                 SolidColorEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
@@ -258,12 +279,12 @@ class EffectRegistry {
                 ))
             },
 
-            {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
-            {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
-            {prefsFn, context -> PermuteColorEffect.flipUV() },
+            EffectInfo("permute_brg", "Swapped colors RGB->BRG", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
+            EffectInfo("permute_gbr", "Swapped colors RGB->GBR", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
+            EffectInfo("flip_uv", "Complementary colors", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.flipUV() },
 
             // Cyan background, purple/red/yellow foreground.
-            {prefsFn, context ->
+            EffectInfo("solid_warm_on_cyan", "Warm on cyan", EffectCategory.COLORS) {prefsFn, context ->
                 SolidColorEffect.fromParameters(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
@@ -282,9 +303,9 @@ class EffectRegistry {
                 ))
             },
 
-            // Row 5: Text effects.
+            // Text effects.
             // Black text on white background.
-            {prefsFn, context ->
+            EffectInfo("ascii_black_on_white", "Text black on white", EffectCategory.TEXT) {prefsFn, context ->
                 AsciiEffect.fromParameters(mapOf(
                     "colorMode" to "fixed",
                     "colors" to mapOf(
@@ -297,7 +318,7 @@ class EffectRegistry {
                 ))
             },
             // White text on black background.
-            {prefsFn, context ->
+            EffectInfo("ascii_white_on_black", "Text white on black", EffectCategory.TEXT) {prefsFn, context ->
                 AsciiEffect.fromParameters(mapOf(
                     "colorMode" to "fixed",
                     "colors" to mapOf(
@@ -310,7 +331,7 @@ class EffectRegistry {
                 ))
             },
             // ANSI color mode.
-            {prefsFn, context ->
+            EffectInfo("ascii_primary", "Text primary colors", EffectCategory.TEXT) {prefsFn, context ->
                 AsciiEffect.fromParameters(mapOf(
                         "colorMode" to "primary",
                         "pixelChars" to asciiChars(prefsFn, "pixelChars.ANSI_COLOR", " .:oO8#"),
@@ -319,7 +340,7 @@ class EffectRegistry {
                 ))
             },
             // Full color mode.
-            {prefsFn, context ->
+            EffectInfo("ascii_full_color", "Text full color", EffectCategory.TEXT) {prefsFn, context ->
                 AsciiEffect.fromParameters(mapOf(
                         "colorMode" to "full",
                         "pixelChars" to asciiChars(prefsFn, "pixelChars.FULL_COLOR", "O8#"),
@@ -328,7 +349,7 @@ class EffectRegistry {
                 ))
             },
             // Matrix with edges.
-            {prefsFn, context ->
+            EffectInfo("matrix_edges", "Matrix edges", EffectCategory.TEXT) {prefsFn, context ->
                 MatrixEffect.fromParameters(mapOf(
                         "numColumns" to numAsciiColumns(prefsFn),
                         "textColor" to matrixTextColor(prefsFn, 0x00ff00),
@@ -336,18 +357,18 @@ class EffectRegistry {
                 ))
             },
             // Solid Matrix.
-            {prefsFn, context ->
+            EffectInfo("matrix", "Matrix", EffectCategory.TEXT) {prefsFn, context ->
                 MatrixEffect.fromParameters(mapOf(
                         "numColumns" to numAsciiColumns(prefsFn),
                         "textColor" to matrixTextColor(prefsFn, 0x00ff00),
                         "edges" to false
                 ))
             },
-            // Row 6: Miscellaneous and custom effects.
+            // Miscellaneous and custom effects.
             // Cartoon
-            {prefsFn, context -> CartoonEffect.fromParameters(mapOf()) },
+            EffectInfo("cartoon", "Cartoon", EffectCategory.ARTISTIC) {prefsFn, context -> CartoonEffect.fromParameters(mapOf()) },
             // Emboss grayscale
-            {prefsFn, context ->
+            EffectInfo("emboss", "Emboss", EffectCategory.ARTISTIC) {prefsFn, context ->
                 Convolve3x3Effect.fromParameters(mapOf(
                         "coefficients" to listOf(8, 4, 0, 4, 1, -4, 0, -4, -8),
                         "colors" to mapOf(
@@ -358,41 +379,37 @@ class EffectRegistry {
                 ))
             },
         
-            {prefsFn, context -> OilPaintingEffect.standard() },
+            EffectInfo("oil_painting", "Oil painting", EffectCategory.ARTISTIC) {prefsFn, context -> OilPaintingEffect.standard() },
 
-            {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
+            EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
             // Custom edge.
-            {prefsFn, context ->
+            EffectInfo("custom1", "Custom 1", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom1",
                         CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
             // Custom solid.
-            {prefsFn, context ->
+            EffectInfo("custom2", "Custom 2", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomEffect(prefsFn, context, "custom2",
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
     )
 
-    fun defaultEffectCount() = baseEffects.size
-
-    // The smallest N such that a N*N grid can show all the effects, e.g. 5 for 25, 6 for 26.
-    fun gridSizeForDefaultEffects() = Math.ceil(Math.sqrt(defaultEffectCount().toDouble())).toInt()
+    fun defaultEffectCount() = effectInfos.size
 
     fun defaultEffectAtIndex(index: Int, prefsFn: (String, Any) -> Any,
                              context: EffectContext = EffectContext.NORMAL): Effect {
-        return baseEffects[index](prefsFn, context)
+        return effectInfos[index].factory(prefsFn, context)
     }
 
-    fun defaultEffectFunctions(prefsFn: (String, Any) -> Any,
-                               context: EffectContext = EffectContext.NORMAL): List<() -> Effect> {
-        val fns = mutableListOf<() -> Effect>()
-        for (i in 0 until defaultEffectCount()) {
-            fns.add({defaultEffectAtIndex(i, prefsFn, context)})
-        }
-        return fns
+    fun effectInfoForId(id: String): EffectInfo? = effectInfos.find {it.id == id}
+
+    fun createEffect(id: String, prefsFn: (String, Any) -> Any,
+                     context: EffectContext = EffectContext.NORMAL): Effect {
+        val info = effectInfoForId(id) ?: throw IllegalArgumentException("Unknown effect id: $id")
+        return info.factory(prefsFn, context)
     }
 
     fun effectForNameAndParameters(name: String, params: Map<String, Any>): Effect {
@@ -416,7 +433,7 @@ class EffectRegistry {
 }
 
 private fun gradientPixelsPerCell(context: EffectContext): Int {
-    return if (context == EffectContext.COMBO_GRID || context == EffectContext.PRELOAD) 20
+    return if (context == EffectContext.THUMBNAIL || context == EffectContext.PRELOAD) 20
     else Animated2dGradient.DEFAULT_PIXELS_PER_CELL
 }
 
@@ -464,5 +481,5 @@ private fun createCustomEffect(
         CustomColorSchemeType.EDGE -> EdgeEffect.fromParameters(params)
         CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(params)
     }
-    return CustomEffect(baseEffect, ctx, scheme, customEffectId)
+    return CustomEffect(baseEffect, scheme, customEffectId)
 }
