@@ -141,6 +141,12 @@
             android:layout_marginLeft="54dp"
             android:layout_marginRight="72dp" />
 
+        <com.dozingcatsoftware.vectorcamera.EditPermuteSchemeView
+            android:id="@+id/editPermuteView"
+            android:visibility="gone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
         <com.dozingcatsoftware.vectorcamera.EffectPickerView
             android:id="@+id/effectPickerView"
             android:visibility="gone"

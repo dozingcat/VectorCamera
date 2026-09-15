@@ -77,8 +77,16 @@ class VCPreferences(val context: Context) {
     }
 
     fun saveCustomScheme(id: String, scheme: CustomColorScheme) {
+        saveCustomScheme(id, scheme.toMap())
+    }
+
+    fun saveCustomScheme(id: String, scheme: CustomPermuteScheme) {
+        saveCustomScheme(id, scheme.toMap())
+    }
+
+    private fun saveCustomScheme(id: String, schemeMap: Map<String, Any>) {
         withPrefsEditor {
-            it.putString(id, mapToJsonString(scheme.toMap()))
+            it.putString(id, mapToJsonString(schemeMap))
         }
     }
 
