@@ -398,7 +398,7 @@ class EffectRegistry {
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
             // Custom color permutation. Defaults to swapping red and blue.
-            EffectInfo("custom3", "Custom 3", EffectCategory.CUSTOM) {prefsFn, context ->
+            EffectInfo("custom3", "Custom Permute", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomPermuteEffect(prefsFn, "custom3",
                         CustomPermuteScheme(ColorComponentSource.BLUE,
                                 ColorComponentSource.GREEN, ColorComponentSource.RED))
