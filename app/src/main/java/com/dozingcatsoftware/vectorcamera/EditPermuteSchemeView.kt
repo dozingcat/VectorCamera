@@ -110,8 +110,8 @@ class EditPermuteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
                 "Inverse green",
                 "Inverse blue",
                 "Inverse brightness",
-                "Black",
-                "White",
+                "None",
+                "Maximum",
         )
     }
 }
