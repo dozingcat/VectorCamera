@@ -10,13 +10,18 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 // Extract color component based on ColorComponentSource mapping
-inline int extractComponent(int r, int g, int b, int source) {
+inline int extractComponent(int r, int g, int b, int y, int source) {
     switch (source) {
-        case 1: return r;     // RED
-        case 2: return g;     // GREEN
-        case 3: return b;     // BLUE
-        case 0: return 0;     // MIN
-        case -1: return 255;  // MAX
+        case 1: return r;        // RED
+        case 2: return g;        // GREEN
+        case 3: return b;        // BLUE
+        case 4: return y;        // BRIGHTNESS
+        case 5: return 255 - r;  // RED_INVERSE
+        case 6: return 255 - g;  // GREEN_INVERSE
+        case 7: return 255 - b;  // BLUE_INVERSE
+        case 8: return 255 - y;  // BRIGHTNESS_INVERSE
+        case 0: return 0;        // MIN
+        case -1: return 255;     // MAX
         default: return 0;
     }
 }
@@ -62,9 +67,9 @@ void processRows(
             int b = rgb & 0xFF;
 
             // Extract color components based on source mapping
-            int outputR = extractComponent(r, g, b, redSource);
-            int outputG = extractComponent(r, g, b, greenSource);
-            int outputB = extractComponent(r, g, b, blueSource);
+            int outputR = extractComponent(r, g, b, yy, redSource);
+            int outputG = extractComponent(r, g, b, yy, greenSource);
+            int outputB = extractComponent(r, g, b, yy, blueSource);
 
             // Create final ARGB pixel
             pixels[pixelIndex] = (255 << 24) | (outputR << 16) | (outputG << 8) | outputB;

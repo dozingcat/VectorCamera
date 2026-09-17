@@ -106,6 +106,7 @@ class MainActivity : AppCompatActivity() {
         binding.cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+        binding.editPermuteView.changeCallback = this::handleCustomPermuteSchemeChanged
         binding.effectPickerView.setEffects(effectRegistry.effectInfos)
         binding.effectPickerView.onEffectSelected = this::handleEffectSelected
 
@@ -347,6 +348,20 @@ class MainActivity : AppCompatActivity() {
             params.rightMargin = if (isPortrait) 0 else shutterMargin.toInt()
             binding.editSchemeView.layoutParams = params
         }
+        run {
+            // The permute editor is a small panel; put it at the bottom in portrait (above the
+            // shutter bar) and at the left in landscape (next to the icon bar).
+            val params = FrameLayout.LayoutParams(wrap, wrap)
+            val metrics = resources.displayMetrics
+            val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
+            val iconMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 54f, metrics)
+            params.gravity =
+                    if (isPortrait) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                    else Gravity.LEFT or Gravity.CENTER_VERTICAL
+            params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
+            params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
+            binding.editPermuteView.layoutParams = params
+        }
     }
 
     private fun isPortraitOrientation(): Boolean {
@@ -587,6 +602,7 @@ class MainActivity : AppCompatActivity() {
         preferredImageSize = ImageSize.EFFECT_GRID
         binding.controlLayout.visibility = View.GONE
         binding.editSchemeView.visibility = View.GONE
+        binding.editPermuteView.visibility = View.GONE
         Log.i(TAG, "Showing effect picker")
     }
 
@@ -643,13 +659,18 @@ class MainActivity : AppCompatActivity() {
         // This reads the new effect from preferences.
         restartCameraImageGenerator()
 
-        if (eff is CustomEffect) {
-            binding.editSchemeView.setScheme(eff.colorScheme)
-            binding.editSchemeView.visibility = View.VISIBLE
-            customSchemeId = eff.customSchemeId
-        }
-        else {
-            customSchemeId = ""
+        when (eff) {
+            is CustomEffect -> {
+                binding.editSchemeView.setScheme(eff.colorScheme)
+                binding.editSchemeView.visibility = View.VISIBLE
+                customSchemeId = eff.customSchemeId
+            }
+            is CustomPermuteEffect -> {
+                binding.editPermuteView.setScheme(eff.scheme)
+                binding.editPermuteView.visibility = View.VISIBLE
+                customSchemeId = eff.customSchemeId
+            }
+            else -> customSchemeId = ""
         }
     }
 
@@ -685,8 +706,20 @@ class MainActivity : AppCompatActivity() {
         if (customSchemeId.isEmpty()) {
             return
         }
-        // The order matters here because `defaultEffectAtIndex` reads from the preferences.
         preferences.saveCustomScheme(customSchemeId, cs)
+        reloadCustomEffect()
+    }
+
+    private fun handleCustomPermuteSchemeChanged(ps: CustomPermuteScheme) {
+        if (customSchemeId.isEmpty()) {
+            return
+        }
+        preferences.saveCustomScheme(customSchemeId, ps)
+        reloadCustomEffect()
+    }
+
+    // Recreates the selected custom effect after its scheme was saved to preferences.
+    private fun reloadCustomEffect() {
         // Keeping customSchemeId and selectedEffectId as instance variables is ugly. The problem
         // is that when the user selects a custom effect, `currentEffect` gets set to the
         // underlying effect rather than the "wrapper" CustomEffect.

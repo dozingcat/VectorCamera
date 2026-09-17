@@ -11,7 +11,16 @@ import kotlin.math.*
  * Enum for color component sources used in color permutation.
  */
 enum class ColorComponentSource(val rsCode: Int) {
-    MIN(0), RED(1), GREEN(2), BLUE(3), MAX(-1)
+    MIN(0),
+    RED(1),
+    GREEN(2),
+    BLUE(3),
+    BRIGHTNESS(4),
+    RED_INVERSE(5),
+    GREEN_INVERSE(6),
+    BLUE_INVERSE(7),
+    BRIGHTNESS_INVERSE(8),
+    MAX(-1),
 }
 
 /**
@@ -171,9 +180,9 @@ class PermuteColorEffect(
                 val b = rgb and 0xFF
 
                 // Extract color components based on source mapping
-                val outputR = extractComponent(r, g, b, redSource)
-                val outputG = extractComponent(r, g, b, greenSource)
-                val outputB = extractComponent(r, g, b, blueSource)
+                val outputR = extractComponent(r, g, b, yy, redSource)
+                val outputG = extractComponent(r, g, b, yy, greenSource)
+                val outputB = extractComponent(r, g, b, yy, blueSource)
 
                 // Create final ARGB pixel
                 pixels[pixelIndex] = Color.argb(255, outputR, outputG, outputB)
@@ -184,11 +193,16 @@ class PermuteColorEffect(
     /**
      * Extract color component based on ColorComponentSource mapping.
      */
-    private fun extractComponent(r: Int, g: Int, b: Int, source: ColorComponentSource): Int {
+    private fun extractComponent(r: Int, g: Int, b: Int, y: Int, source: ColorComponentSource): Int {
         return when (source) {
             ColorComponentSource.RED -> r
             ColorComponentSource.GREEN -> g
             ColorComponentSource.BLUE -> b
+            ColorComponentSource.BRIGHTNESS -> y
+            ColorComponentSource.RED_INVERSE -> 255 - r
+            ColorComponentSource.GREEN_INVERSE -> 255 - g
+            ColorComponentSource.BLUE_INVERSE -> 255 - b
+            ColorComponentSource.BRIGHTNESS_INVERSE -> 255 - y
             ColorComponentSource.MIN -> 0
             ColorComponentSource.MAX -> 255
         }
@@ -253,6 +267,12 @@ class PermuteColorEffect(
             "green" to ColorComponentSource.GREEN.toString(),
             "blue" to ColorComponentSource.BLUE.toString(),
             "flipUV" to true
+        ))
+
+        fun colorNegative() = fromParameters(mapOf(
+            "red" to ColorComponentSource.RED_INVERSE.toString(),
+            "green" to ColorComponentSource.GREEN_INVERSE.toString(),
+            "blue" to ColorComponentSource.BLUE_INVERSE.toString()
         ))
     }
 } 
