@@ -274,12 +274,5 @@ class PermuteColorEffect(
             "green" to ColorComponentSource.GREEN_INVERSE.toString(),
             "blue" to ColorComponentSource.BLUE_INVERSE.toString()
         ))
-
-        fun grayscaleNegative() = fromParameters(mapOf(
-            "red" to ColorComponentSource.BRIGHTNESS_INVERSE.toString(),
-            "green" to ColorComponentSource.BRIGHTNESS_INVERSE.toString(),
-            "blue" to ColorComponentSource.BRIGHTNESS_INVERSE.toString()
-        ))
-
     }
 } 
