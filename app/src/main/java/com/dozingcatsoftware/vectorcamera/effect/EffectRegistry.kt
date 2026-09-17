@@ -384,7 +384,7 @@ class EffectRegistry {
 
             EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
-            // Stippling: black dots on white, and colored dots.
+            // Stippling: black, white, and colored dots.
             EffectInfo("stippling", "Stippling", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.blackOnWhite() },
             EffectInfo("stippling_inverse", "Stippling (inverse)", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.whiteOnBlack() },
             EffectInfo("stippling_color", "Stippling (color)", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.color() },
