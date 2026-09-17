@@ -4,6 +4,7 @@ import android.graphics.Color
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
 import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
+import com.dozingcatsoftware.vectorcamera.CustomPermuteScheme
 
 enum class EffectContext {
     NORMAL,
@@ -282,6 +283,7 @@ class EffectRegistry {
             EffectInfo("permute_brg", "Swapped colors RGB->BRG", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
             EffectInfo("permute_gbr", "Swapped colors RGB->GBR", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
             EffectInfo("flip_uv", "Complementary colors", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.flipUV() },
+            EffectInfo("color_negative", "Color negative", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.colorNegative() },
 
             // Cyan background, purple/red/yellow foreground.
             EffectInfo("solid_warm_on_cyan", "Warm on cyan", EffectCategory.COLORS) {prefsFn, context ->
@@ -395,6 +397,12 @@ class EffectRegistry {
                         CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
+            // Custom color permutation. Defaults to swapping red and blue.
+            EffectInfo("custom_permute", "Custom Permute", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomPermuteEffect(prefsFn, "custom_permute",
+                        CustomPermuteScheme(ColorComponentSource.BLUE,
+                                ColorComponentSource.GREEN, ColorComponentSource.RED))
+            },
     )
 
     fun defaultEffectCount() = effectInfos.size
@@ -482,4 +490,16 @@ private fun createCustomEffect(
         CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(params)
     }
     return CustomEffect(baseEffect, scheme, customEffectId)
+}
+
+private fun createCustomPermuteEffect(
+    prefsFn: (String, Any) -> Any,
+    customEffectId: String,
+    defaultScheme: CustomPermuteScheme): Effect {
+    val schemeJson =
+        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+        catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomPermuteScheme.fromMap(schemeJson, defaultScheme)
+    val baseEffect = PermuteColorEffect.fromParameters(scheme.toEffectParameters())
+    return CustomPermuteEffect(baseEffect, scheme, customEffectId)
 }
