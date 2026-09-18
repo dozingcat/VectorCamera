@@ -1,18 +1,19 @@
 package com.dozingcatsoftware.vectorcamera
 
-enum class CustomColorSchemeType {
-    EDGE,
-    SOLID,
-}
+import com.dozingcatsoftware.vectorcamera.effect.ColorMapMode
 
+/**
+ * User-editable parameters for a ColorMapEffect: whether it colors edges or solid areas, the
+ * background color, and the four corner colors of the gradient drawn over it.
+ */
 data class CustomColorScheme(
-        val type: CustomColorSchemeType, val backgroundColor: Int,
+        val mode: ColorMapMode, val backgroundColor: Int,
         val topLeftColor: Int, val topRightColor: Int,
         val bottomLeftColor: Int, val bottomRightColor: Int) {
 
     fun toMap(): Map<String, Any> {
         return mapOf(
-                "type" to this.type.name,
+                "type" to this.mode.name,
                 "background" to this.backgroundColor,
                 "topLeft" to this.topLeftColor,
                 "topRight" to this.topRightColor,
@@ -23,11 +24,11 @@ data class CustomColorScheme(
 
     companion object {
         fun fromMap(map: Map<String, Any>, defaultValues: CustomColorScheme): CustomColorScheme {
-            val typeName = map.getOrElse("type", {defaultValues.type.name}) as String
-            val type = try {CustomColorSchemeType.valueOf(typeName)}
-                       catch (ex: IllegalArgumentException) {CustomColorSchemeType.EDGE}
+            val modeName = map.getOrElse("type", {defaultValues.mode.name}) as String
+            val mode = try {ColorMapMode.valueOf(modeName)}
+                       catch (ex: IllegalArgumentException) {ColorMapMode.EDGE}
             return CustomColorScheme(
-                    type,
+                    mode,
                     map.getOrElse("background", {defaultValues.backgroundColor}) as Int,
                     map.getOrElse("topLeft", {defaultValues.topLeftColor}) as Int,
                     map.getOrElse("topRight", {defaultValues.topRightColor}) as Int,

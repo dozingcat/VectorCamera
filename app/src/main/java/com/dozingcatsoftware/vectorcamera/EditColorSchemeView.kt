@@ -11,11 +11,12 @@ import android.widget.LinearLayout
 import androidx.fragment.app.FragmentActivity
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
+import com.dozingcatsoftware.vectorcamera.effect.ColorMapMode
 
 class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(context, attrs) {
 
     lateinit var activity: FragmentActivity
-    private var scheme = CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
+    private var scheme = CustomColorScheme(ColorMapMode.EDGE, Color.BLACK,
             Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE)
     var changeCallback: ((CustomColorScheme) -> Unit)? = null
     private lateinit var contentView: View
@@ -26,7 +27,7 @@ class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(
 
     fun setScheme(s: CustomColorScheme) {
         scheme = s
-        findViewById<CheckBox>(R.id.solidCheckbox).isChecked = s.type == CustomColorSchemeType.SOLID
+        findViewById<CheckBox>(R.id.solidCheckbox).isChecked = s.mode == ColorMapMode.SOLID
     }
 
     private fun initView() {
@@ -88,8 +89,8 @@ class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(
     }
 
     private fun handleTypeCheckbox(cb: CheckBox) {
-        val newType = if (cb.isChecked) CustomColorSchemeType.SOLID else CustomColorSchemeType.EDGE
-        scheme = scheme.copy(type=newType)
+        val newMode = if (cb.isChecked) ColorMapMode.SOLID else ColorMapMode.EDGE
+        scheme = scheme.copy(mode=newMode)
         changeCallback?.invoke(scheme)
     }
 }

@@ -459,7 +459,7 @@ class StippleEffect private constructor(
                     as Boolean
             return StippleEffect(
                 effectParams = params,
-                dotsAcross = num("dotsAcross", 300.0).toInt().coerceAtLeast(1),
+                dotsAcross = num("dotsAcross", 400.0).toInt().coerceAtLeast(1),
                 numLayers = num("numLayers", 8.0).toInt().coerceIn(1, 16),
                 dotRadiusFraction = num("dotRadius", 0.65),
                 dotSizeVariation = num("dotSizeVariation", 0.5),
