@@ -1,9 +1,9 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Color
+import android.util.Log
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
-import com.dozingcatsoftware.vectorcamera.CustomColorSchemeType
 import com.dozingcatsoftware.vectorcamera.CustomPermuteScheme
 
 enum class EffectContext {
@@ -34,6 +34,9 @@ data class EffectInfo(
         val factory: ((String, Any) -> Any, EffectContext) -> Effect)
 
 class EffectRegistry {
+    companion object {
+        const val TAG = "EffectRegistry"
+    }
 
     // The effects available in the picker, in display order.
     // See Animated2dGradient.kt for description of gradient grids.
@@ -45,7 +48,7 @@ class EffectRegistry {
 
             // White
             EffectInfo("edge_white", "White edges", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(0, 0, 0),
@@ -55,7 +58,7 @@ class EffectRegistry {
             },
             // Green
             EffectInfo("edge_green", "Green edges", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(0, 0, 0),
@@ -65,7 +68,7 @@ class EffectRegistry {
             },
             // Red
             EffectInfo("edge_red", "Red edges", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(0, 0, 0),
@@ -75,7 +78,7 @@ class EffectRegistry {
             },
             // Cyan
             EffectInfo("edge_cyan", "Cyan edges", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(0, 0, 0),
@@ -85,7 +88,7 @@ class EffectRegistry {
             },
             // Yellow
             EffectInfo("edge_yellow", "Yellow edges", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                         "colors" to mapOf(
                                 "type" to "fixed",
                                 "minColor" to listOf(0, 0, 0),
@@ -97,7 +100,7 @@ class EffectRegistry {
             // Edges on light background.
             // Black on white.
             EffectInfo("edge_black_on_white", "Black on white", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(255, 255, 255),
@@ -107,7 +110,7 @@ class EffectRegistry {
             },
             // Green on white.
             EffectInfo("edge_green_on_white", "Green on white", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(255, 255, 255),
@@ -117,7 +120,7 @@ class EffectRegistry {
             },
             // Red on white.
             EffectInfo("edge_red_on_white", "Red on white", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(255, 255, 255),
@@ -127,7 +130,7 @@ class EffectRegistry {
             },
             // Blue on white.
             EffectInfo("edge_blue_on_white", "Blue on white", EffectCategory.EDGES) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(255, 255, 255),
@@ -138,7 +141,7 @@ class EffectRegistry {
 
             // Rainbow, animated vertically on white background.
             EffectInfo("edge_rainbow_on_white", "Rainbow on white", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
                         "minColor" to listOf(255, 255, 255),
@@ -159,7 +162,7 @@ class EffectRegistry {
 
             // Yellow background, 2d gradient colors.
             EffectInfo("edge_gradient_on_yellow", "Gradient on yellow", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
                         "minColor" to listOf(255, 255, 192),
@@ -176,7 +179,7 @@ class EffectRegistry {
             // Gradients.
             // Pink background, 2d gradient colors.
             EffectInfo("edge_gradient_on_pink", "Gradient on pink", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
                         "minColor" to listOf(255,182,193),
@@ -191,7 +194,7 @@ class EffectRegistry {
             },
             // Blue-green edges on black.
             EffectInfo("edge_blue_green", "Blue-green edges", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "linear_gradient",
                         "minColor" to listOf(0, 0, 0),
@@ -202,7 +205,7 @@ class EffectRegistry {
             },
             // Radial gradient, yellow in center to orange in edges.
             EffectInfo("edge_radial", "Radial glow", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "radial_gradient",
                         "minColor" to listOf(25, 25, 112),
@@ -214,7 +217,7 @@ class EffectRegistry {
 
             // Red-green horizontally animated colors.
             EffectInfo("edge_red_green_animated", "Red-green waves", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                         "colors" to mapOf(
                                 "type" to "grid_gradient",
                                 "minColor" to listOf(0, 0, 0),
@@ -231,7 +234,7 @@ class EffectRegistry {
             },
             // Animated colors with 2d sliding window.
             EffectInfo("edge_rainbow_animated", "Sliding rainbow", EffectCategory.GRADIENTS) {prefsFn, context ->
-                EdgeEffect.fromParameters(mapOf(
+                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
                         "minColor" to listOf(0, 0, 0),
@@ -255,7 +258,7 @@ class EffectRegistry {
             },
             // Solid rainbow 2d gradient.
             EffectInfo("solid_rainbow", "Rainbow", EffectCategory.GRADIENTS) {prefsFn, context ->
-                SolidColorEffect.fromParameters(mapOf(
+                ColorMapEffect.solid(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
                         "minColor" to listOf(0, 0, 0),
@@ -271,7 +274,7 @@ class EffectRegistry {
             EffectInfo("normal", "Normal", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.noOp() },
             // Grayscale negative.
             EffectInfo("grayscale_negative", "Grayscale negative", EffectCategory.COLORS) {prefsFn, context ->
-                SolidColorEffect.fromParameters(mapOf(
+                ColorMapEffect.solid(mapOf(
                     "colors" to mapOf(
                         "type" to "fixed",
                         "minColor" to listOf(255, 255, 255),
@@ -287,7 +290,7 @@ class EffectRegistry {
 
             // Cyan background, purple/red/yellow foreground.
             EffectInfo("solid_warm_on_cyan", "Warm on cyan", EffectCategory.COLORS) {prefsFn, context ->
-                SolidColorEffect.fromParameters(mapOf(
+                ColorMapEffect.solid(mapOf(
                     "colors" to mapOf(
                         "type" to "grid_gradient",
                         "minColor" to listOf(0, 255, 255),
@@ -386,19 +389,19 @@ class EffectRegistry {
             EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
             // Custom edge.
-            EffectInfo("custom1", "Custom 1", EffectCategory.CUSTOM) {prefsFn, context ->
-                createCustomEffect(prefsFn, context, "custom1",
-                        CustomColorScheme(CustomColorSchemeType.EDGE, Color.BLACK,
+            EffectInfo("custom1", "Custom colors 1", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomColorMapEffect(prefsFn, context, "custom1",
+                        CustomColorScheme(ColorMapMode.EDGE, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
             // Custom solid.
-            EffectInfo("custom2", "Custom 2", EffectCategory.CUSTOM) {prefsFn, context ->
-                createCustomEffect(prefsFn, context, "custom2",
-                        CustomColorScheme(CustomColorSchemeType.SOLID, Color.BLACK,
+            EffectInfo("custom2", "Custom colors 2", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomColorMapEffect(prefsFn, context, "custom2",
+                        CustomColorScheme(ColorMapMode.SOLID, Color.BLACK,
                                 Color.RED, Color.BLUE, Color.GREEN, Color.WHITE))
             },
             // Custom color permutation. Defaults to swapping red and blue.
-            EffectInfo("custom_permute", "Custom Permute", EffectCategory.CUSTOM) {prefsFn, context ->
+            EffectInfo("custom_permute", "Custom permute", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomPermuteEffect(prefsFn, "custom_permute",
                         CustomPermuteScheme(ColorComponentSource.BLUE,
                                 ColorComponentSource.GREEN, ColorComponentSource.RED))
@@ -423,21 +426,35 @@ class EffectRegistry {
     fun effectForNameAndParameters(name: String, params: Map<String, Any>): Effect {
         return when (name) {
             AsciiEffect.EFFECT_NAME -> AsciiEffect.fromParameters(params)
-            EdgeEffect.EFFECT_NAME -> EdgeEffect.fromParameters(params)
+            ColorMapEffect.EFFECT_NAME -> ColorMapEffect.fromParameters(params)
             EdgeLuminanceEffect.EFFECT_NAME -> EdgeLuminanceEffect.fromParameters(params)
-            SolidColorEffect.EFFECT_NAME -> SolidColorEffect.fromParameters(params)
             Convolve3x3Effect.EFFECT_NAME -> Convolve3x3Effect.fromParameters(params)
             CartoonEffect.EFFECT_NAME -> CartoonEffect.fromParameters(params)
             MatrixEffect.EFFECT_NAME -> MatrixEffect.fromParameters(params)
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
             StainedGlassEffect.EFFECT_NAME -> StainedGlassEffect.fromParameters(params)
+            // Names used before the edge and solid color effects were merged.
+            "edge" -> ColorMapEffect.edge(params)
+            "solid_color" -> ColorMapEffect.solid(params)
             else -> throw IllegalArgumentException("Unknown effect: ${name}")
         }
     }
 
-    fun effectForMetadata(metadata: EffectMetadata) =
+    /**
+     * Effect for saved picture or video metadata. Falls back to a default effect if the
+     * metadata can't be read, e.g. because it was written by a version of the app that used a
+     * different effect name, so that old media can still be opened.
+     */
+    fun effectForMetadata(metadata: EffectMetadata): Effect {
+        return try {
             effectForNameAndParameters(metadata.name, metadata.parameters)
+        }
+        catch (ex: Exception) {
+            Log.w(TAG, "Can't create effect ${metadata.name} from metadata, using default", ex)
+            EdgeLuminanceEffect()
+        }
+    }
 }
 
 private fun gradientPixelsPerCell(context: EffectContext): Int {
@@ -467,7 +484,7 @@ private fun rgbComponents(vararg colors: Int): List<Int> {
     return result
 }
 
-private fun createCustomEffect(
+private fun createCustomColorMapEffect(
     prefsFn: (String, Any) -> Any,
     ctx: EffectContext,
     customEffectId: String,
@@ -485,11 +502,8 @@ private fun createCustomEffect(
             scheme.bottomLeftColor, scheme.bottomRightColor))),
         "pixelsPerCell" to gradientPixelsPerCell(ctx)
     )
-    val baseEffect = when (scheme.type) {
-        CustomColorSchemeType.EDGE -> EdgeEffect.fromParameters(params)
-        CustomColorSchemeType.SOLID -> SolidColorEffect.fromParameters(params)
-    }
-    return CustomEffect(baseEffect, scheme, customEffectId)
+    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, params)
+    return CustomColorMapEffect(baseEffect, scheme, customEffectId)
 }
 
 private fun createCustomPermuteEffect(

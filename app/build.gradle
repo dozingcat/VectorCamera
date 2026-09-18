@@ -43,6 +43,10 @@ android {
         viewBinding true
         buildConfig true
     }
+    testOptions {
+        // Lets local unit tests call android.util.Log without a device.
+        unitTests.returnDefaultValues = true
+    }
 }
 
 kotlin {

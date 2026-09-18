@@ -660,8 +660,8 @@ class MainActivity : AppCompatActivity() {
         restartCameraImageGenerator()
 
         when (eff) {
-            is CustomEffect -> {
-                binding.editSchemeView.setScheme(eff.colorScheme)
+            is CustomColorMapEffect -> {
+                binding.editSchemeView.setScheme(eff.scheme)
                 binding.editSchemeView.visibility = View.VISIBLE
                 customSchemeId = eff.customSchemeId
             }
@@ -722,7 +722,7 @@ class MainActivity : AppCompatActivity() {
     private fun reloadCustomEffect() {
         // Keeping customSchemeId and selectedEffectId as instance variables is ugly. The problem
         // is that when the user selects a custom effect, `currentEffect` gets set to the
-        // underlying effect rather than the "wrapper" CustomEffect.
+        // underlying effect rather than the "wrapper" CustomColorMapEffect.
         val effectId = selectedEffectId ?: return
         val newEffect = effectRegistry.createEffect(effectId, preferences.lookupFunction)
         // Save the resulting effect so that it will restore correctly.

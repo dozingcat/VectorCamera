@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O2 -g")
 # Create the unified native library
 add_library(vectorcamera_native SHARED
     edge_luminance_native.cpp
-    edge_effect_native.cpp
+    color_map_effect_native.cpp
     permute_color_effect_native.cpp
     cartoon_effect_native.cpp
     convolve3x3_effect_native.cpp
