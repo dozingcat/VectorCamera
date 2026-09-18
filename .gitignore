@@ -6,4 +6,5 @@
 /build
 /captures
 .externalNativeBuild
+.cxx
 __MACOSX

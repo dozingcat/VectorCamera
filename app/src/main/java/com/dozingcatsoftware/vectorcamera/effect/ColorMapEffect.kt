@@ -1,18 +1,37 @@
 package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.*
-import android.util.Log
 import com.dozingcatsoftware.vectorcamera.*
 import kotlinx.coroutines.*
-import kotlin.math.*
 
 /**
- * Pure Kotlin implementation of SolidColorEffect that maps each pixel to an output color based on its brightness.
+ * How each pixel's 0-255 index into the color map is computed. `paramValue` is how the mode
+ * is stored in the effect parameters.
  */
-class SolidColorEffect(
+enum class ColorMapMode(val paramValue: String) {
+    /** Index is the edge strength from a Laplacian filter on the luminance. */
+    EDGE("edge"),
+    /** Index is the pixel's luminance. */
+    SOLID("solid"),
+    ;
+
+    companion object {
+        fun fromParamValue(value: Any?): ColorMapMode =
+                values().find {it.paramValue == value} ?: EDGE
+    }
+}
+
+/**
+ * Effect that maps each pixel to a color by looking up a per-pixel value (edge strength or
+ * luminance, depending on the mode) in a 256-entry color table. The table is either a fixed
+ * gradient between two colors, or an alpha ramp over a background gradient that's drawn first.
+ */
+class ColorMapEffect private constructor(
+    private val mode: ColorMapMode,
     private val effectParams: Map<String, Any> = mapOf(),
-    private val colorMap: IntArray,
-    private val backgroundFn: (CameraImage, Canvas, RectF) -> Unit = { _, _, _ -> }
+    private val colorMap: IntArray? = null,
+    private val alphaMap: IntArray? = null,
+    private val backgroundFn: ((CameraImage, Canvas, RectF) -> Unit)? = null
 ) : Effect {
 
     override fun effectName() = EFFECT_NAME
@@ -20,108 +39,185 @@ class SolidColorEffect(
     override fun effectParameters() = effectParams
 
     override fun drawBackground(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
-        backgroundFn.invoke(cameraImage, canvas, rect)
+        backgroundFn?.invoke(cameraImage, canvas, rect)
     }
 
     override fun createBitmap(cameraImage: CameraImage): ProcessedBitmap {
         val startTime = System.nanoTime()
-        
+
         val width = cameraImage.width()
         val height = cameraImage.height()
+        // Edge strength scales with image size so that edges look similar at any resolution.
+        val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
-        // Get Y plane data directly (solid color effect only needs luminance)
-        val yData = cameraImage.getYBytes()
-        val (bitmap, threadsUsed) = createBitmapFromYData(yData, width, height)
-        
+        val yBytes = cameraImage.getYBytes()
+        val (bitmap, threadsUsed, architectureUsed) = createBitmapFromYBytes(yBytes, width, height, multiplier)
+
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
-            codeArchitecture = CodeArchitecture.Kotlin,
+            codeArchitecture = architectureUsed,
             numThreads = threadsUsed,
             generationDurationNanos = endTime - startTime
         )
-        
+
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
+    }
+
+    /**
+     * Calculate the optimal number of threads for native processing based on image dimensions.
+     */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
     }
 
     /**
      * Calculate the optimal number of threads for Kotlin processing based on image dimensions.
      */
-    private fun calculateOptimalThreads(height: Int): Int {
+    private fun calculateOptimalKotlinThreads(height: Int): Int {
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32 // Minimum rows per thread to avoid overhead
         val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS)
         return maxOf(1, maxThreads)
     }
 
-    private fun createBitmapFromYData(yData: ByteArray, width: Int, height: Int): Pair<Bitmap, Int> {
-        val numThreads = calculateOptimalThreads(height)
-
-        val t1 = System.currentTimeMillis()
-
+    private fun createBitmapFromYBytes(yData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val pixels = IntArray(width * height)
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        // Multi-threaded processing
-        if (numThreads == 1) {
-            processRows(0, height, width, yData, pixels, colorMap)
+        val actualThreads: Int
+        val architecture: CodeArchitecture
+
+        val lookupMap = colorMap ?: alphaMap!!
+        if (nativeLibraryLoaded) {
+            actualThreads = nativeThreads
+            architecture = CodeArchitecture.Native
+            processImageNative(yData, width, height, mode == ColorMapMode.EDGE, multiplier,
+                               lookupMap, pixels, actualThreads)
         } else {
-            runBlocking {
-                val jobs = mutableListOf<Job>()
-                val rowsPerThread = height / numThreads
-                
-                for (threadIndex in 0 until numThreads) {
-                    val startY = threadIndex * rowsPerThread
-                    val endY = if (threadIndex == numThreads - 1) height else (threadIndex + 1) * rowsPerThread
-                    
-                    val job = launch(Dispatchers.Default) {
-                        processRows(startY, endY, width, yData, pixels, colorMap)
+            // Fallback to Kotlin implementation with coroutines
+            actualThreads = kotlinThreads
+            architecture = CodeArchitecture.Kotlin
+            if (actualThreads == 1) {
+                processRows(0, height, width, height, multiplier, yData, pixels, lookupMap)
+            } else {
+                runBlocking {
+                    val jobs = mutableListOf<Job>()
+                    val rowsPerThread = height / actualThreads
+
+                    for (threadIndex in 0 until actualThreads) {
+                        val startY = threadIndex * rowsPerThread
+                        val endY = if (threadIndex == actualThreads - 1) height else (threadIndex + 1) * rowsPerThread
+
+                        val job = launch(Dispatchers.Default) {
+                            processRows(startY, endY, width, height, multiplier, yData, pixels, lookupMap)
+                        }
+                        jobs.add(job)
                     }
-                    jobs.add(job)
+
+                    // Wait for all threads to complete
+                    jobs.forEach { it.join() }
                 }
-                
-                // Wait for all threads to complete
-                jobs.forEach { it.join() }
             }
         }
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return Pair(bitmap, numThreads)
+
+        return Triple(bitmap, actualThreads, architecture)
     }
 
     private fun processRows(
-        startY: Int, 
-        endY: Int, 
-        width: Int, 
+        startY: Int,
+        endY: Int,
+        width: Int,
+        height: Int,
+        multiplier: Int,
         yData: ByteArray,
         pixels: IntArray,
-        colorMap: IntArray
+        lookupMap: IntArray
     ) {
         for (y in startY until endY) {
             for (x in 0 until width) {
                 val pixelIndex = y * width + x
-
-                // Get Y (luminance) value and use it as index into color map
-                val yValue = yData[pixelIndex].toInt() and 0xFF
-                
-                // Map brightness to color using lookup table
-                pixels[pixelIndex] = colorMap[yValue]
+                val index = when (mode) {
+                    ColorMapMode.EDGE -> edgeStrength(yData, x, y, width, height, multiplier)
+                    ColorMapMode.SOLID -> yData[pixelIndex].toInt() and 0xFF
+                }
+                pixels[pixelIndex] = lookupMap[index]
             }
         }
     }
 
+    /**
+     * Edge strength at (x, y) using a Laplacian operator, scaled by `multiplier` and clamped
+     * to 0..255. Pixels on the image border are 0.
+     */
+    private fun edgeStrength(yData: ByteArray, x: Int, y: Int, width: Int, height: Int, multiplier: Int): Int {
+        if (x <= 0 || x >= width - 1 || y <= 0 || y >= height - 1) {
+            return 0
+        }
+        val center = yData[y * width + x].toInt() and 0xFF
+        val surroundingSum =
+            (yData[(y - 1) * width + (x - 1)].toInt() and 0xFF) +
+            (yData[(y - 1) * width + x].toInt() and 0xFF) +
+            (yData[(y - 1) * width + (x + 1)].toInt() and 0xFF) +
+            (yData[y * width + (x - 1)].toInt() and 0xFF) +
+            (yData[y * width + (x + 1)].toInt() and 0xFF) +
+            (yData[(y + 1) * width + (x - 1)].toInt() and 0xFF) +
+            (yData[(y + 1) * width + x].toInt() and 0xFF) +
+            (yData[(y + 1) * width + (x + 1)].toInt() and 0xFF)
+
+        val edge = 8 * center - surroundingSum
+        return (multiplier * edge).coerceIn(0, 255)
+    }
+
     companion object {
-        const val EFFECT_NAME = "solid_color"
-        
-        fun fromParameters(effectParams: Map<String, Any>): SolidColorEffect {
+        const val EFFECT_NAME = "color_map"
+        const val MODE_PARAM = "mode"
+
+        // Native method declaration
+        private external fun processImageNative(
+            yData: ByteArray,
+            width: Int,
+            height: Int,
+            edgeMode: Boolean,
+            multiplier: Int,
+            colorMap: IntArray,
+            outputPixels: IntArray,
+            numThreads: Int
+        )
+
+        // Load native library
+        private var nativeLibraryLoaded = false
+
+        init {
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
+        }
+
+        fun edge(effectParams: Map<String, Any>) = fromParameters(ColorMapMode.EDGE, effectParams)
+
+        fun solid(effectParams: Map<String, Any>) = fromParameters(ColorMapMode.SOLID, effectParams)
+
+        /** Creates the effect from saved parameters, which include the mode. */
+        fun fromParameters(params: Map<String, Any>) =
+                fromParameters(ColorMapMode.fromParamValue(params[MODE_PARAM]), params)
+
+        fun fromParameters(mode: ColorMapMode, params: Map<String, Any>): ColorMapEffect {
+            // The mode is stored with the parameters so the effect can be restored by name.
+            val effectParams = params + (MODE_PARAM to mode.paramValue)
             // Parse color scheme parameters (backwards compatibility)
             val colorParams = effectParams.getOrElse("colors", { effectParams }) as Map<String, Any>
-            
+
             when (colorParams["type"]) {
                 "fixed" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
                     val maxColor = parseColorFromList(colorParams, "maxColor", "maxEdgeColor")
                     val colorMap = createFixedColorMap(minColor, maxColor)
-                    return SolidColorEffect(effectParams, colorMap)
+                    return ColorMapEffect(mode, effectParams, colorMap = colorMap)
                 }
                 "linear_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -131,14 +227,14 @@ class SolidColorEffect(
                         val paint = Paint()
                         paint.shader = LinearGradient(
                             rect.left, rect.top, rect.right, rect.bottom,
-                            gradientStartColor or 0xFF000000.toInt(), 
+                            gradientStartColor or 0xFF000000.toInt(),
                             gradientEndColor or 0xFF000000.toInt(),
                             Shader.TileMode.MIRROR
                         )
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return SolidColorEffect(effectParams, alphaMap, backgroundFn)
+                    return ColorMapEffect(mode, effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
                 "radial_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor", "minEdgeColor")
@@ -149,14 +245,14 @@ class SolidColorEffect(
                         paint.shader = RadialGradient(
                             rect.width() / 2, rect.height() / 2,
                             maxOf(rect.width(), rect.height()) / 2f,
-                            centerColor or 0xFF000000.toInt(), 
-                            outerColor or 0xFF000000.toInt(), 
+                            centerColor or 0xFF000000.toInt(),
+                            outerColor or 0xFF000000.toInt(),
                             Shader.TileMode.MIRROR
                         )
                         canvas.drawRect(rect, paint)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return SolidColorEffect(effectParams, alphaMap, backgroundFn)
+                    return ColorMapEffect(mode, effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
                 "grid_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor")
@@ -166,22 +262,22 @@ class SolidColorEffect(
                     val sizeX = (colorParams.getOrElse("sizeX", { 1 }) as Number).toFloat()
                     val sizeY = (colorParams.getOrElse("sizeY", { 1 }) as Number).toFloat()
                     val pixelsPerCell = (colorParams.getOrElse("pixelsPerCell", { Animated2dGradient.DEFAULT_PIXELS_PER_CELL }) as Number).toInt()
-                    
+
                     val gradient = Animated2dGradient(gridColors, speedX, speedY, sizeX, sizeY, pixelsPerCell)
                     val backgroundFn = fun(cameraImage: CameraImage, canvas: Canvas, rect: RectF) {
                         gradient.drawToCanvas(canvas, rect, cameraImage.timestamp)
                     }
                     val alphaMap = createAlphaMap(minColor)
-                    return SolidColorEffect(effectParams, alphaMap, backgroundFn)
+                    return ColorMapEffect(mode, effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
                 else -> {
                     // Default to black to white gradient
                     val colorMap = createFixedColorMap(Color.BLACK, Color.WHITE)
-                    return SolidColorEffect(effectParams, colorMap)
+                    return ColorMapEffect(mode, effectParams, colorMap = colorMap)
                 }
             }
         }
-        
+
         private fun parseColorFromList(params: Map<String, Any>, vararg keys: String): Int {
             for (key in keys) {
                 if (params.containsKey(key)) {
@@ -191,20 +287,20 @@ class SolidColorEffect(
             }
             throw IllegalArgumentException("Color key not found: ${keys.joinToString(", ")}")
         }
-        
+
         /**
          * Create a color map that linearly interpolates between minColor and maxColor over 256 values
          */
         private fun createFixedColorMap(minColor: Int, maxColor: Int): IntArray {
             val colorMap = IntArray(256)
-            
+
             val r0 = Color.red(minColor)
             val g0 = Color.green(minColor)
             val b0 = Color.blue(minColor)
             val r1 = Color.red(maxColor)
             val g1 = Color.green(maxColor)
             val b1 = Color.blue(maxColor)
-            
+
             for (i in 0 until 256) {
                 val fraction = i / 255f
                 val r = Math.round(r0 + (r1 - r0) * fraction)
@@ -212,10 +308,10 @@ class SolidColorEffect(
                 val b = Math.round(b0 + (b1 - b0) * fraction)
                 colorMap[i] = Color.argb(255, r, g, b)
             }
-            
+
             return colorMap
         }
-        
+
         /**
          * Create an alpha map where 0 is fully opaque (showing minColor) and 255 is fully transparent.
          * This is used for gradient effects where the background is drawn first.
@@ -225,48 +321,14 @@ class SolidColorEffect(
             val r = Color.red(minColor)
             val g = Color.green(minColor)
             val b = Color.blue(minColor)
-            
+
             for (i in 0 until 256) {
                 // For gradient effects: 0 = fully opaque (show foreground color), 255 = fully transparent (show gradient)
                 val alpha = 255 - i
                 alphaMap[i] = Color.argb(alpha, r, g, b)
             }
-            
+
             return alphaMap
         }
-        
-        // Factory methods for common configurations
-        fun blackToWhite() = fromParameters(mapOf(
-            "colors" to mapOf(
-                "type" to "fixed",
-                "minColor" to listOf(0, 0, 0),
-                "maxColor" to listOf(255, 255, 255)
-            )
-        ))
-        
-        fun whiteToBlack() = fromParameters(mapOf(
-            "colors" to mapOf(
-                "type" to "fixed",
-                "minColor" to listOf(255, 255, 255),
-                "maxColor" to listOf(0, 0, 0)
-            )
-        ))
-        
-        /**
-         * Test method to verify the color mapping functionality
-         */
-        fun testColorMap() {
-            val effect = blackToWhite()
-            val colorMap = effect.colorMap
-            
-            // Test key values
-            assert(colorMap[0] == Color.BLACK) { "colorMap[0] should be black, got ${colorMap[0]}" }
-            assert(colorMap[255] == Color.WHITE) { "colorMap[255] should be white, got ${colorMap[255]}" }
-            assert(Color.red(colorMap[128]) == 128) { "colorMap[128] red should be ~128, got ${Color.red(colorMap[128])}" }
-            assert(Color.green(colorMap[128]) == 128) { "colorMap[128] green should be ~128, got ${Color.green(colorMap[128])}" }
-            assert(Color.blue(colorMap[128]) == 128) { "colorMap[128] blue should be ~128, got ${Color.blue(colorMap[128])}" }
-            
-            Log.i(EFFECT_NAME, "Color map test passed - brightness to color mapping is working correctly")
-        }
     }
-} 
+}

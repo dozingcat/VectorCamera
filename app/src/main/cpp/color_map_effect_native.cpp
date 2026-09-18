@@ -6,7 +6,7 @@
 #include <thread>
 #include <vector>
 
-#define LOG_TAG "EdgeEffectNative"
+#define LOG_TAG "ColorMapEffectNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
@@ -48,7 +48,25 @@ inline int calculateEdgeStrength(
     return clamp(multiplier * edge, 0, 255);
 }
 
-// Process a range of rows
+// Process a range of rows in solid mode: the luminance is the color map index.
+void processRowsSolid(
+    const uint8_t* yData,
+    int width,
+    const int* colorMap,
+    int* outputPixels,
+    int startRow,
+    int endRow
+) {
+    for (int y = startRow; y < endRow; y++) {
+        const uint8_t* row = yData + y * width;
+        int* out = outputPixels + y * width;
+        for (int x = 0; x < width; x++) {
+            out[x] = colorMap[row[x]];
+        }
+    }
+}
+
+// Process a range of rows in edge mode: the edge strength is the color map index.
 void processRows(
     const uint8_t* yData,
     int yRowStride,
@@ -69,12 +87,13 @@ void processRows(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_EdgeEffect_00024Companion_processImageNativeFromYuvBytes(
+Java_com_dozingcatsoftware_vectorcamera_effect_ColorMapEffect_00024Companion_processImageNative(
     JNIEnv* env,
     jobject thiz,
     jbyteArray yData,
     jint width,
     jint height,
+    jboolean edgeMode,
     jint multiplier,
     jintArray colorMap,
     jintArray outputPixels,
@@ -92,49 +111,35 @@ Java_com_dozingcatsoftware_vectorcamera_effect_EdgeEffect_00024Companion_process
     
     // For YUV bytes, row stride equals width (no padding)
     int yRowStride = width;
-    
+
+    const uint8_t* yPtr = reinterpret_cast<const uint8_t*>(yDataPtr);
+    auto processBand = [=](int startRow, int endRow) {
+        if (edgeMode) {
+            processRows(yPtr, yRowStride, width, height, multiplier, colorMapData,
+                        outputPixelsData, startRow, endRow);
+        } else {
+            processRowsSolid(yPtr, width, colorMapData, outputPixelsData, startRow, endRow);
+        }
+    };
+
     if (numThreads == 1) {
-        // Single-threaded processing
-        processRows(
-            reinterpret_cast<const uint8_t*>(yDataPtr),
-            yRowStride,
-            width,
-            height,
-            multiplier,
-            colorMapData,
-            outputPixelsData,
-            0,
-            height
-        );
+        processBand(0, height);
     } else {
-        // Multi-threaded processing
         std::vector<std::thread> threads;
         int rowsPerThread = height / numThreads;
-        
+
         for (int i = 0; i < numThreads; i++) {
             int startRow = i * rowsPerThread;
             int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-            
-            threads.emplace_back(
-                processRows,
-                reinterpret_cast<const uint8_t*>(yDataPtr),
-                yRowStride,
-                width,
-                height,
-                multiplier,
-                colorMapData,
-                outputPixelsData,
-                startRow,
-                endRow
-            );
+            threads.emplace_back(processBand, startRow, endRow);
         }
-        
+
         // Wait for all threads to complete
         for (auto& thread : threads) {
             thread.join();
         }
     }
-    
+
     // Release native arrays
     env->ReleaseByteArrayElements(yData, yDataPtr, JNI_ABORT);
     env->ReleaseIntArrayElements(colorMap, colorMapData, JNI_ABORT);
