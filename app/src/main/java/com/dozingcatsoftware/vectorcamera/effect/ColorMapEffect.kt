@@ -254,6 +254,13 @@ class ColorMapEffect private constructor(
                     val alphaMap = createAlphaMap(minColor)
                     return ColorMapEffect(mode, effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
+                "palette" -> {
+                    // Evenly spaced color stops, e.g. a thermal camera palette.
+                    val stops = (colorParams["stops"] as List<List<Int>>).map {
+                        Color.argb(255, it[0], it[1], it[2])
+                    }
+                    return ColorMapEffect(mode, effectParams, colorMap = createPaletteColorMap(stops))
+                }
                 "grid_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor")
                     val gridColors = colorParams["grid"] as List<List<List<Int>>>
@@ -309,6 +316,27 @@ class ColorMapEffect private constructor(
                 colorMap[i] = Color.argb(255, r, g, b)
             }
 
+            return colorMap
+        }
+
+        /**
+         * Create a color map that interpolates through evenly spaced color stops.
+         */
+        private fun createPaletteColorMap(stops: List<Int>): IntArray {
+            require(stops.size >= 2) { "Palette needs at least two colors" }
+            val colorMap = IntArray(256)
+            val lastSegment = stops.size - 2
+            for (i in 0 until 256) {
+                val position = i / 255f * (stops.size - 1)
+                val segment = minOf(lastSegment, position.toInt())
+                val fraction = position - segment
+                val c0 = stops[segment]
+                val c1 = stops[segment + 1]
+                colorMap[i] = Color.argb(255,
+                        Math.round(Color.red(c0) + (Color.red(c1) - Color.red(c0)) * fraction),
+                        Math.round(Color.green(c0) + (Color.green(c1) - Color.green(c0)) * fraction),
+                        Math.round(Color.blue(c0) + (Color.blue(c1) - Color.blue(c0)) * fraction))
+            }
             return colorMap
         }
 

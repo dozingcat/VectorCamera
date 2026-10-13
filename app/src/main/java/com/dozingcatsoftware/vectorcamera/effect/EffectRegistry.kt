@@ -22,6 +22,16 @@ enum class EffectCategory(val displayName: String) {
     CUSTOM("Custom"),
 }
 
+// Black through purple, red and yellow to white, like a thermal camera's "ironbow" palette.
+private val IRONBOW_STOPS = listOf(
+        listOf(0, 0, 0), listOf(32, 0, 96), listOf(160, 0, 128), listOf(255, 64, 0),
+        listOf(255, 200, 0), listOf(255, 255, 255))
+
+// Navy through blue, cyan, green and yellow to red.
+private val SPECTRUM_STOPS = listOf(
+        listOf(0, 0, 96), listOf(0, 0, 255), listOf(0, 255, 255), listOf(0, 255, 0),
+        listOf(255, 255, 0), listOf(255, 0, 0))
+
 /**
  * Describes an effect that the user can select. `id` is a stable identifier that is safe to
  * store; `name` is shown in the effect picker. `factory` creates the effect using the current
@@ -387,6 +397,23 @@ class EffectRegistry {
             EffectInfo("oil_painting", "Oil painting", EffectCategory.ARTISTIC) {prefsFn, context -> OilPaintingEffect.standard() },
 
             EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
+
+            // Multi-stop palettes applied to brightness or edge strength.
+            EffectInfo("thermal", "Thermal", EffectCategory.COLORS) {prefsFn, context ->
+                ColorMapEffect.solid(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
+                ))
+            },
+            EffectInfo("thermal_edges", "Thermal edges", EffectCategory.EDGES) {prefsFn, context ->
+                ColorMapEffect.edge(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
+                ))
+            },
+            EffectInfo("spectrum", "Spectrum", EffectCategory.COLORS) {prefsFn, context ->
+                ColorMapEffect.solid(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to SPECTRUM_STOPS)
+                ))
+            },
 
             // Custom edge.
             EffectInfo("custom1", "Custom colors 1", EffectCategory.CUSTOM) {prefsFn, context ->
