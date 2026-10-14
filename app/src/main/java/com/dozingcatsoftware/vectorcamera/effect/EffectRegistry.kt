@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.util.Log
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
+import com.dozingcatsoftware.vectorcamera.CustomPaletteScheme
 import com.dozingcatsoftware.vectorcamera.CustomPermuteScheme
 
 enum class EffectContext {
@@ -21,6 +22,16 @@ enum class EffectCategory(val displayName: String) {
     ARTISTIC("Artistic"),
     CUSTOM("Custom"),
 }
+
+// Black through purple, red and yellow to white, like a thermal camera's "ironbow" palette.
+private val IRONBOW_STOPS = listOf(
+        listOf(0, 0, 0), listOf(32, 0, 96), listOf(160, 0, 128), listOf(255, 64, 0),
+        listOf(255, 200, 0), listOf(255, 255, 255))
+
+// Navy through blue, cyan, green and yellow to red.
+private val SPECTRUM_STOPS = listOf(
+        listOf(0, 0, 96), listOf(0, 0, 255), listOf(0, 255, 255), listOf(0, 255, 0),
+        listOf(255, 255, 0), listOf(255, 0, 0))
 
 /**
  * Describes an effect that the user can select. `id` is a stable identifier that is safe to
@@ -388,6 +399,23 @@ class EffectRegistry {
 
             EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
 
+            // Multi-stop palettes applied to brightness or edge strength.
+            EffectInfo("thermal", "Thermal", EffectCategory.COLORS) {prefsFn, context ->
+                ColorMapEffect.solid(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
+                ))
+            },
+            EffectInfo("thermal_edges", "Thermal edges", EffectCategory.EDGES) {prefsFn, context ->
+                ColorMapEffect.edge(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
+                ))
+            },
+            EffectInfo("spectrum", "Spectrum", EffectCategory.COLORS) {prefsFn, context ->
+                ColorMapEffect.solid(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to SPECTRUM_STOPS)
+                ))
+            },
+
             // Custom edge.
             EffectInfo("custom1", "Custom colors 1", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomColorMapEffect(prefsFn, context, "custom1",
@@ -405,6 +433,13 @@ class EffectRegistry {
                 createCustomPermuteEffect(prefsFn, "custom_permute",
                         CustomPermuteScheme(ColorComponentSource.BLUE,
                                 ColorComponentSource.GREEN, ColorComponentSource.RED))
+            },
+            // Custom multi-stop palette.
+            EffectInfo("custom_palette", "Custom palette", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomPaletteEffect(prefsFn, "custom_palette",
+                        CustomPaletteScheme(ColorMapMode.SOLID, listOf(
+                                Color.BLACK, Color.rgb(0, 0, 160), Color.rgb(255, 0, 128),
+                                Color.YELLOW, Color.WHITE)))
             },
     )
 
@@ -504,6 +539,18 @@ private fun createCustomColorMapEffect(
     )
     val baseEffect = ColorMapEffect.fromParameters(scheme.mode, params)
     return CustomColorMapEffect(baseEffect, scheme, customEffectId)
+}
+
+private fun createCustomPaletteEffect(
+    prefsFn: (String, Any) -> Any,
+    customEffectId: String,
+    defaultScheme: CustomPaletteScheme): Effect {
+    val schemeJson =
+        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+        catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomPaletteScheme.fromMap(schemeJson, defaultScheme)
+    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, scheme.toEffectParameters())
+    return CustomPaletteEffect(baseEffect, scheme, customEffectId)
 }
 
 private fun createCustomPermuteEffect(
