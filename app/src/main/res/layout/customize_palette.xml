@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- All direct children use match_parent width. A wrap_content LinearLayout only counts the
+     measured widths of match_parent children if every child is match_parent, so mixing in
+     wrap_content children would let a wider row get clipped. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="#C0000000"
+    android:paddingLeft="16dp"
+    android:paddingRight="16dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:text="Colors, dark to bright" />
+
+    <!-- Color swatches are added here programmatically; they shrink to fit the width. -->
+    <LinearLayout
+        android:id="@+id/colorSwatches"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="horizontal" />
+
+    <!-- Mode checkbox on the left, add/remove buttons on the right. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <CheckBox
+            android:id="@+id/solidCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:paddingLeft="8dp"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:text="Solid" />
+
+        <Button
+            android:id="@+id/removeColorButton"
+            android:layout_width="64dp"
+            android:layout_height="48dp"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="8dp"
+            android:minWidth="0dp"
+            android:textSize="20sp"
+            android:text="−" />
+
+        <Button
+            android:id="@+id/addColorButton"
+            android:layout_width="64dp"
+            android:layout_height="48dp"
+            android:minWidth="0dp"
+            android:textSize="20sp"
+            android:text="+" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/doneButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:minWidth="120dp"
+            android:minHeight="48dp"
+            android:textSize="16sp"
+            android:text="Done" />
+    </FrameLayout>
+
+</LinearLayout>

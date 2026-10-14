@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.util.Log
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
+import com.dozingcatsoftware.vectorcamera.CustomPaletteScheme
 import com.dozingcatsoftware.vectorcamera.CustomPermuteScheme
 
 enum class EffectContext {
@@ -433,6 +434,13 @@ class EffectRegistry {
                         CustomPermuteScheme(ColorComponentSource.BLUE,
                                 ColorComponentSource.GREEN, ColorComponentSource.RED))
             },
+            // Custom multi-stop palette.
+            EffectInfo("custom_palette", "Custom palette", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomPaletteEffect(prefsFn, "custom_palette",
+                        CustomPaletteScheme(ColorMapMode.SOLID, listOf(
+                                Color.BLACK, Color.rgb(0, 0, 160), Color.rgb(255, 0, 128),
+                                Color.YELLOW, Color.WHITE)))
+            },
     )
 
     fun defaultEffectCount() = effectInfos.size
@@ -531,6 +539,18 @@ private fun createCustomColorMapEffect(
     )
     val baseEffect = ColorMapEffect.fromParameters(scheme.mode, params)
     return CustomColorMapEffect(baseEffect, scheme, customEffectId)
+}
+
+private fun createCustomPaletteEffect(
+    prefsFn: (String, Any) -> Any,
+    customEffectId: String,
+    defaultScheme: CustomPaletteScheme): Effect {
+    val schemeJson =
+        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+        catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomPaletteScheme.fromMap(schemeJson, defaultScheme)
+    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, scheme.toEffectParameters())
+    return CustomPaletteEffect(baseEffect, scheme, customEffectId)
 }
 
 private fun createCustomPermuteEffect(

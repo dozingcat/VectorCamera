@@ -147,6 +147,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
+        <com.dozingcatsoftware.vectorcamera.EditPaletteSchemeView
+            android:id="@+id/editPaletteView"
+            android:visibility="gone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
         <com.dozingcatsoftware.vectorcamera.EffectPickerView
             android:id="@+id/effectPickerView"
             android:visibility="gone"
