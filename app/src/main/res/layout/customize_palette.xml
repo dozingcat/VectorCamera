@@ -20,12 +20,11 @@
         android:text="Colors, dark to bright" />
 
     <!-- Color swatches are added here programmatically; they shrink to fit the width. -->
-    <LinearLayout
+    <com.dozingcatsoftware.vectorcamera.ColorSwatchRow
         android:id="@+id/colorSwatches"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:orientation="horizontal" />
+        android:gravity="center_horizontal" />
 
     <!-- Mode checkbox on the left, add/remove buttons on the right. -->
     <LinearLayout

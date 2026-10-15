@@ -322,7 +322,7 @@ class ColorMapEffect private constructor(
         /**
          * Create a color map that interpolates through evenly spaced color stops.
          */
-        private fun createPaletteColorMap(stops: List<Int>): IntArray {
+        fun createPaletteColorMap(stops: List<Int>): IntArray {
             require(stops.size >= 2) { "Palette needs at least two colors" }
             val colorMap = IntArray(256)
             val lastSegment = stops.size - 2
