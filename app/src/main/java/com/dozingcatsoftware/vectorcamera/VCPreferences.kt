@@ -88,6 +88,10 @@ class VCPreferences(val context: Context) {
         saveCustomScheme(id, scheme.toMap())
     }
 
+    fun saveCustomScheme(id: String, scheme: CustomContourScheme) {
+        saveCustomScheme(id, scheme.toMap())
+    }
+
     private fun saveCustomScheme(id: String, schemeMap: Map<String, Any>) {
         withPrefsEditor {
             it.putString(id, mapToJsonString(schemeMap))

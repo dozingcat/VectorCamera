@@ -109,6 +109,8 @@ class MainActivity : AppCompatActivity() {
         binding.editPermuteView.changeCallback = this::handleCustomPermuteSchemeChanged
         binding.editPaletteView.activity = this
         binding.editPaletteView.changeCallback = this::handleCustomPaletteSchemeChanged
+        binding.editContourView.activity = this
+        binding.editContourView.changeCallback = this::handleCustomContourSchemeChanged
         binding.effectPickerView.setEffects(effectRegistry.effectInfos)
         binding.effectPickerView.onEffectSelected = this::handleEffectSelected
 
@@ -351,9 +353,10 @@ class MainActivity : AppCompatActivity() {
             binding.editSchemeView.layoutParams = params
         }
         run {
-            // The permute and palette editors are small panels; put them at the bottom in
-            // portrait (above the shutter bar) and at the left in landscape (next to the icon bar).
-            for (panel in listOf(binding.editPermuteView, binding.editPaletteView)) {
+            // The permute, palette, and contour editors are small panels; put them at the bottom
+            // in portrait (above the shutter bar) and at the left in landscape (next to the icon bar).
+            for (panel in listOf(binding.editPermuteView, binding.editPaletteView,
+                                 binding.editContourView)) {
                 val params = FrameLayout.LayoutParams(wrap, wrap)
                 val metrics = resources.displayMetrics
                 val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
@@ -608,6 +611,7 @@ class MainActivity : AppCompatActivity() {
         binding.editSchemeView.visibility = View.GONE
         binding.editPermuteView.visibility = View.GONE
         binding.editPaletteView.visibility = View.GONE
+        binding.editContourView.visibility = View.GONE
         Log.i(TAG, "Showing effect picker")
     }
 
@@ -680,6 +684,11 @@ class MainActivity : AppCompatActivity() {
                 binding.editPaletteView.visibility = View.VISIBLE
                 customSchemeId = eff.customSchemeId
             }
+            is CustomContourEffect -> {
+                binding.editContourView.setScheme(eff.scheme)
+                binding.editContourView.visibility = View.VISIBLE
+                customSchemeId = eff.customSchemeId
+            }
             else -> customSchemeId = ""
         }
     }
@@ -733,6 +742,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
         preferences.saveCustomScheme(customSchemeId, ps)
+        reloadCustomEffect()
+    }
+
+    private fun handleCustomContourSchemeChanged(cs: CustomContourScheme) {
+        if (customSchemeId.isEmpty()) {
+            return
+        }
+        preferences.saveCustomScheme(customSchemeId, cs)
         reloadCustomEffect()
     }
 
