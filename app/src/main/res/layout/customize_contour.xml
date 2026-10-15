@@ -33,24 +33,28 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <TextView
+        <!-- Measured at its natural width, with weight so it takes any extra space and keeps
+             the buttons at the right edge. -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:text="Lines" />
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <View
-            android:id="@+id/lineSwatch"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginLeft="8dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:text="Lines" />
 
-        <!-- Spacer pushing the buttons to the right. -->
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
+            <View
+                android:id="@+id/lineSwatch"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginLeft="8dp" />
+        </LinearLayout>
 
         <Button
             android:id="@+id/removeColorButton"
