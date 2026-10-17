@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.ImageFormat
 import android.graphics.Rect
 import android.hardware.camera2.*
+import android.util.Range
 import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
@@ -223,6 +224,12 @@ class CameraImageGenerator(val context: Context,
             }
         }
         request.addTarget(imageReader!!.surface)
+        if (this.targetStatus != CameraStatus.CAPTURING_PHOTO) {
+            // Without an explicit range the HAL's default is typically [15, 30], and at least the
+            // Pixel 8a then delivers YUV frames at the 15 fps lower bound. Ask for the steadiest
+            // range up to 30 fps.
+            previewFpsRange()?.let {request.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it)}
+        }
         if (this.zoomRatio > 0) {
             val cc = cameraCharacteristics
             val baseRect = cc.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)!!
@@ -243,6 +250,19 @@ class CameraImageGenerator(val context: Context,
         }
         this.status = this.targetStatus
         Log.i(TAG, "Capture started, status=${status}")
+    }
+
+    /**
+     * The available AE frame rate range with the highest maximum not above MAX_PREVIEW_FPS,
+     * preferring a fixed range (equal bounds) so the rate doesn't drop in low light.
+     */
+    private fun previewFpsRange(): Range<Int>? {
+        val ranges = cameraCharacteristics.get(
+                CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: return null
+        val range = ranges.filter {it.upper <= MAX_PREVIEW_FPS}
+                .maxWithOrNull(compareBy({it.upper}, {it.lower}))
+        Log.i(TAG, "Available fps ranges: ${ranges.toList()}, using $range")
+        return range
     }
 
     fun setZoom(zoomRatio: Double) {
@@ -277,6 +297,8 @@ class CameraImageGenerator(val context: Context,
 
     companion object {
         const val TAG = "CameraImageGenerator"
+        // Higher rates would mostly be dropped, since processing can't keep up at full resolution.
+        const val MAX_PREVIEW_FPS = 30
 
         fun pickBestSize(sizes: Array<Size>, target: Size): Size {
             fun differenceFromRequested(s: Size) =

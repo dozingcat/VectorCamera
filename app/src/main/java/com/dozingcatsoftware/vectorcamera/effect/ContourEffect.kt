@@ -2,6 +2,7 @@ package com.dozingcatsoftware.vectorcamera.effect
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.util.Log
 import com.dozingcatsoftware.vectorcamera.CameraImage
 import com.dozingcatsoftware.vectorcamera.CodeArchitecture
 import com.dozingcatsoftware.vectorcamera.ProcessedBitmap
@@ -31,10 +32,43 @@ class ContourEffect private constructor(
         val startTime = System.nanoTime()
         val width = cameraImage.width()
         val height = cameraImage.height()
+        val yBytes = cameraImage.getYBytes()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-        val levelPlane = computeLevels(cameraImage.getYBytes(), width, height, levels, smoothingRadius)
-        val pixels = IntArray(width * height)
-        val numThreads = calculateOptimalThreads(height)
+        var architecture = CodeArchitecture.Kotlin
+        // The native code hands out row chunks dynamically, so slow cores just take fewer and
+        // any thread count works. Three gets most of the speedup without occupying every core.
+        var numThreads = calculateOptimalThreads(height, MAX_NATIVE_THREADS)
+        var done = false
+        if (nativeLibraryLoaded) {
+            try {
+                // Renders straight into the bitmap, skipping the pixel array and setPixels copy.
+                done = processImageNativeToBitmap(yBytes, width, height, levels, smoothingRadius,
+                                                  lineThickness, fillColors, lineColor, bitmap,
+                                                  numThreads)
+                if (done) {
+                    architecture = CodeArchitecture.Native
+                }
+            } catch (e: Exception) {
+                Log.w(EFFECT_NAME, "Native processing failed, falling back to Kotlin: ${e.message}")
+            }
+        }
+        if (!done) {
+            numThreads = calculateOptimalThreads(height, Effect.MAX_KOTLIN_THREADS)
+            val pixels = IntArray(width * height)
+            renderKotlin(yBytes, width, height, numThreads, pixels)
+            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        }
+        val metadata = ProcessedBitmapMetadata(
+                codeArchitecture = architecture,
+                numThreads = numThreads,
+                generationDurationNanos = System.nanoTime() - startTime)
+        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
+    }
+
+    private fun renderKotlin(yBytes: ByteArray, width: Int, height: Int, numThreads: Int,
+                             pixels: IntArray) {
+        val levelPlane = computeLevels(yBytes, width, height, levels, smoothingRadius)
         if (numThreads == 1) {
             renderLevels(levelPlane, width, height, 0, height, fillColors, lineColor,
                          lineThickness, pixels)
@@ -53,20 +87,12 @@ class ContourEffect private constructor(
                 jobs.forEach { it.join() }
             }
         }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        val metadata = ProcessedBitmapMetadata(
-                codeArchitecture = CodeArchitecture.Kotlin,
-                numThreads = numThreads,
-                generationDurationNanos = System.nanoTime() - startTime)
-        return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    private fun calculateOptimalThreads(height: Int): Int {
+    private fun calculateOptimalThreads(height: Int, maxThreads: Int): Int {
         val numCores = Runtime.getRuntime().availableProcessors()
         val minRowsPerThread = 32
-        return maxOf(1, minOf(numCores, height / minRowsPerThread, Effect.MAX_KOTLIN_THREADS))
+        return maxOf(1, minOf(numCores, height / minRowsPerThread, maxThreads))
     }
 
     companion object {
@@ -74,6 +100,32 @@ class ContourEffect private constructor(
         const val DEFAULT_LEVELS = 8
         const val DEFAULT_SMOOTHING = 2
         const val DEFAULT_LINE_THICKNESS = 2
+        const val MAX_NATIVE_THREADS = 3
+
+        /**
+         * Native implementation of computeLevels + renderLevels (see contour_effect_native.cpp)
+         * rendering into `bitmap`, which must be ARGB_8888 and width x height. `fillColors`
+         * must have at least `levels` entries. Returns false without modifying the bitmap if
+         * it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
+            yData: ByteArray,
+            width: Int,
+            height: Int,
+            levels: Int,
+            smoothingRadius: Int,
+            lineThickness: Int,
+            fillColors: IntArray,
+            lineColor: Int,
+            bitmap: Bitmap,
+            numThreads: Int
+        ): Boolean
+
+        private var nativeLibraryLoaded = false
+
+        init {
+            nativeLibraryLoaded = Effect.loadNativeLibrary()
+        }
 
         /**
          * Quantizes brightness into `levels` bands (0 to levels-1) after a box blur of radius
@@ -151,7 +203,8 @@ class ContourEffect private constructor(
 
         fun fromParameters(params: Map<String, Any>): ContourEffect {
             val levels = (params.getOrElse("levels", {DEFAULT_LEVELS}) as Number).toInt().coerceIn(2, 256)
-            val smoothing = (params.getOrElse("smoothing", {DEFAULT_SMOOTHING}) as Number).toInt()
+            // The native implementation supports radii up to 127.
+            val smoothing = (params.getOrElse("smoothing", {DEFAULT_SMOOTHING}) as Number).toInt().coerceIn(0, 127)
             val thickness = (params.getOrElse("lineThickness", {DEFAULT_LINE_THICKNESS}) as Number).toInt()
             val colors = params.getOrElse("colors", {mapOf<String, Any>()}) as Map<String, Any>
             val fillStops = (colors.getOrElse("fill", {listOf(listOf(0, 0, 0), listOf(255, 255, 255))})
