@@ -7,7 +7,7 @@
 // Build and run (from the repository root):
 //   NDK=~/Library/Android/sdk/ndk/29.0.13599879/toolchains/llvm/prebuilt/darwin-x86_64
 //   $NDK/bin/clang++ --target=aarch64-linux-android33 -std=c++17 -O3 -ffast-math -funroll-loops \
-//       -static-libstdc++ -landroid -DCONTOUR_HOST_TEST app/src/test/cpp/contour_device_bench.cpp \
+//       -static-libstdc++ -landroid -DCONTOUR_NO_JNI app/src/test/cpp/contour_device_bench.cpp \
 //       -o /tmp/contour_bench
 //   adb push /tmp/contour_bench /data/local/tmp/ && adb shell /data/local/tmp/contour_bench 1920 1080 2 all
 //

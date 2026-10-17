@@ -2,8 +2,9 @@
 // each level with a color and draw lines where neighboring levels differ. The arithmetic matches
 // the Kotlin implementation exactly so both produce identical images.
 //
-// Compiling with -DCONTOUR_HOST_TEST leaves out the JNI entry point so the core functions can be
-// unit tested on the host (see app/src/test/cpp/contour_effect_native_test.cpp).
+// Compiling with -DCONTOUR_NO_JNI leaves out the JNI entry point and Android headers so the core
+// functions can be built into standalone programs: the host unit test and the on-device
+// benchmark in app/src/test/cpp.
 
 #include <algorithm>
 #include <atomic>
@@ -12,7 +13,7 @@
 
 #include "worker_pool.h"
 
-#ifndef CONTOUR_HOST_TEST
+#ifndef CONTOUR_NO_JNI
 #include <jni.h>
 #include <android/bitmap.h>
 #include <android/log.h>
@@ -47,7 +48,7 @@ struct ExactDivider {
 
 // Rows per work chunk. Chunks are handed out dynamically, so fast cores take more of them and
 // slow cores take fewer; every thread finishes within about one chunk of the others regardless
-// of the device's core mix, and the thread count can simply be the number of cores.
+// of the device's core mix.
 constexpr int kChunkRows = 32;
 
 // Calls fn(startRow, endRow) for chunks of rows claimed from `nextChunk` until none are left.
@@ -205,7 +206,7 @@ void processImage(const uint8_t* yData, int width, int height, int levels, int s
 
 }  // namespace contour
 
-#ifndef CONTOUR_HOST_TEST
+#ifndef CONTOUR_NO_JNI
 // Converts an ARGB color int (as used by android.graphics.Color) to the in-memory layout of an
 // RGBA_8888 bitmap pixel on a little-endian device: bytes R, G, B, A. Alpha is forced opaque, so
 // premultiplication is the identity.
