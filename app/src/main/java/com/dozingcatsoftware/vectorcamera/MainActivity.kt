@@ -82,7 +82,7 @@ class MainActivity : AppCompatActivity() {
 
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
-        imageProcessor = CameraImageProcessor()
+        imageProcessor = CameraImageProcessor(this)
 
         currentEffect = effectFromPreferences()
         selectedEffectId = preferences.effectId()

@@ -1,12 +1,13 @@
 package com.dozingcatsoftware.vectorcamera
 
 
+import android.content.Context
 import android.util.Log
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CameraImageProcessor() {
+class CameraImageProcessor(private val context: Context) {
     private var consumerThread: Thread? = null
     private var receivedCameraImage: CameraImage? = null
     private val threadLock = ReentrantLock()
@@ -57,10 +58,12 @@ class CameraImageProcessor() {
     }
 
     private fun threadEntry() {
+        val performanceHint = ProcessingPerformanceHint(context)
         var currentCamAllocation: CameraImage? = null
         while (true) {
             while (currentCamAllocation == null) {
                 if (!shouldCurrentThreadContinue()) {
+                    performanceHint.close()
                     return
                 }
                 allocationLock.withLock({
@@ -75,7 +78,9 @@ class CameraImageProcessor() {
                 })
             }
 
+            performanceHint.beginFrame()
             processFn?.invoke(currentCamAllocation)
+            performanceHint.endFrame()
             currentCamAllocation = null
         }
     }

@@ -42,6 +42,14 @@ interface Effect {
         const val DISABLE_NATIVE_CODE = false
         var nativeLibraryLoaded = false
 
+        /** Thread IDs of the native worker pool; see worker_pool.h. Empty until a native effect
+         *  has run multi-threaded. Only valid after loadNativeLibrary() returns true. */
+        external fun nativeWorkerThreadIds(): IntArray
+
+        /** Thread IDs of the native worker pool, or empty if the native library isn't loaded. */
+        fun workerThreadIds(): IntArray =
+                if (nativeLibraryLoaded) nativeWorkerThreadIds() else IntArray(0)
+
         fun loadNativeLibrary(): Boolean {
             if (DISABLE_NATIVE_CODE) {
                 return false

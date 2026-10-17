@@ -16,7 +16,9 @@ add_library(vectorcamera_native SHARED
     matrix_effect_native.cpp
     ascii_effect.cpp
     oil_painting_effect_native.cpp
-    stained_glass_effect_native.cpp)
+    stained_glass_effect_native.cpp
+    contour_effect_native.cpp
+    worker_pool_jni.cpp)
 
 # Set C++17 standard
 set_property(TARGET vectorcamera_native PROPERTY CXX_STANDARD 17)
@@ -43,4 +45,6 @@ endif()
 
 # Link against the log library (for Android logging)
 find_library(log-lib log)
-target_link_libraries(vectorcamera_native ${log-lib})
+# jnigraphics provides AndroidBitmap_lockPixels for rendering straight into bitmaps.
+find_library(jnigraphics-lib jnigraphics)
+target_link_libraries(vectorcamera_native ${log-lib} ${jnigraphics-lib})
