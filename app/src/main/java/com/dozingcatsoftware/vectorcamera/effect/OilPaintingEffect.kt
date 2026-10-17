@@ -64,16 +64,15 @@ class OilPaintingEffect(
     private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         // Scale down input image for better performance while maintaining quality
         val (scaledWidth, scaledHeight, scaleFactor) = calculateOptimalSize(width, height)
-        val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
 
-        // The native code renders straight into the bitmap, skipping the pixel array and the
-        // setPixels copy.
+        // The native code scales the image itself and renders straight into the bitmap,
+        // skipping the scaled copies, the pixel array, and the setPixels copy.
         if (nativeLibraryLoaded) {
             val nativeThreads = calculateOptimalNativeThreads(scaledHeight)
             try {
                 val resultBitmap = Bitmap.createBitmap(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
                 val done = processImageNativeToBitmap(
-                    scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, brushSize, levels,
+                    yData, uData, vData, width, height, scaledWidth, scaledHeight, brushSize, levels,
                     contrastSensitivity, resultBitmap, nativeThreads
                 )
                 if (done) {
@@ -85,6 +84,7 @@ class OilPaintingEffect(
         }
 
         // Fall back to Kotlin implementation with scaled data
+        val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
         val kotlinThreads = calculateOptimalKotlinThreads(scaledHeight)
         val resultBitmap = createBitmapFromPlanesKotlin(scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, kotlinThreads)
         return Triple(resultBitmap, kotlinThreads, CodeArchitecture.Kotlin)
@@ -483,13 +483,16 @@ class OilPaintingEffect(
         }
         
         /**
-         * Renders into `bitmap` (ARGB_8888, width x height). Returns false without modifying
-         * the bitmap if it can't be used directly.
+         * Scales the srcWidth x srcHeight planes down to width x height (bilinear, as
+         * resizeImageBytes does) and renders into `bitmap` (ARGB_8888, width x height). Returns
+         * false without modifying the bitmap if it can't be used directly.
          */
         private external fun processImageNativeToBitmap(
             yData: ByteArray,
             uData: ByteArray,
             vData: ByteArray,
+            srcWidth: Int,
+            srcHeight: Int,
             width: Int,
             height: Int,
             brushSize: Int,

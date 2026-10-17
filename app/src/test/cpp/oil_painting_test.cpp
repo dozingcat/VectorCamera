@@ -1,7 +1,11 @@
-// Host test for oil_painting_effect_native.cpp: checks the chunked, bitmap-writing kernel against
-// a verbatim copy of the original kernel (commit e688b42) run single-threaded, which is the
-// correct reference: the original's multi-threaded path sampled unconverted (zero) pixels across
-// band boundaries, which the rewrite fixes.
+// Host test for oil_painting_effect_native.cpp.
+//
+// The brush sizing and color conversion are checked against verbatim copies of the original
+// kernel's code (commit e688b42; the original computed the brightness variance in doubles, the
+// rewrite in integers, so a mismatch could only come from a rounding edge). The downscaling is
+// checked against a port of the Kotlin resizeImageBytes. The painted color is checked against a
+// brute-force count of the colors in each pixel's brush disc, with the rewrite's tie-breaking
+// rule (the smallest hash among the most common colors).
 //
 // Run from the repository root with:
 //   clang++ -std=c++17 -O2 -Wall -DVC_NO_JNI app/src/test/cpp/oil_painting_test.cpp \
@@ -15,52 +19,37 @@
 
 namespace reference {
 
-struct BrushPattern {
-    std::vector<std::pair<int16_t, int16_t>> offsets;
-    std::vector<std::pair<int16_t, int16_t>> leftEdgeToRemove;
-    std::vector<std::pair<int16_t, int16_t>> rightEdgeToAdd;
-};
-static std::vector<BrushPattern> brushPatterns;
-static bool brushPatternsInitialized = false;
-
-void initializeBrushPatterns() {
-    if (brushPatternsInitialized) return;
-    const int maxRadius = 20;
-    brushPatterns.resize(maxRadius + 1);
-    for (int radius = 0; radius <= maxRadius; radius++) {
-        BrushPattern& pattern = brushPatterns[radius];
-        pattern.offsets.clear();
-        if (radius == 0) {
-            pattern.offsets.emplace_back(0, 0);
-            continue;
-        }
-        int radiusSquared = radius * radius;
-        for (int dy = -radius; dy <= radius; dy++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                int distanceSquared = dx * dx + dy * dy;
-                if (distanceSquared <= radiusSquared) {
-                    pattern.offsets.emplace_back(static_cast<int16_t>(dx), static_cast<int16_t>(dy));
-                }
-            }
-        }
-        pattern.leftEdgeToRemove.clear();
-        pattern.rightEdgeToAdd.clear();
-        if (radius > 0) {
-            for (const auto &p : pattern.offsets) {
-                int dx = p.first;
-                int dy = p.second;
-                int leftDistanceSquared = (dx - 1) * (dx - 1) + dy * dy;
-                if (leftDistanceSquared > radiusSquared) {
-                    pattern.leftEdgeToRemove.emplace_back(dx - 1, dy);
-                }
-                int rightDistanceSquared = (dx + 1) * (dx + 1) + dy * dy;
-                if (rightDistanceSquared > radiusSquared) {
-                    pattern.rightEdgeToAdd.emplace_back(dx, dy);
-                }
-            }
+// Port of resizeImageBytes in app/src/main/java/com/dozingcatsoftware/util/images.kt.
+std::vector<uint8_t> resizeImageBytes(const std::vector<uint8_t>& data, int oldWidth, int oldHeight,
+                                      int newWidth, int newHeight) {
+    std::vector<uint8_t> result(static_cast<size_t>(newWidth) * newHeight);
+    const float xRatio = static_cast<float>(oldWidth) / newWidth;
+    const float yRatio = static_cast<float>(oldHeight) / newHeight;
+    for (int y = 0; y < newHeight; y++) {
+        for (int x = 0; x < newWidth; x++) {
+            const float px = x * xRatio;
+            const float py = y * yRatio;
+            const int x1 = static_cast<int>(px);
+            const int y1 = static_cast<int>(py);
+            const int x2 = std::min(x1 + 1, oldWidth - 1);
+            const int y2 = std::min(y1 + 1, oldHeight - 1);
+            const float fx = px - x1;
+            const float fy = py - y1;
+            const int p1 = data[y1 * oldWidth + x1];
+            const int p2 = data[y1 * oldWidth + x2];
+            const int p3 = data[y2 * oldWidth + x1];
+            const int p4 = data[y2 * oldWidth + x2];
+            volatile float t1 = p1 * (1 - fx) * (1 - fy);
+            volatile float t2 = p2 * fx * (1 - fy);
+            volatile float t3 = p3 * (1 - fx) * fy;
+            volatile float t4 = p4 * fx * fy;
+            volatile float s12 = t1 + t2;
+            volatile float s123 = s12 + t3;
+            const float interpolated = s123 + t4;
+            result[y * newWidth + x] = static_cast<uint8_t>(static_cast<int>(interpolated));
         }
     }
-    brushPatternsInitialized = true;
+    return result;
 }
 
 inline uint32_t yuvToRgbQuantized(int y, int u, int v, int quantizationStep) {
@@ -115,109 +104,50 @@ inline uint32_t hashQuantizedColor(uint32_t color) {
     return (r << 10) | (g << 5) | b;
 }
 
-enum ColorCountUpdateType {Full, Incremental};
-
-void updateColorCounts(const uint32_t* pixels, int centerX, int centerY, int width, int height, int radius,
-                       std::vector<uint16_t>& colorCounts, std::vector<uint32_t>& usedColors,
-                       std::vector<uint32_t>& colorSamples, ColorCountUpdateType updateType) {
-    if (!brushPatternsInitialized) initializeBrushPatterns();
-    radius = std::max(0, std::min(radius, static_cast<int>(brushPatterns.size()) - 1));
-    const BrushPattern& pattern = brushPatterns[radius];
-    if (updateType == ColorCountUpdateType::Full) {
-        for (const auto& offset : pattern.offsets) {
-            int sampleX = centerX + offset.first;
-            int sampleY = centerY + offset.second;
-            if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
-                uint32_t samplePixel = pixels[sampleY * width + sampleX];
-                uint32_t colorHash = hashQuantizedColor(samplePixel);
-                if (colorCounts[colorHash] == 0) {
-                    usedColors.push_back(colorHash);
-                    colorSamples.push_back(samplePixel);
-                }
-                colorCounts[colorHash]++;
-            }
-        }
-    } else {
-        for (const auto& offset : pattern.leftEdgeToRemove) {
-            int sampleX = centerX + offset.first;
-            int sampleY = centerY + offset.second;
-            if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
-                uint32_t samplePixel = pixels[sampleY * width + sampleX];
-                uint32_t colorHash = hashQuantizedColor(samplePixel);
-                if (colorCounts[colorHash] > 0) colorCounts[colorHash]--;
-            }
-        }
-        for (const auto& offset : pattern.rightEdgeToAdd) {
-            int sampleX = centerX + offset.first;
-            int sampleY = centerY + offset.second;
-            if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
-                uint32_t samplePixel = pixels[sampleY * width + sampleX];
-                uint32_t colorHash = hashQuantizedColor(samplePixel);
-                if (colorCounts[colorHash] == 0) {
-                    usedColors.push_back(colorHash);
-                    colorSamples.push_back(samplePixel);
-                }
-                colorCounts[colorHash]++;
+// Expected output: brute-force histogram of the disc with the rewrite's tie-breaking.
+uint32_t expectedPixel(const std::vector<uint32_t>& rgb, int width, int height, int x, int y, int radius,
+                       const oil::ColorTables& tables) {
+    std::vector<int> counts(oil::kNumHashes, 0);
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            const int sx = x + dx, sy = y + dy;
+            if (dx * dx + dy * dy <= radius * radius && sx >= 0 && sx < width && sy >= 0 && sy < height) {
+                counts[hashQuantizedColor(rgb[sy * width + sx])]++;
             }
         }
     }
+    int best = -1, bestCount = 0;
+    for (int h = 0; h < oil::kNumHashes; h++) {
+        if (counts[h] > bestCount) { bestCount = counts[h]; best = h; }
+    }
+    return tables.bitmapColor(static_cast<uint16_t>(best));
 }
 
-uint32_t findDominantColorFromCounts(const std::vector<uint16_t>& colorCounts, const std::vector<uint32_t>& usedColors,
-                                     const std::vector<uint32_t>& colorSamples, uint32_t fallbackColor) {
-    uint32_t dominantColor = fallbackColor;
-    int maxCount = 0;
-    for (size_t i = 0; i < usedColors.size(); i++) {
-        uint32_t colorHash = usedColors[i];
-        if (colorCounts[colorHash] > maxCount) {
-            maxCount = colorCounts[colorHash];
-            dominantColor = colorSamples[i];
+// Expected output image: scale as the Kotlin code does, convert as the original kernel did, size
+// the brush as the original kernel did, and pick each pixel's color by brute force.
+std::vector<uint32_t> expectedImage(const std::vector<uint8_t>& y, const std::vector<uint8_t>& u,
+                                    const std::vector<uint8_t>& v, int srcW, int srcH, int w, int h,
+                                    int brush, int levels, float sens) {
+    const int srcUvW = (srcW + 1) / 2, srcUvH = (srcH + 1) / 2, uvW = (w + 1) / 2, uvH = (h + 1) / 2;
+    const std::vector<uint8_t> sy = resizeImageBytes(y, srcW, srcH, w, h);
+    const std::vector<uint8_t> su = resizeImageBytes(u, srcUvW, srcUvH, uvW, uvH);
+    const std::vector<uint8_t> sv = resizeImageBytes(v, srcUvW, srcUvH, uvW, uvH);
+    const int step = 256 / levels;
+    std::vector<uint32_t> rgb(static_cast<size_t>(w) * h);
+    for (int row = 0; row < h; row++)
+        for (int x = 0; x < w; x++)
+            rgb[row * w + x] = yuvToRgbQuantized(sy[row * w + x], su[(row / 2) * uvW + x / 2],
+                                                 sv[(row / 2) * uvW + x / 2], step);
+    const oil::ColorTables tables(levels);
+    std::vector<uint32_t> out(static_cast<size_t>(w) * h);
+    for (int row = 0; row < h; row++) {
+        for (int x = 0; x < w; x++) {
+            const int radius = std::min(oil::kMaxBrushRadius,
+                                        calculateAdaptiveBrushSize(rgb.data(), x, row, w, h, brush, sens));
+            out[row * w + x] = expectedPixel(rgb, w, h, x, row, radius, tables);
         }
     }
-    return dominantColor;
-}
-
-void processOilPaintingRows(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData, int width, int height,
-                            int brushSize, int levels, float contrastSensitivity, uint32_t* outputPixels,
-                            int startRow, int endRow) {
-    const int uvWidth = (width + 1) / 2;
-    const int quantizationStep = 256 / levels;
-    std::vector<uint32_t> rgbPixels(width * height);
-    for (int y = startRow; y < endRow; y++) {
-        for (int x = 0; x < width; x++) {
-            int pixelIndex = y * width + x;
-            int yy = yData[pixelIndex];
-            int uvIndex = (y / 2) * uvWidth + (x / 2);
-            rgbPixels[pixelIndex] = yuvToRgbQuantized(yy, uData[uvIndex], vData[uvIndex], quantizationStep);
-        }
-    }
-    std::vector<uint16_t> colorCounts(32768, 0);
-    std::vector<uint32_t> usedColors;
-    std::vector<uint32_t> colorSamples;
-    for (int y = startRow; y < endRow; y++) {
-        for (uint32_t colorHash : usedColors) colorCounts[colorHash] = 0;
-        usedColors.clear();
-        colorSamples.clear();
-        int previousBrushSize = -1;
-        for (int x = 0; x < width; x++) {
-            int pixelIndex = y * width + x;
-            int localBrushSize = calculateAdaptiveBrushSize(rgbPixels.data(), x, y, width, height, brushSize, contrastSensitivity);
-            if (localBrushSize == previousBrushSize && x > 0) {
-                updateColorCounts(rgbPixels.data(), x, y, width, height, localBrushSize,
-                                  colorCounts, usedColors, colorSamples, ColorCountUpdateType::Incremental);
-            } else {
-                if (previousBrushSize != -1) {
-                    for (uint32_t colorHash : usedColors) colorCounts[colorHash] = 0;
-                    usedColors.clear();
-                    colorSamples.clear();
-                }
-                updateColorCounts(rgbPixels.data(), x, y, width, height, localBrushSize,
-                                  colorCounts, usedColors, colorSamples, ColorCountUpdateType::Full);
-            }
-            outputPixels[pixelIndex] = findDominantColorFromCounts(colorCounts, usedColors, colorSamples, rgbPixels[pixelIndex]);
-            previousBrushSize = localBrushSize;
-        }
-    }
+    return out;
 }
 
 }  // namespace reference
@@ -225,40 +155,41 @@ void processOilPaintingRows(const uint8_t* yData, const uint8_t* uData, const ui
 int main() {
     std::mt19937 rng(4242);
     int failures = 0;
-    struct Size { int w, h, stride; };
-    const Size sizes[] = {{1, 1, 1}, {3, 2, 5}, {13, 11, 13}, {40, 33, 48}, {97, 61, 100}};
-    const int brushSizes[] = {2, 4, 6};
-    const int levelsList[] = {8, 16, 32};
+    struct Size { int srcW, srcH, w, h, stride; };
+    const Size sizes[] = {{1, 1, 1, 1, 1}, {3, 2, 3, 2, 5}, {13, 11, 13, 11, 13}, {40, 33, 40, 33, 48},
+                          {97, 61, 97, 61, 100}, {160, 90, 97, 55, 97}, {203, 77, 61, 23, 70}, {50, 50, 7, 7, 9}};
+    const int brushSizes[] = {2, 4, 6, 9};
+    const int levelsList[] = {8, 32, 48};
     const float sensitivities[] = {0.5f, 2.0f, 5.0f};
     const int threadCounts[] = {1, 2, 5};
     int cases = 0;
     for (const Size& s : sizes) {
-        const int uvWidth = (s.w + 1) / 2, uvHeight = (s.h + 1) / 2;
-        std::vector<uint8_t> y(s.w * s.h), u(uvWidth * uvHeight), v(uvWidth * uvHeight);
+        const int uvWidth = (s.srcW + 1) / 2, uvHeight = (s.srcH + 1) / 2;
+        std::vector<uint8_t> y(s.srcW * s.srcH), u(uvWidth * uvHeight), v(uvWidth * uvHeight);
         // Smooth regions with a sprinkling of noise, so the adaptive brush size varies.
-        for (int row = 0; row < s.h; row++)
-            for (int x = 0; x < s.w; x++)
-                y[row * s.w + x] = static_cast<uint8_t>((x * 200 / std::max(1, s.w) + (rng() % 50)) & 0xFF);
+        for (int row = 0; row < s.srcH; row++)
+            for (int x = 0; x < s.srcW; x++)
+                y[row * s.srcW + x] = static_cast<uint8_t>((x * 200 / std::max(1, s.srcW) + (rng() % 50)) & 0xFF);
         for (auto& p : u) p = 100 + rng() % 60;
         for (auto& p : v) p = 90 + rng() % 80;
         for (int brush : brushSizes) {
             for (int levels : levelsList) {
                 for (float sens : sensitivities) {
-                    std::vector<uint32_t> expected(s.w * s.h);
-                    reference::processOilPaintingRows(y.data(), u.data(), v.data(), s.w, s.h, brush, levels, sens,
-                                                      expected.data(), 0, s.h);
+                    const std::vector<uint32_t> expected = reference::expectedImage(
+                            y, u, v, s.srcW, s.srcH, s.w, s.h, brush, levels, sens);
                     for (int threads : threadCounts) {
                         std::vector<uint32_t> actual(s.stride * s.h, 0x12345678u);
-                        oil::processImage(y.data(), u.data(), v.data(), s.w, s.h, brush, levels, sens,
-                                          actual.data(), s.stride, threads);
+                        oil::processImage(y.data(), u.data(), v.data(), s.srcW, s.srcH, s.w, s.h, brush,
+                                          levels, sens, actual.data(), s.stride, threads);
                         cases++;
                         bool ok = true;
                         for (int row = 0; row < s.h && ok; row++) {
                             for (int x = 0; x < s.stride; x++) {
-                                uint32_t want = x < s.w ? vc::argbToRgba(expected[row * s.w + x]) : 0x12345678u;
+                                uint32_t want = x < s.w ? expected[row * s.w + x] : 0x12345678u;
                                 if (actual[row * s.stride + x] != want) {
-                                    std::printf("FAIL: %dx%d brush=%d levels=%d sens=%.1f threads=%d at (%d,%d): got %08x want %08x\n",
-                                                s.w, s.h, brush, levels, sens, threads, x, row, actual[row * s.stride + x], want);
+                                    std::printf("FAIL: %dx%d->%dx%d brush=%d levels=%d sens=%.1f threads=%d at (%d,%d): got %08x want %08x\n",
+                                                s.srcW, s.srcH, s.w, s.h, brush, levels, sens, threads, x, row,
+                                                actual[row * s.stride + x], want);
                                     ok = false;
                                     break;
                                 }
