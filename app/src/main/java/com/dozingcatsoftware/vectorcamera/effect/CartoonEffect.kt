@@ -67,15 +67,16 @@ class CartoonEffect(
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        // Try native implementation first
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
         if (nativeLibraryLoaded) {
             try {
-                val nativePixels = processImageNativeFromPlanes(
-                    yData, uData, vData, width, height, blurRadius, nativeThreads
+                val done = processImageNativeToBitmap(
+                    yData, uData, vData, width, height, blurRadius, bitmap, nativeThreads
                 )
-                if (nativePixels != null) {
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
+                if (done) {
                     return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
                 }
             } catch (e: Exception) {
@@ -84,11 +85,11 @@ class CartoonEffect(
         }
         
         // Fall back to Kotlin implementation using individual planes directly
-        val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads)
-        return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+        createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads, bitmap)
+        return Triple(bitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
-    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
+    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int, bitmap: Bitmap) {
         // Create color quantization LUT (lookup table)
         val colorLUT = createColorLUT()
         
@@ -98,9 +99,7 @@ class CartoonEffect(
         // Apply blur effect
         val blurredPixels = applyBlur(pixels, width, height, blurRadius)
 
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(blurredPixels, 0, width, 0, 0, width, height)
-        return bitmap
     }
 
     /**
@@ -327,15 +326,20 @@ class CartoonEffect(
             nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
-        private external fun processImageNativeFromPlanes(
+        /**
+         * Renders into `bitmap` (ARGB_8888, width x height). Returns false without modifying
+         * the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             uData: ByteArray,
             vData: ByteArray,
             width: Int,
             height: Int,
             blurRadius: Int,
+            bitmap: Bitmap,
             numThreads: Int
-        ): IntArray?
+        ): Boolean
         
         fun fromParameters(effectParams: Map<String, Any>): CartoonEffect {
             val blurRadius = effectParams.getOrElse("blurRadius", { 4 }) as Int

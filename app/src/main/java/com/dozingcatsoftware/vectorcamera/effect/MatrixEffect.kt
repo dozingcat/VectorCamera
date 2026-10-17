@@ -115,7 +115,11 @@ class MatrixEffect(
     
 
     
-    private external fun renderCharacterGridNative(
+    /**
+     * Renders the character grid into `bitmap` (ARGB_8888, outputWidth x outputHeight). Returns
+     * false without modifying the bitmap if it can't be used directly.
+     */
+    private external fun renderCharacterGridNativeToBitmap(
         templatePixels: IntArray,
         templateWidth: Int,
         templateHeight: Int,
@@ -130,11 +134,9 @@ class MatrixEffect(
         yFlipped: Boolean,
         outputWidth: Int,
         outputHeight: Int,
-        outputPixels: IntArray,
+        bitmap: Bitmap,
         numThreads: Int
-    )
-    
-    private external fun isNativeAvailable(): Boolean
+    ): Boolean
 
     // Static block to load native library
     companion object {
@@ -324,16 +326,8 @@ class MatrixEffect(
         // Use native implementation if available for better performance
         if (nativeLibraryLoaded) {
             try {
-                val numCores = Runtime.getRuntime().availableProcessors()
-                // Use threading only for larger grids to avoid overhead
-                val minRowsForThreading = 32
-                val numThreads = if (height >= minRowsForThreading) {
-                    minOf(numCores, height / 16).coerceAtLeast(1)
-                } else {
-                    1 // Single thread for small grids
-                }
-                
-                applyEdgeDetectionNative(input, result, width, height, multiplier, numThreads)
+                // The grid is small, so the native code runs single-threaded.
+                applyEdgeDetectionNative(input, result, width, height, multiplier, 1)
             } catch (e: Exception) {
                 Log.w(EFFECT_NAME, "Native edge detection failed, falling back to Kotlin", e)
                 applyEdgeDetectionKotlin(input, result, width, height, multiplier)
@@ -552,38 +546,34 @@ class MatrixEffect(
         val template = characterTemplate!!
         val charWidth = metrics.charPixelSize.width
         val charHeight = metrics.charPixelSize.height
-        val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
-        
-        // Use native bulk rendering if available for massive performance improvement
+
+        // Native rendering writes straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
+        var nativeSuccess = false
         if (nativeLibraryLoaded) {
             try {
                 // Get template bitmap pixels once
                 val templatePixels = IntArray(template.width * template.height)
                 template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
-                
-                // Use the pre-calculated thread count passed as parameter
-                
-                // Render entire character grid in native code with multi-threading
-                renderCharacterGridNative(
+                nativeSuccess = renderCharacterGridNativeToBitmap(
                     templatePixels, template.width, template.height,
                     charWidth, charHeight,
                     characterIndices!!, characterColors!!,
                     metrics.numCharacterColumns, metrics.numCharacterRows,
                     metrics.isPortrait, cameraImage.orientation.xFlipped, cameraImage.orientation.yFlipped,
                     metrics.outputSize.width, metrics.outputSize.height,
-                    outputPixels, numThreads
+                    resultBitmap, numThreads
                 )
             } catch (e: Exception) {
                 Log.w(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
-                renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
             }
-        } else {
-            renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
         }
-        
-        // Create bitmap from rendered pixels
-        resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0, 
-                              metrics.outputSize.width, metrics.outputSize.height)
+        if (!nativeSuccess) {
+            val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
+            renderFinalBitmapKotlin(cameraImage, metrics, template, charWidth, charHeight, outputPixels)
+            resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0,
+                                  metrics.outputSize.width, metrics.outputSize.height)
+        }
         return resultBitmap
     }
     

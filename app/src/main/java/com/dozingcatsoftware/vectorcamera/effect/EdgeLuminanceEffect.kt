@@ -19,39 +19,25 @@ import kotlin.math.min
  */
 class EdgeLuminanceEffect : Effect {
 
-    // Native method declarations
-    private external fun processRowsNative(
-        startY: Int, 
-        endY: Int, 
-        width: Int, 
-        height: Int, 
-        multiplier: Int,
-        yData: ByteArray, 
-        uData: ByteArray, 
-        vData: ByteArray, 
-        uvWidth: Int, 
-        pixels: IntArray
-    )
-    
-    // Optimized native method that handles threading internally
-    private external fun processImageNative(
-        width: Int,
-        height: Int,
-        multiplier: Int,
-        yData: ByteArray,
-        uData: ByteArray,
-        vData: ByteArray,
-        uvWidth: Int,
-        pixels: IntArray,
-        numThreads: Int
-    )
-    
-    private external fun isNativeAvailable(): Boolean
-
-    // Static block to load native library
     companion object {
         const val EFFECT_NAME = "edge_luminance"
-        
+
+        /**
+         * Renders into `bitmap` (ARGB_8888, width x height) with threading handled natively.
+         * Returns false without modifying the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
+            width: Int,
+            height: Int,
+            multiplier: Int,
+            yData: ByteArray,
+            uData: ByteArray,
+            vData: ByteArray,
+            uvWidth: Int,
+            bitmap: Bitmap,
+            numThreads: Int
+        ): Boolean
+
         private var nativeLibraryLoaded = false
         
         init {
@@ -92,19 +78,16 @@ class EdgeLuminanceEffect : Effect {
         val height = cameraImage.height()
         val multiplier = minOf(4, maxOf(2, Math.round(width / 480f)))
 
-        val nativeThreads = calculateOptimalNativeThreads(height)
-        val kotlinThreads = calculateOptimalKotlinThreads(height)
-        val actualThreads = if (nativeLibraryLoaded) nativeThreads else kotlinThreads
-
         // Get individual plane data directly
         val yData = cameraImage.getYBytes()
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
-        val bitmap = createBitmapFromPlanes(yData, uData, vData, width, height, multiplier, actualThreads)
-        
+        val (bitmap, actualThreads, architecture) =
+                createBitmapFromPlanes(yData, uData, vData, width, height, multiplier)
+
         val endTime = System.nanoTime()
         val metadata = ProcessedBitmapMetadata(
-            codeArchitecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin,
+            codeArchitecture = architecture,
             numThreads = actualThreads,
             generationDurationNanos = endTime - startTime
         )
@@ -112,18 +95,22 @@ class EdgeLuminanceEffect : Effect {
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
     }
 
-    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, multiplier: Int, numThreads: Int): Bitmap {
+    private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
         val uvWidth = (width + 1) / 2
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        if (nativeLibraryLoaded && processImageNativeToBitmap(
+                        width, height, multiplier, yData, uData, vData, uvWidth, bitmap, nativeThreads)) {
+            return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
+        }
+
+        // Kotlin implementation with coroutines.
         val pixels = IntArray(width * height)
-
-        val t1 = System.currentTimeMillis()
-        
-        if (nativeLibraryLoaded) {
-            // Use optimized native implementation that handles threading internally
-            processImageNative(width, height, multiplier, yData, uData, vData, uvWidth, pixels, numThreads)
-        } else {
-            // Fallback to Kotlin implementation with coroutines
+        val numThreads = calculateOptimalKotlinThreads(height)
+        run {
             if (numThreads == 1) {
                 processRows(0, height, width, height, multiplier, yData, uData, vData, uvWidth, pixels)
             } else {
@@ -146,10 +133,8 @@ class EdgeLuminanceEffect : Effect {
                 }
             }
         }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
+        return Triple(bitmap, numThreads, CodeArchitecture.Kotlin)
     }
 
     private fun processRows(

@@ -47,16 +47,13 @@ class StainedGlassEffect private constructor(
         val segmentSize = (cameraImage.width() / sectionsPerRow).coerceAtLeast(minSegmentSize)
 
         // Create bitmap using region-based segmentation (hybrid native/Kotlin)
-        val bitmap = createStainedGlassBitmap(cameraImage, segmentSize)
+        val (bitmap, numThreads, architecture) = createStainedGlassBitmap(cameraImage, segmentSize)
 
         val endTime = System.nanoTime()
-        
-        // Determine which implementation was used for metadata
-        val architecture = if (nativeLibraryLoaded) CodeArchitecture.Native else CodeArchitecture.Kotlin
-        
+
         val metadata = ProcessedBitmapMetadata(
             codeArchitecture = architecture,
-            numThreads = 1, // Single-threaded for simplicity
+            numThreads = numThreads,
             generationDurationNanos = endTime - startTime
         )
         
@@ -66,39 +63,41 @@ class StainedGlassEffect private constructor(
     /**
      * Create the stained glass effect using region-based segmentation.
      */
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    /** Returns the bitmap, the number of threads used, and the implementation used. */
     private fun createStainedGlassBitmap(
         cameraImage: CameraImage,
         segmentSize: Int,
-    ): Bitmap {
+    ): Triple<Bitmap, Int, CodeArchitecture> {
         val width = cameraImage.width()
         val height = cameraImage.height()
         val yData = cameraImage.getYBytes()
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
-        
-        // Try native implementation first for better performance
-        val outputPixels = IntArray(width * height)
         val thicknessPixels = (edgeThickness * width).roundToInt().coerceAtLeast(1)
-        
-        val nativeSuccess = if (nativeLibraryLoaded) {
-            processStainedGlassNative(
-                yData, uData, vData, width, height, segmentSize,
-                thicknessPixels, edgeColor, colorVariation, outputPixels, 1
-            )
-        } else {
-            false
-        }
-        
-        if (nativeSuccess) {
-            // Native processing succeeded
+
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
+        if (nativeLibraryLoaded) {
+            val numThreads = calculateOptimalNativeThreads(height)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            bitmap.setPixels(outputPixels, 0, width, 0, 0, width, height)
-            return bitmap
-        } else {
-            // Fall back to Kotlin implementation
+            val nativeSuccess = processImageNativeToBitmap(
+                yData, uData, vData, width, height, segmentSize,
+                thicknessPixels, edgeColor, colorVariation, bitmap, numThreads
+            )
+            if (nativeSuccess) {
+                return Triple(bitmap, numThreads, CodeArchitecture.Native)
+            }
             Log.i(EFFECT_NAME, "Native failed, using Kotlin fallback")
-            return createStainedGlassBitmapKotlin(cameraImage, width, height, segmentSize)
         }
+        val bitmap = createStainedGlassBitmapKotlin(cameraImage, width, height, segmentSize)
+        return Triple(bitmap, 1, CodeArchitecture.Kotlin)
     }
 
     /**
@@ -372,9 +371,10 @@ class StainedGlassEffect private constructor(
         }
         
         /**
-         * Native method for stained glass effect processing.
+         * Renders into `bitmap` (ARGB_8888, width x height). Returns false if the bitmap
+         * can't be used directly or no segments could be generated.
          */
-        private external fun processStainedGlassNative(
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             uData: ByteArray,
             vData: ByteArray,
@@ -384,7 +384,7 @@ class StainedGlassEffect private constructor(
             edgeThickness: Int,
             edgeColor: Int,
             colorVariation: Float,
-            outputPixels: IntArray,
+            bitmap: Bitmap,
             numThreads: Int
         ): Boolean
         

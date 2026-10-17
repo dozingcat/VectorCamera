@@ -1,256 +1,166 @@
-#include <jni.h>
-#include <android/log.h>
-#include <thread>
-#include <vector>
+// Native implementation of CartoonEffect: each pixel's RGB is quantized to 4 levels per channel
+// and the result is box blurred. Renders straight into the bitmap.
+//
+// Compiling with -DVC_NO_JNI leaves out the JNI entry point so the kernels can be unit tested on
+// the host (app/src/test/cpp/cartoon_test.cpp).
+
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <vector>
+
+#include "box_blur.h"
+#include "pixel_format.h"
+#include "worker_pool.h"
 #include "yuv.h"
 
+#ifndef VC_NO_JNI
+#include <jni.h>
+#include <android/log.h>
+#include "bitmap_output.h"
 #define LOG_TAG "CartoonEffectNative"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#endif
 
-// Create color quantization LUT that reduces each color component to 2 bits (4 levels)
-// Possible RGB values are (0, 85, 170, 255)
-inline void createColorLUT(int* lut) {
-    for (int index = 0; index < 256; index++) {
-        int mapval = static_cast<int>(round(index / 85.0)) * 85;
-        lut[index] = mapval;
+namespace cartoon {
+
+// Color quantization LUT that reduces each color component to 2 bits (4 levels). Possible
+// values are 0, 85, 170 and 255.
+struct ColorLut {
+    ColorLut() {
+        for (int index = 0; index < 256; index++) {
+            table[index] = static_cast<uint8_t>(static_cast<int>(std::round(index / 85.0)) * 85);
+        }
     }
-}
+    uint8_t table[256];
+};
 
-// Process rows function for multi-threading
-void processRows(
-    int startY, 
-    int endY, 
-    int width, 
-    int height, 
-    const unsigned char* yData, 
-    const unsigned char* uData, 
-    const unsigned char* vData, 
-    int uvWidth, 
-    int* pixels,
-    const int* colorLUT
-) {
-    for (int y = startY; y < endY; y++) {
+// Quantizes `numRows` image rows starting at `firstRow` into planar R, G, B bytes.
+void quantizeRows(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData, int width,
+                  int uvWidth, const ColorLut& lut, int firstRow, int numRows,
+                  uint8_t* rPlane, uint8_t* gPlane, uint8_t* bPlane) {
+    for (int i = 0; i < numRows; i++) {
+        const int y = firstRow + i;
+        const uint8_t* yRow = yData + static_cast<size_t>(y) * width;
+        const uint8_t* uRow = uData + static_cast<size_t>(y / 2) * uvWidth;
+        const uint8_t* vRow = vData + static_cast<size_t>(y / 2) * uvWidth;
+        uint8_t* rOut = rPlane + static_cast<size_t>(i) * width;
+        uint8_t* gOut = gPlane + static_cast<size_t>(i) * width;
+        uint8_t* bOut = bPlane + static_cast<size_t>(i) * width;
         for (int x = 0; x < width; x++) {
-            int pixelIndex = y * width + x;
-
-            // Get Y value
-            int yy = yData[pixelIndex] & 0xFF;
-
-            // Get U and V values (subsampled)
-            int uvX = x / 2;
-            int uvY = y / 2;
-            int uvIndex = uvY * uvWidth + uvX;
-            int u = uData[uvIndex] & 0xFF;
-            int v = vData[uvIndex] & 0xFF;
-
-            // Convert YUV to RGB
-            int rgb = YuvUtils::yuvToRgb(yy, u, v, false);
-            int r = (rgb >> 16) & 0xFF;
-            int g = (rgb >> 8) & 0xFF;
-            int b = rgb & 0xFF;
-
-            // Apply color quantization using LUT
-            int quantizedR = colorLUT[r];
-            int quantizedG = colorLUT[g];
-            int quantizedB = colorLUT[b];
-
-            // Create final ARGB pixel
-            pixels[pixelIndex] = (255 << 24) | (quantizedR << 16) | (quantizedG << 8) | quantizedB;
+            const uint32_t rgb = YuvUtils::yuvToRgb(yRow[x], uRow[x / 2], vRow[x / 2], false);
+            rOut[x] = lut.table[(rgb >> 16) & 0xFF];
+            gOut[x] = lut.table[(rgb >> 8) & 0xFF];
+            bOut[x] = lut.table[rgb & 0xFF];
         }
     }
 }
 
-// Apply horizontal blur using sliding window for efficiency
-void applyHorizontalBlur(const int* input, int* output, int width, int height, int radius) {
-    const int kernelSize = radius * 2 + 1;
-    
-    for (int y = 0; y < height; y++) {
-        int totalR = 0, totalG = 0, totalB = 0;
-        
-        // Initialize sliding window for first pixel
-        for (int kx = -radius; kx <= radius; kx++) {
-            int sampleX = std::max(0, std::min(width - 1, kx));
-            int sampleIndex = y * width + sampleX;
-            int samplePixel = input[sampleIndex];
-            
-            totalR += (samplePixel >> 16) & 0xFF;
-            totalG += (samplePixel >> 8) & 0xFF;
-            totalB += samplePixel & 0xFF;
-        }
-        
-        // Apply blur to each pixel in the row using sliding window
-        for (int x = 0; x < width; x++) {
-            int avgR = totalR / kernelSize;
-            int avgG = totalG / kernelSize;
-            int avgB = totalB / kernelSize;
-            
-            int pixelIndex = y * width + x;
-            output[pixelIndex] = (255 << 24) | (avgR << 16) | (avgG << 8) | avgB;
-            
-            // Update sliding window for next pixel
-            if (x < width - 1) {
-                // Remove leftmost pixel from window
-                int leftX = std::max(0, std::min(width - 1, x - radius));
-                int leftIndex = y * width + leftX;
-                int leftPixel = input[leftIndex];
-                totalR -= (leftPixel >> 16) & 0xFF;
-                totalG -= (leftPixel >> 8) & 0xFF;
-                totalB -= leftPixel & 0xFF;
-                
-                // Add rightmost pixel to window
-                int rightX = std::max(0, std::min(width - 1, x + radius + 1));
-                int rightIndex = y * width + rightX;
-                int rightPixel = input[rightIndex];
-                totalR += (rightPixel >> 16) & 0xFF;
-                totalG += (rightPixel >> 8) & 0xFF;
-                totalB += rightPixel & 0xFF;
+// Processes image rows [startRow, endRow) completely: quantize the rows plus `radius` halo rows
+// above and below into planar scratch, blur horizontally, then blur vertically while packing
+// into the output. Halo rows are quantized and blurred redundantly by neighboring chunks, which
+// costs a little but keeps chunks independent and the intermediates in cache.
+void processChunk(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData, int width,
+                  int height, int uvWidth, int radius, const ColorLut& lut, uint32_t* pixels,
+                  int pixelStride, int startRow, int endRow) {
+    const int blurStart = std::max(0, startRow - radius);
+    const int blurEnd = std::min(height, endRow + radius);
+    const int blurRowCount = blurEnd - blurStart;
+    const size_t planeSize = static_cast<size_t>(blurRowCount) * width;
+
+    // Three quantized planes, three horizontally blurred planes, three blurred output rows.
+    static thread_local std::vector<uint8_t> quantized;
+    static thread_local std::vector<uint8_t> blurred;
+    static thread_local std::vector<uint8_t> outRows;
+    if (quantized.size() < 3 * planeSize) quantized.resize(3 * planeSize);
+    if (blurred.size() < 3 * planeSize) blurred.resize(3 * planeSize);
+    if (outRows.size() < 3 * static_cast<size_t>(width)) outRows.resize(3 * width);
+    uint8_t* q[3] = {quantized.data(), quantized.data() + planeSize, quantized.data() + 2 * planeSize};
+    uint8_t* h[3] = {blurred.data(), blurred.data() + planeSize, blurred.data() + 2 * planeSize};
+    uint8_t* o[3] = {outRows.data(), outRows.data() + width, outRows.data() + 2 * width};
+
+    quantizeRows(yData, uData, vData, width, uvWidth, lut, blurStart, blurRowCount, q[0], q[1], q[2]);
+
+    if (radius == 0) {
+        // No blur: the quantized colors are the output.
+        for (int y = startRow; y < endRow; y++) {
+            const size_t local = static_cast<size_t>(y - blurStart) * width;
+            uint32_t* out = pixels + static_cast<size_t>(y) * pixelStride;
+            for (int x = 0; x < width; x++) {
+                out[x] = vc::packRgba(q[0][local + x], q[1][local + x], q[2][local + x]);
             }
         }
+        return;
     }
-}
 
-// Apply vertical blur using sliding window for efficiency
-void applyVerticalBlur(const int* input, int* output, int width, int height, int radius) {
-    const int kernelSize = radius * 2 + 1;
-    
-    for (int x = 0; x < width; x++) {
-        int totalR = 0, totalG = 0, totalB = 0;
-        
-        // Initialize sliding window for first pixel
-        for (int ky = -radius; ky <= radius; ky++) {
-            int sampleY = std::max(0, std::min(height - 1, ky));
-            int sampleIndex = sampleY * width + x;
-            int samplePixel = input[sampleIndex];
-            
-            totalR += (samplePixel >> 16) & 0xFF;
-            totalG += (samplePixel >> 8) & 0xFF;
-            totalB += samplePixel & 0xFF;
+    for (int plane = 0; plane < 3; plane++) {
+        vc::boxBlurRows(q[plane], h[plane], width, radius, blurRowCount);
+    }
+    vc::ColumnBoxBlur columns[3] = {
+        vc::ColumnBoxBlur(h[0], width, width, blurRowCount, radius, startRow - blurStart),
+        vc::ColumnBoxBlur(h[1], width, width, blurRowCount, radius, startRow - blurStart),
+        vc::ColumnBoxBlur(h[2], width, width, blurRowCount, radius, startRow - blurStart)};
+    for (int y = startRow; y < endRow; y++) {
+        for (int plane = 0; plane < 3; plane++) {
+            columns[plane].nextRow(o[plane]);
         }
-        
-        // Apply blur to each pixel in the column using sliding window
-        for (int y = 0; y < height; y++) {
-            int avgR = totalR / kernelSize;
-            int avgG = totalG / kernelSize;
-            int avgB = totalB / kernelSize;
-            
-            int pixelIndex = y * width + x;
-            output[pixelIndex] = (255 << 24) | (avgR << 16) | (avgG << 8) | avgB;
-            
-            // Update sliding window for next pixel
-            if (y < height - 1) {
-                // Remove topmost pixel from window
-                int topY = std::max(0, std::min(height - 1, y - radius));
-                int topIndex = topY * width + x;
-                int topPixel = input[topIndex];
-                totalR -= (topPixel >> 16) & 0xFF;
-                totalG -= (topPixel >> 8) & 0xFF;
-                totalB -= topPixel & 0xFF;
-                
-                // Add bottommost pixel to window
-                int bottomY = std::max(0, std::min(height - 1, y + radius + 1));
-                int bottomIndex = bottomY * width + x;
-                int bottomPixel = input[bottomIndex];
-                totalR += (bottomPixel >> 16) & 0xFF;
-                totalG += (bottomPixel >> 8) & 0xFF;
-                totalB += bottomPixel & 0xFF;
-            }
+        uint32_t* out = pixels + static_cast<size_t>(y) * pixelStride;
+        for (int x = 0; x < width; x++) {
+            out[x] = vc::packRgba(o[0][x], o[1][x], o[2][x]);
         }
     }
 }
 
-extern "C" JNIEXPORT jintArray JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_processImageNativeFromPlanes(
-    JNIEnv* env, 
-    jobject /* this */, 
-    jbyteArray yData_, 
-    jbyteArray uData_, 
-    jbyteArray vData_, 
-    jint width, 
+// Full effect into `pixels` (rows `pixelStride` uint32s apart) as bitmap pixels. Row chunks are
+// spread over `numThreads` threads.
+void processImage(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData, int width,
+                  int height, int blurRadius, uint32_t* pixels, int pixelStride, int numThreads) {
+    static const ColorLut lut;
+    const int uvWidth = (width + 1) / 2;
+    const int radius = std::max(0, std::min(blurRadius, vc::kMaxBoxBlurRadius));
+    vc::parallelRows(numThreads, height, [&](int start, int end) {
+        processChunk(yData, uData, vData, width, height, uvWidth, radius, lut, pixels,
+                     pixelStride, start, end);
+    });
+}
+
+}  // namespace cartoon
+
+#ifndef VC_NO_JNI
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_dozingcatsoftware_vectorcamera_effect_CartoonEffect_00024Companion_processImageNativeToBitmap(
+    JNIEnv* env,
+    jobject thiz,
+    jbyteArray yData,
+    jbyteArray uData,
+    jbyteArray vData,
+    jint width,
     jint height,
     jint blurRadius,
+    jobject bitmap,
     jint numThreads
 ) {
-    // Get individual plane data
-    jbyte* yBytes = env->GetByteArrayElements(yData_, NULL);
-    jbyte* uBytes = env->GetByteArrayElements(uData_, NULL);
-    jbyte* vBytes = env->GetByteArrayElements(vData_, NULL);
-    
-    if (yBytes == NULL || uBytes == NULL || vBytes == NULL) {
-        if (yBytes) env->ReleaseByteArrayElements(yData_, yBytes, 0);
-        if (uBytes) env->ReleaseByteArrayElements(uData_, uBytes, 0);
-        if (vBytes) env->ReleaseByteArrayElements(vData_, vBytes, 0);
-        return NULL;
+    vc::LockedBitmap locked(env, bitmap, width, height);
+    if (!locked.ok()) {
+        return JNI_FALSE;
     }
-
-    const unsigned char* yData = reinterpret_cast<const unsigned char*>(yBytes);
-    const unsigned char* uData = reinterpret_cast<const unsigned char*>(uBytes);
-    const unsigned char* vData = reinterpret_cast<const unsigned char*>(vBytes);
-    
-    // Calculate UV dimensions
-    int uvWidth = (width + 1) / 2;
-
-    // Create color quantization LUT
-    int colorLUT[256];
-    createColorLUT(colorLUT);
-
-    // Create output arrays
-    jintArray result = env->NewIntArray(width * height);
-    if (result == NULL) {
-        env->ReleaseByteArrayElements(yData_, yBytes, 0);
-        env->ReleaseByteArrayElements(uData_, uBytes, 0);
-        env->ReleaseByteArrayElements(vData_, vBytes, 0);
-        return NULL;
+    jbyte* yPtr = env->GetByteArrayElements(yData, nullptr);
+    jbyte* uPtr = env->GetByteArrayElements(uData, nullptr);
+    jbyte* vPtr = env->GetByteArrayElements(vData, nullptr);
+    if (!yPtr || !uPtr || !vPtr) {
+        LOGE("Failed to get native arrays");
+        if (yPtr) env->ReleaseByteArrayElements(yData, yPtr, JNI_ABORT);
+        if (uPtr) env->ReleaseByteArrayElements(uData, uPtr, JNI_ABORT);
+        if (vPtr) env->ReleaseByteArrayElements(vData, vPtr, JNI_ABORT);
+        return JNI_FALSE;
     }
-
-    jint* pixels = env->GetIntArrayElements(result, NULL);
-    if (pixels == NULL) {
-        env->ReleaseByteArrayElements(yData_, yBytes, 0);
-        env->ReleaseByteArrayElements(uData_, uBytes, 0);
-        env->ReleaseByteArrayElements(vData_, vBytes, 0);
-        return NULL;
-    }
-
-    // Process image with color quantization using multi-threading
-    if (numThreads == 1) {
-        processRows(0, height, width, height, yData, uData, vData, uvWidth, pixels, colorLUT);
-    } else {
-        std::vector<std::thread> threads;
-        int rowsPerThread = height / numThreads;
-        
-        for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
-            int startY = threadIndex * rowsPerThread;
-            int endY = (threadIndex == numThreads - 1) ? height : (threadIndex + 1) * rowsPerThread;
-            
-            threads.emplace_back(processRows, startY, endY, width, height, yData, uData, vData, uvWidth, pixels, colorLUT);
-        }
-        
-        // Wait for all threads to complete
-        for (auto& thread : threads) {
-            thread.join();
-        }
-    }
-
-    // Apply blur if radius > 0
-    if (blurRadius > 0) {
-        // Allocate temporary array for horizontal blur
-        int* tempPixels = new int[width * height];
-        
-        // Apply horizontal blur
-        applyHorizontalBlur(pixels, tempPixels, width, height, blurRadius);
-        
-        // Apply vertical blur (back to original array)
-        applyVerticalBlur(tempPixels, pixels, width, height, blurRadius);
-        
-        delete[] tempPixels;
-    }
-
-    // Release arrays
-    env->ReleaseIntArrayElements(result, pixels, 0);
-    env->ReleaseByteArrayElements(yData_, yBytes, 0);
-    env->ReleaseByteArrayElements(uData_, uBytes, 0);
-    env->ReleaseByteArrayElements(vData_, vBytes, 0);
-
-    return result;
-} 
+    cartoon::processImage(
+            reinterpret_cast<const uint8_t*>(yPtr), reinterpret_cast<const uint8_t*>(uPtr),
+            reinterpret_cast<const uint8_t*>(vPtr), width, height, blurRadius, locked.pixels(),
+            locked.stride(), std::max(1, static_cast<int>(numThreads)));
+    env->ReleaseByteArrayElements(yData, yPtr, JNI_ABORT);
+    env->ReleaseByteArrayElements(uData, uPtr, JNI_ABORT);
+    env->ReleaseByteArrayElements(vData, vPtr, JNI_ABORT);
+    return JNI_TRUE;
+}
+#endif

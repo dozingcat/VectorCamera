@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "pixel_format.h"
+
 /**
  * Shared YUV to RGB conversion utilities using ITU-R BT.601 conversion equations.
  */
@@ -63,6 +65,22 @@ namespace YuvUtils {
             ((red << 16) | (green << 8) | blue);
     }
     
+    /**
+     * Fixed-point conversion packed as an opaque bitmap pixel (see pixel_format.h).
+     */
+    inline uint32_t yuvToRgbaFixed(int y, int u, int v) {
+        const uint32_t argb = yuvToRgbFixed(y, u, v, false);
+        return vc::packRgba(argb >> 16, (argb >> 8) & 0xFF, argb & 0xFF);
+    }
+
+    /**
+     * Floating-point conversion packed as an opaque bitmap pixel (see pixel_format.h).
+     */
+    inline uint32_t yuvToRgbaFloat(int y, int u, int v) {
+        const uint32_t argb = yuvToRgbFloat(y, u, v, false);
+        return vc::packRgba(argb >> 16, (argb >> 8) & 0xFF, argb & 0xFF);
+    }
+
     /**
      * Alias for the default YUV to RGB conversion (using floating-point).
      */

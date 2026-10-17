@@ -7,7 +7,7 @@
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_dozingcatsoftware_vectorcamera_effect_Effect_00024Companion_nativeWorkerThreadIds(
     JNIEnv* env, jobject thiz) {
-    std::vector<int32_t> ids = contour::WorkerPool::instance().threadIds();
+    std::vector<int32_t> ids = vc::WorkerPool::instance().threadIds();
     jintArray result = env->NewIntArray(ids.size());
     if (result != nullptr && !ids.empty()) {
         env->SetIntArrayRegion(result, 0, ids.size(), ids.data());
