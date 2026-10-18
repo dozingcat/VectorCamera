@@ -7,9 +7,8 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <vector>
 
-#include "pixel_format.h"
+#include "character_grid.h"
 #include "worker_pool.h"
 
 #ifndef VC_NO_JNI
@@ -21,9 +20,6 @@
 #endif
 
 namespace matrix {
-
-// Character cell rows per work chunk; each block row covers many image rows.
-constexpr int kBlockRowsPerChunk = 1;
 
 inline int clamp(int value, int min_val, int max_val) {
     return std::max(min_val, std::min(value, max_val));
@@ -37,29 +33,15 @@ void computeBlockBrightnessRows(const uint8_t* yData, int imageWidth, int imageH
         for (int blockX = 0; blockX < numCharColumns; blockX++) {
             const int blockIndex = blockY * numCharColumns + blockX;
 
-            int xmin, xmax, ymin, ymax;
-            if (isPortrait) {
-                const int inputPixelsPerCol = imageHeight / numCharColumns;
-                const int inputPixelsPerRow = imageWidth / numCharRows;
-                xmin = blockY * inputPixelsPerRow;
-                xmax = xmin + inputPixelsPerRow;
-                ymin = (numCharColumns - 1 - blockX) * inputPixelsPerCol;
-                ymax = ymin + inputPixelsPerCol;
-            } else {
-                const int inputPixelsPerCol = imageWidth / numCharColumns;
-                const int inputPixelsPerRow = imageHeight / numCharRows;
-                xmin = blockX * inputPixelsPerCol;
-                xmax = xmin + inputPixelsPerCol;
-                ymin = blockY * inputPixelsPerRow;
-                ymax = ymin + inputPixelsPerRow;
-            }
+            const vc::CellInputRect cell = vc::cellInputRect(
+                imageWidth, imageHeight, numCharColumns, numCharRows, isPortrait, blockX, blockY);
 
             uint32_t brightnessTotal = 0;
             int pixelCount = 0;
-            for (int yy = ymin; yy < ymax; yy++) {
+            for (int yy = cell.ymin; yy < cell.ymax; yy++) {
                 if (yy < 0 || yy >= imageHeight) continue;
                 const uint8_t* rowPtr = yData + static_cast<size_t>(yy) * imageWidth;
-                for (int xx = xmin; xx < xmax; xx++) {
+                for (int xx = cell.xmin; xx < cell.xmax; xx++) {
                     if (xx >= 0 && xx < imageWidth) {
                         brightnessTotal += rowPtr[xx];
                         pixelCount++;
@@ -75,7 +57,7 @@ void computeBlockBrightnessRows(const uint8_t* yData, int imageWidth, int imageH
 void computeBlockBrightness(const uint8_t* yData, int imageWidth, int imageHeight,
                             int numCharColumns, int numCharRows, bool isPortrait,
                             uint8_t* blockAverages, int numThreads) {
-    vc::parallelRows(numThreads, numCharRows, kBlockRowsPerChunk, [&](int start, int end) {
+    vc::parallelRows(numThreads, numCharRows, vc::kCharacterRowsPerChunk, [&](int start, int end) {
         computeBlockBrightnessRows(yData, imageWidth, imageHeight, numCharColumns, numCharRows,
                                    isPortrait, blockAverages, start, end);
     });
@@ -103,96 +85,18 @@ void applyEdgeDetection(const uint8_t* input, uint8_t* output, int width, int he
     }
 }
 
-// Stamps the character template into the output for the cells of block rows [startRow, endRow).
-// Template pixels are ARGB; `cellPixels` holds the already converted bitmap pixels per cell.
-// Output rows are `pixelStride` uint32s apart.
-void renderBlockRows(const uint32_t* templatePixels, int templateWidth, int templateHeight,
-                     int charWidth, int charHeight, const int32_t* characterIndices,
-                     const uint32_t* cellPixels, int numCharColumns, bool isPortrait,
-                     bool xFlipped, bool yFlipped, int outputWidth, int outputHeight,
-                     uint32_t* outputPixels, int pixelStride, int startRow, int endRow) {
-    const uint32_t BLACK = vc::argbToRgba(0xFF000000u);
-    for (int blockY = startRow; blockY < endRow; blockY++) {
-        for (int blockX = 0; blockX < numCharColumns; blockX++) {
-            const int cellIndex = blockY * numCharColumns + blockX;
-            const int charIndex = characterIndices[cellIndex];
-            const uint32_t color = cellPixels[cellIndex];
-
-            const int srcLeft = charIndex * charWidth;
-            const int srcRight = srcLeft + charWidth;
-
-            int dstLeft, dstTop, dstWidth, dstHeight;
-            if (isPortrait) {
-                // Portrait mode: characters are rotated.
-                dstLeft = blockY * charHeight;
-                dstTop = (numCharColumns - 1 - blockX) * charWidth;
-                dstWidth = charHeight;
-                dstHeight = charWidth;
-            } else {
-                dstLeft = blockX * charWidth;
-                dstTop = blockY * charHeight;
-                dstWidth = charWidth;
-                dstHeight = charHeight;
-            }
-
-            for (int dy = 0; dy < dstHeight; dy++) {
-                const int outY = dstTop + dy;
-                if (outY < 0 || outY >= outputHeight) continue;
-                uint32_t* outRow = outputPixels + static_cast<size_t>(outY) * pixelStride;
-                for (int dx = 0; dx < dstWidth; dx++) {
-                    int srcX, srcY;
-                    if (isPortrait) {
-                        // Rotate -90 degrees, with flips.
-                        srcX = srcLeft + (yFlipped ? dy : charWidth - 1 - dy);
-                        srcY = xFlipped ? charHeight - 1 - dx : dx;
-                    } else {
-                        srcX = srcLeft + (xFlipped ? charWidth - 1 - dx : dx);
-                        srcY = yFlipped ? charHeight - 1 - dy : dy;
-                    }
-                    if (srcX >= srcLeft && srcX < srcRight && srcY >= 0 && srcY < templateHeight) {
-                        const uint32_t templatePixel = templatePixels[srcY * templateWidth + srcX];
-                        const uint8_t red = (templatePixel >> 16) & 0xFF;
-                        const uint8_t green = (templatePixel >> 8) & 0xFF;
-                        const uint8_t blue = templatePixel & 0xFF;
-                        // Character color where the template is non-black.
-                        const uint32_t outputPixel = (red > 0 || green > 0 || blue > 0) ? color : BLACK;
-                        const int outX = dstLeft + dx;
-                        if (outX >= 0 && outX < outputWidth) {
-                            outRow[outX] = outputPixel;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Renders the whole character grid: clears the output to black, then stamps every cell.
-// `characterColors` are ARGB; the output receives bitmap pixels (see pixel_format.h), rows
-// `pixelStride` uint32s apart.
+// Renders the character grid into bitmap pixels (see character_grid.h) on a black background.
+// `characterColors` are ARGB; characters are drawn where the template is non-black.
 void renderCharacterGrid(const uint32_t* templatePixels, int templateWidth, int templateHeight,
                          int charWidth, int charHeight, const int32_t* characterIndices,
                          const int32_t* characterColors, int numCharColumns, int numCharRows,
                          bool isPortrait, bool xFlipped, bool yFlipped, int outputWidth,
                          int outputHeight, uint32_t* outputPixels, int pixelStride,
                          int numThreads) {
-    const uint32_t black = vc::argbToRgba(0xFF000000u);
-    std::vector<uint32_t> cellPixels(static_cast<size_t>(numCharColumns) * numCharRows);
-    for (size_t i = 0; i < cellPixels.size(); i++) {
-        cellPixels[i] = vc::argbToRgba(static_cast<uint32_t>(characterColors[i]));
-    }
-    vc::parallelRows(numThreads, outputHeight, [&](int start, int end) {
-        for (int y = start; y < end; y++) {
-            uint32_t* row = outputPixels + static_cast<size_t>(y) * pixelStride;
-            std::fill(row, row + outputWidth, black);
-        }
-    });
-    vc::parallelRows(numThreads, numCharRows, kBlockRowsPerChunk, [&](int start, int end) {
-        renderBlockRows(templatePixels, templateWidth, templateHeight, charWidth, charHeight,
-                        characterIndices, cellPixels.data(), numCharColumns, isPortrait,
-                        xFlipped, yFlipped, outputWidth, outputHeight, outputPixels,
-                        pixelStride, start, end);
-    });
+    vc::renderCharacterGrid(templatePixels, templateWidth, templateHeight, charWidth, charHeight,
+                            characterIndices, characterColors, numCharColumns, numCharRows,
+                            isPortrait, xFlipped, yFlipped, outputWidth, outputHeight,
+                            outputPixels, pixelStride, /*backgroundColor=*/0xFF000000u, numThreads);
 }
 
 }  // namespace matrix
