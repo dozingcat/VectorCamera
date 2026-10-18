@@ -134,7 +134,29 @@ void check(const std::string& what, const std::vector<int>& expected, const std:
 
 }  // namespace
 
+// Translucent palette colors must come out premultiplied, as Bitmap.setPixels would store them.
+bool checkPremultiply() {
+    struct Case { uint32_t argb, rgba; };
+    const Case cases[] = {
+        {0xFF102030u, 0xFF302010u},  // Opaque: components reordered only.
+        {0x80FF0000u, 0x80000080u},  // 255 * 128 / 255 = 128.
+        {0x00FFFFFFu, 0x00000000u},  // Fully transparent.
+        {0x7F0000FFu, 0x7F7F0000u},  // 255 * 127 / 255 = 127.
+        {0x33C8C8C8u, 0x33282828u},  // round(200 * 51 / 255) = 40.
+    };
+    bool ok = true;
+    for (const Case& c : cases) {
+        const uint32_t got = vc::argbToRgba(c.argb);
+        if (got != c.rgba) {
+            std::printf("FAIL: argbToRgba(%08x) = %08x, want %08x\n", c.argb, got, c.rgba);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
 int main() {
+    if (!checkPremultiply()) return 1;
     struct Size { int w, h, stride; };
     const Size sizes[] = {{1, 1, 1}, {2, 3, 2}, {17, 9, 20}, {64, 70, 64}, {131, 101, 140}};
     const int threadCounts[] = {1, 2, 5};

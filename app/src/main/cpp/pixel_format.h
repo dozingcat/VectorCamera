@@ -18,18 +18,25 @@ inline uint32_t packRgba(uint32_t r, uint32_t g, uint32_t b) {
     return 0xFF000000u | (b << 16) | (g << 8) | r;
 }
 
-// Converts an ARGB color int to an opaque bitmap pixel. Alpha is forced to 255, which makes
-// premultiplication the identity.
-inline uint32_t argbToRgba(uint32_t argb) {
-    return 0xFF000000u | ((argb & 0xFFu) << 16) | (argb & 0xFF00u) | ((argb >> 16) & 0xFFu);
+// Rounded a * b / 255, as Skia premultiplies.
+inline uint32_t mulDiv255Round(uint32_t a, uint32_t b) {
+    const uint32_t product = a * b + 128;
+    return (product + (product >> 8)) >> 8;
 }
 
-// Converts `count` ARGB pixels in place to opaque bitmap pixels. Vectorizes well, so converting
-// a chunk of rows that is still in cache costs little.
-inline void argbToRgbaInPlace(uint32_t* pixels, int count) {
-    for (int i = 0; i < count; i++) {
-        pixels[i] = argbToRgba(pixels[i]);
+// Converts an ARGB color int to a bitmap pixel. Effects render into bitmaps that are
+// premultiplied (the default for Bitmap.createBitmap), so a translucent color's components are
+// scaled by its alpha, as Bitmap.setPixels does. Used for palettes and lookup tables, not per
+// pixel; kernels that compute opaque colors use packRgba.
+inline uint32_t argbToRgba(uint32_t argb) {
+    const uint32_t a = argb >> 24;
+    uint32_t r = (argb >> 16) & 0xFFu, g = (argb >> 8) & 0xFFu, b = argb & 0xFFu;
+    if (a != 0xFFu) {
+        r = mulDiv255Round(a, r);
+        g = mulDiv255Round(a, g);
+        b = mulDiv255Round(a, b);
     }
+    return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
 }  // namespace vc
