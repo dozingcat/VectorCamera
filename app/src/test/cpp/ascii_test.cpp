@@ -19,14 +19,10 @@ namespace reference {
 
 enum ColorMode { FIXED = 0, PRIMARY = 1, FULL = 2 };
 
+// The original kernel had its own BT.601 constants here; the reference now uses the shared
+// conversion the kernel switched to.
 inline int yuvToArgb(int y, int u, int v) {
-    int r = y + ((359 * (v - 128)) >> 8);
-    int g = y - ((88 * (u - 128) + 183 * (v - 128)) >> 8);
-    int b = y + ((454 * (u - 128)) >> 8);
-    r = std::max(0, std::min(255, r));
-    g = std::max(0, std::min(255, g));
-    b = std::max(0, std::min(255, b));
-    return (0xFF << 24) | (r << 16) | (g << 8) | b;
+    return static_cast<int>(YuvUtils::yuvToRgbFixed(y, u, v, true));
 }
 
 inline int extractPrimaryColor(int argb) {

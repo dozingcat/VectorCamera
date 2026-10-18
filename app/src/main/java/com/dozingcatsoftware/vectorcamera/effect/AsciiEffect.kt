@@ -9,6 +9,7 @@ import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.util.scaleToTargetSize
 import com.dozingcatsoftware.util.intFromArgbList
+import com.dozingcatsoftware.util.YuvUtils
 import com.dozingcatsoftware.vectorcamera.*
 import java.io.OutputStream
 import java.io.OutputStreamWriter
@@ -303,17 +304,12 @@ class AsciiEffect(
                     for (xx in xmin until xmax) {
                         if (xx in 0 until width && yy in 0 until height) {
                             val y = (yData[yy * width + xx].toInt() and 0xFF)
-                            val u = (uData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF) - 128
-                            val v = (vData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF) - 128
-                            
-                            // YUV to RGB conversion (ITU-R BT.601)
-                            val r = (y + 1.402 * v).roundToInt().coerceIn(0, 255)
-                            val g = (y - 0.344136 * u - 0.714136 * v).roundToInt().coerceIn(0, 255)
-                            val b = (y + 1.772 * u).roundToInt().coerceIn(0, 255)
-                            
-                            redTotal += r
-                            greenTotal += g
-                            blueTotal += b
+                            val u = (uData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF)
+                            val v = (vData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF)
+                            val rgb = YuvUtils.yuvToRgb(y, u, v)
+                            redTotal += (rgb shr 16) and 0xFF
+                            greenTotal += (rgb shr 8) and 0xFF
+                            blueTotal += rgb and 0xFF
                             pixelCount++
                         }
                     }

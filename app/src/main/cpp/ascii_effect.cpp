@@ -11,6 +11,7 @@
 
 #include "pixel_format.h"
 #include "worker_pool.h"
+#include "yuv.h"
 
 #ifndef VC_NO_JNI
 #include <jni.h>
@@ -31,16 +32,6 @@ enum ColorMode {
 
 // Character cell rows per work chunk; each block row covers many image rows.
 constexpr int kBlockRowsPerChunk = 1;
-
-inline int yuvToArgb(int y, int u, int v) {
-    int r = y + ((359 * (v - 128)) >> 8);
-    int g = y - ((88 * (u - 128) + 183 * (v - 128)) >> 8);
-    int b = y + ((454 * (u - 128)) >> 8);
-    r = std::max(0, std::min(255, r));
-    g = std::max(0, std::min(255, g));
-    b = std::max(0, std::min(255, b));
-    return (0xFF << 24) | (r << 16) | (g << 8) | b;
-}
 
 // Dominant-component color: each channel is 255 if it is close to the brightest one, else 0.
 inline int extractPrimaryColor(int argb) {
@@ -98,7 +89,7 @@ void computeCellRows(const uint8_t* yData, const uint8_t* uData, const uint8_t* 
                         const int v = (uvIndex < uvSize) ? (vData[uvIndex] & 0xFF) : 128;
                         brightnessTotal += y;
                         if (wantColor) {
-                            const int argb = yuvToArgb(y, u, v);
+                            const int argb = static_cast<int>(YuvUtils::yuvToRgbFixed(y, u, v, true));
                             rTotal += (argb >> 16) & 0xFF;
                             gTotal += (argb >> 8) & 0xFF;
                             bTotal += argb & 0xFF;
