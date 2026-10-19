@@ -33,9 +33,9 @@ interface Effect {
     fun effectMetadata(): EffectMetadata = EffectMetadata(effectName(), effectParameters())
 
     companion object {
-        // Maximum thread counts based on performance characteristics
-        // Native code hits memory bandwidth limits quickly
-        const val MAX_NATIVE_THREADS = 2
+        // Native effects hand out row chunks dynamically, so any count works; three gets most
+        // of the available speedup without occupying every core.
+        const val MAX_NATIVE_THREADS = 3
         // Kotlin code is more CPU-bound and benefits from more parallelism
         const val MAX_KOTLIN_THREADS = 4
 

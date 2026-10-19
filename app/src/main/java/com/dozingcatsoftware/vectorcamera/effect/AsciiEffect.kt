@@ -9,6 +9,7 @@ import android.util.Log
 import android.util.Size
 import com.dozingcatsoftware.util.scaleToTargetSize
 import com.dozingcatsoftware.util.intFromArgbList
+import com.dozingcatsoftware.util.YuvUtils
 import com.dozingcatsoftware.vectorcamera.*
 import java.io.OutputStream
 import java.io.OutputStreamWriter
@@ -93,6 +94,7 @@ class AsciiEffect(
         val uData = cameraImage.getUBytes()
         val vData = cameraImage.getVBytes()
         
+        val threadsUsed = calculateOptimalNativeThreads(metrics.numCharacterRows)
         val nativeResult = if (nativeLibraryLoaded) Companion.computeAsciiDataNativeFromPlanes(
             yData, uData, vData,
             cameraImage.width(),
@@ -102,7 +104,8 @@ class AsciiEffect(
             metrics.isPortrait,
             colorMode.id,
             pixelChars.length,
-            textColor
+            textColor,
+            threadsUsed
         ) else null
         
         if (nativeResult == null || nativeResult.size != metrics.numCharacterColumns * metrics.numCharacterRows * 2) {
@@ -124,9 +127,7 @@ class AsciiEffect(
         
         // Create character template bitmap if needed
         updateCharTemplateBitmap(metrics.charPixelSize)
-        
-        val threadsUsed = calculateOptimalNativeThreads(metrics.numCharacterRows)
-        
+
         // Render final bitmap using bulk character rendering
         val resultBitmap = renderFinalBitmap(cameraImage, metrics, characterIndices, characterColors, threadsUsed)
         
@@ -303,17 +304,12 @@ class AsciiEffect(
                     for (xx in xmin until xmax) {
                         if (xx in 0 until width && yy in 0 until height) {
                             val y = (yData[yy * width + xx].toInt() and 0xFF)
-                            val u = (uData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF) - 128
-                            val v = (vData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF) - 128
-                            
-                            // YUV to RGB conversion (ITU-R BT.601)
-                            val r = (y + 1.402 * v).roundToInt().coerceIn(0, 255)
-                            val g = (y - 0.344136 * u - 0.714136 * v).roundToInt().coerceIn(0, 255)
-                            val b = (y + 1.772 * u).roundToInt().coerceIn(0, 255)
-                            
-                            redTotal += r
-                            greenTotal += g
-                            blueTotal += b
+                            val u = (uData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF)
+                            val v = (vData[(yy / 2) * (width / 2) + (xx / 2)].toInt() and 0xFF)
+                            val rgb = YuvUtils.yuvToRgb(y, u, v)
+                            redTotal += (rgb shr 16) and 0xFF
+                            greenTotal += (rgb shr 8) and 0xFF
+                            blueTotal += rgb and 0xFF
                             pixelCount++
                         }
                     }
@@ -407,16 +403,15 @@ class AsciiEffect(
         val template = characterTemplate!!
         val charWidth = metrics.charPixelSize.width
         val charHeight = metrics.charPixelSize.height
-        val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
-        
-        // Try native C++ rendering first for maximum performance
+
+        // Native rendering writes straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
         var nativeSuccess = false
-        try {
-            val templatePixels = IntArray(template.width * template.height)
-            template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
-            
-            if (nativeLibraryLoaded) {
-                Companion.renderCharacterGridNative(
+        if (nativeLibraryLoaded) {
+            try {
+                val templatePixels = IntArray(template.width * template.height)
+                template.getPixels(templatePixels, 0, template.width, 0, 0, template.width, template.height)
+                nativeSuccess = Companion.renderCharacterGridNativeToBitmap(
                     templatePixels,
                     template.width,
                     template.height,
@@ -429,27 +424,24 @@ class AsciiEffect(
                     metrics.isPortrait,
                     metrics.outputSize.width,
                     metrics.outputSize.height,
-                    outputPixels,
+                    resultBitmap,
                     backgroundColor,
                     numThreads
                 )
-                nativeSuccess = true
+            } catch (e: Exception) {
+                Log.e(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
             }
-            
-        } catch (e: Exception) {
-            Log.e(EFFECT_NAME, "Native character grid rendering failed, falling back to Kotlin", e)
         }
 
         if (!nativeSuccess) {
+            val outputPixels = IntArray(metrics.outputSize.width * metrics.outputSize.height)
             renderCharacterGridKotlin(
                 cameraImage, metrics, template, charWidth, charHeight,
                 characterIndices, characterColors, outputPixels
             )
+            resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0,
+                                  metrics.outputSize.width, metrics.outputSize.height)
         }
-        
-        // Create bitmap from rendered pixels
-        resultBitmap.setPixels(outputPixels, 0, metrics.outputSize.width, 0, 0, 
-                              metrics.outputSize.width, metrics.outputSize.height)
         return resultBitmap
     }
     
@@ -711,28 +703,18 @@ class AsciiEffect(
             isPortrait: Boolean,
             colorMode: Int,
             pixelCharsLength: Int,
-            textColor: Int
+            textColor: Int,
+            numThreads: Int
         ): IntArray?
-        
+
         /**
-         * Native method to compute brightness averages for each character cell.
+         * Native method to render the character grid into `bitmap` (ARGB_8888,
+         * outputWidth x outputHeight). This replaces thousands of Canvas drawing operations with
+         * one bulk operation. Returns false without modifying the bitmap if it can't be used
+         * directly.
          */
         @JvmStatic
-        external fun computeBlockBrightnessNative(
-            yuvBytes: ByteArray,
-            width: Int,
-            height: Int,
-            numCharCols: Int,
-            numCharRows: Int,
-            isPortrait: Boolean
-        ): ByteArray?
-        
-        /**
-         * Native method to render the character grid directly to pixels.
-         * This replaces thousands of Canvas drawing operations with one fast bulk operation.
-         */
-        @JvmStatic
-        external fun renderCharacterGridNative(
+        external fun renderCharacterGridNativeToBitmap(
             templatePixels: IntArray,
             templateWidth: Int,
             templateHeight: Int,
@@ -745,10 +727,10 @@ class AsciiEffect(
             isPortrait: Boolean,
             outputWidth: Int,
             outputHeight: Int,
-            outputPixels: IntArray,
+            bitmap: Bitmap,
             backgroundColor: Int,
             numThreads: Int
-        )
+        ): Boolean
 
         fun fromParameters(params: Map<String, Any>): AsciiEffect {
             val colors = params.getOrElse("colors", { mapOf<String, Any>() }) as Map<String, Any>

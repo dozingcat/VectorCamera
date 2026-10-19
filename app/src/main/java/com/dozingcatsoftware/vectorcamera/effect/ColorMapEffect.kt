@@ -84,23 +84,21 @@ class ColorMapEffect private constructor(
     }
 
     private fun createBitmapFromYBytes(yData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
-        val pixels = IntArray(width * height)
-        val nativeThreads = calculateOptimalNativeThreads(height)
-        val kotlinThreads = calculateOptimalKotlinThreads(height)
-
-        val actualThreads: Int
-        val architecture: CodeArchitecture
-
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val lookupMap = colorMap ?: alphaMap!!
-        if (nativeLibraryLoaded) {
-            actualThreads = nativeThreads
-            architecture = CodeArchitecture.Native
-            processImageNative(yData, width, height, mode == ColorMapMode.EDGE, multiplier,
-                               lookupMap, pixels, actualThreads)
-        } else {
-            // Fallback to Kotlin implementation with coroutines
-            actualThreads = kotlinThreads
-            architecture = CodeArchitecture.Kotlin
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        if (nativeLibraryLoaded && processImageNativeToBitmap(
+                        yData, width, height, mode == ColorMapMode.EDGE, multiplier, lookupMap,
+                        bitmap, nativeThreads)) {
+            return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
+        }
+
+        // Kotlin implementation with coroutines.
+        val pixels = IntArray(width * height)
+        val actualThreads = calculateOptimalKotlinThreads(height)
+        run {
             if (actualThreads == 1) {
                 processRows(0, height, width, height, multiplier, yData, pixels, lookupMap)
             } else {
@@ -123,11 +121,8 @@ class ColorMapEffect private constructor(
                 }
             }
         }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        return Triple(bitmap, actualThreads, architecture)
+        return Triple(bitmap, actualThreads, CodeArchitecture.Kotlin)
     }
 
     private fun processRows(
@@ -179,17 +174,20 @@ class ColorMapEffect private constructor(
         const val EFFECT_NAME = "color_map"
         const val MODE_PARAM = "mode"
 
-        // Native method declaration
-        private external fun processImageNative(
+        /**
+         * Renders into `bitmap` (ARGB_8888, width x height). Returns false without modifying
+         * the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             width: Int,
             height: Int,
             edgeMode: Boolean,
             multiplier: Int,
             colorMap: IntArray,
-            outputPixels: IntArray,
+            bitmap: Bitmap,
             numThreads: Int
-        )
+        ): Boolean
 
         // Load native library
         private var nativeLibraryLoaded = false

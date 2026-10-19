@@ -2,7 +2,7 @@
 // single-threaded port of the Kotlin ContourEffect algorithm on random images.
 //
 // Run from the repository root with:
-//   clang++ -std=c++17 -O2 -DCONTOUR_NO_JNI app/src/test/cpp/contour_effect_native_test.cpp \
+//   clang++ -std=c++17 -O2 -DVC_NO_JNI app/src/test/cpp/contour_effect_native_test.cpp \
 //       -o /tmp/contour_test && /tmp/contour_test
 
 #include "../../main/cpp/contour_effect_native.cpp"  // Pulls in worker_pool.h from the same directory.

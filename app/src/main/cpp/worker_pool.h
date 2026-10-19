@@ -1,7 +1,9 @@
-// Persistent worker threads for native effects. See WorkerPool below.
+// Persistent worker threads and dynamic row-chunk scheduling for native effects.
 #ifndef VECTORCAMERA_WORKER_POOL_H
 #define VECTORCAMERA_WORKER_POOL_H
 
+#include <algorithm>
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
@@ -15,7 +17,7 @@
 #include <unistd.h>
 #endif
 
-namespace contour {
+namespace vc {
 
 // Persistent worker threads shared by all frames. Threads that are created and destroyed within
 // a frame never build up scheduler load history and tend to be placed on slow cores; long-lived
@@ -101,6 +103,44 @@ private:
     int generation_ = 0;
 };
 
-}  // namespace contour
+// Rows per work chunk for parallelRows. Chunks are handed out dynamically, so fast cores take
+// more of them and slow cores fewer; every thread finishes within about one chunk of the others
+// regardless of the device's core mix.
+constexpr int kDefaultChunkRows = 32;
+
+// Runs fn() on `numThreads` threads: the worker pool plus the calling thread.
+template <typename Fn>
+void runOnThreads(int numThreads, Fn fn) {
+    if (numThreads <= 1) {
+        fn();
+        return;
+    }
+    WorkerPool::instance().run(numThreads, [&](int) { fn(); });
+}
+
+// Calls fn(startRow, endRow) for every chunk of `chunkRows` rows in [0, totalRows), spreading
+// the chunks over `numThreads` threads (the worker pool plus the caller). Chunks are claimed
+// from a shared counter, so fn must not depend on which thread runs a chunk or in what order,
+// and chunks must not write to each other's rows. fn is called on worker threads, so
+// per-thread scratch should be `static thread_local`.
+template <typename Fn>
+void parallelRows(int numThreads, int totalRows, int chunkRows, Fn fn) {
+    const int numChunks = (totalRows + chunkRows - 1) / chunkRows;
+    numThreads = std::max(1, std::min(numThreads, numChunks));
+    std::atomic<int> nextChunk{0};
+    runOnThreads(numThreads, [&] {
+        for (int c = nextChunk.fetch_add(1, std::memory_order_relaxed); c < numChunks;
+             c = nextChunk.fetch_add(1, std::memory_order_relaxed)) {
+            fn(c * chunkRows, std::min(totalRows, (c + 1) * chunkRows));
+        }
+    });
+}
+
+template <typename Fn>
+void parallelRows(int numThreads, int totalRows, Fn fn) {
+    parallelRows(numThreads, totalRows, kDefaultChunkRows, fn);
+}
+
+}  // namespace vc
 
 #endif  // VECTORCAMERA_WORKER_POOL_H

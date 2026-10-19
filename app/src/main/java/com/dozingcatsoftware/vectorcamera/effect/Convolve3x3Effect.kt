@@ -70,15 +70,16 @@ class Convolve3x3Effect(
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        // Try native implementation first
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
         if (nativeLibraryLoaded) {
             try {
-                val nativePixels = processImageNativeFromYData(
-                    yData, width, height, coefficients, colorMap, nativeThreads
+                val done = processImageNativeToBitmap(
+                    yData, width, height, coefficients, colorMap, bitmap, nativeThreads
                 )
-                if (nativePixels != null) {
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
+                if (done) {
                     return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
                 }
             } catch (e: Exception) {
@@ -87,11 +88,11 @@ class Convolve3x3Effect(
         }
         
         // Fall back to Kotlin implementation using Y plane directly
-        val kotlinBitmap = createBitmapFromYDataKotlin(yData, width, height, kotlinThreads)
-        return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+        createBitmapFromYDataKotlin(yData, width, height, kotlinThreads, bitmap)
+        return Triple(bitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
-    private fun createBitmapFromYDataKotlin(yData: ByteArray, width: Int, height: Int, numThreads: Int): Bitmap {
+    private fun createBitmapFromYDataKotlin(yData: ByteArray, width: Int, height: Int, numThreads: Int, bitmap: Bitmap) {
 
         // First apply convolution to get brightness values
         val convolvedData = applyConvolution(yData, width, height, numThreads)
@@ -100,9 +101,7 @@ class Convolve3x3Effect(
         val pixels = IntArray(width * height)
         mapToColors(convolvedData, pixels, numThreads)
 
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
     }
 
     /**
@@ -229,14 +228,19 @@ class Convolve3x3Effect(
             nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
-        private external fun processImageNativeFromYData(
+        /**
+         * Renders into `bitmap` (ARGB_8888, width x height). Returns false without modifying
+         * the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             width: Int,
             height: Int,
             coefficients: FloatArray,
             colorMap: IntArray,
+            bitmap: Bitmap,
             numThreads: Int
-        ): IntArray?
+        ): Boolean
         
         fun fromParameters(effectParams: Map<String, Any>): Convolve3x3Effect {
             // Parse coefficients
