@@ -48,8 +48,10 @@ class OilPaintingEffect(
     }
 
     private fun calculateOptimalNativeThreads(height: Int): Int {
-        // More threads don't seem to help in C++.
-        return 1
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
     }
 
     private fun calculateOptimalKotlinThreads(height: Int): Int {
@@ -62,17 +64,18 @@ class OilPaintingEffect(
     private fun createBitmapFromPlanes(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int): Triple<Bitmap, Int, CodeArchitecture> {
         // Scale down input image for better performance while maintaining quality
         val (scaledWidth, scaledHeight, scaleFactor) = calculateOptimalSize(width, height)
-        val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
 
+        // The native code scales the image itself and renders straight into the bitmap,
+        // skipping the scaled copies, the pixel array, and the setPixels copy.
         if (nativeLibraryLoaded) {
             val nativeThreads = calculateOptimalNativeThreads(scaledHeight)
             try {
-                val nativePixels = processImageNativeFromPlanes(
-                    scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, brushSize, levels, contrastSensitivity, nativeThreads
+                val resultBitmap = Bitmap.createBitmap(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
+                val done = processImageNativeToBitmap(
+                    yData, uData, vData, width, height, scaledWidth, scaledHeight, brushSize, levels,
+                    contrastSensitivity, resultBitmap, nativeThreads
                 )
-                if (nativePixels != null) {
-                    val resultBitmap = Bitmap.createBitmap(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
-                    resultBitmap.setPixels(nativePixels, 0, scaledWidth, 0, 0, scaledWidth, scaledHeight)
+                if (done) {
                     return Triple(resultBitmap, nativeThreads, CodeArchitecture.Native)
                 }
             } catch (e: Exception) {
@@ -81,6 +84,7 @@ class OilPaintingEffect(
         }
 
         // Fall back to Kotlin implementation with scaled data
+        val (scaledYData, scaledUData, scaledVData) = downsampleYuvData(yData, uData, vData, width, height, scaledWidth, scaledHeight)
         val kotlinThreads = calculateOptimalKotlinThreads(scaledHeight)
         val resultBitmap = createBitmapFromPlanesKotlin(scaledYData, scaledUData, scaledVData, scaledWidth, scaledHeight, kotlinThreads)
         return Triple(resultBitmap, kotlinThreads, CodeArchitecture.Kotlin)
@@ -478,17 +482,25 @@ class OilPaintingEffect(
             nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
-        private external fun processImageNativeFromPlanes(
+        /**
+         * Scales the srcWidth x srcHeight planes down to width x height (bilinear, as
+         * resizeImageBytes does) and renders into `bitmap` (ARGB_8888, width x height). Returns
+         * false without modifying the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             uData: ByteArray,
             vData: ByteArray,
+            srcWidth: Int,
+            srcHeight: Int,
             width: Int,
             height: Int,
             brushSize: Int,
             levels: Int,
             contrastSensitivity: Float,
+            bitmap: Bitmap,
             numThreads: Int
-        ): IntArray?
+        ): Boolean
         
         fun fromParameters(effectParams: Map<String, Any>): OilPaintingEffect {
             val brushSize = (effectParams.getOrElse("brushSize", { 8 }) as Number).toInt()

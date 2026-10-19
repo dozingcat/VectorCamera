@@ -82,7 +82,7 @@ class MainActivity : AppCompatActivity() {
 
         PreferenceManager.setDefaultValues(this.baseContext, R.xml.preferences, false)
 
-        imageProcessor = CameraImageProcessor()
+        imageProcessor = CameraImageProcessor(this)
 
         currentEffect = effectFromPreferences()
         selectedEffectId = preferences.effectId()
@@ -107,6 +107,10 @@ class MainActivity : AppCompatActivity() {
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
         binding.editPermuteView.changeCallback = this::handleCustomPermuteSchemeChanged
+        binding.editPaletteView.activity = this
+        binding.editPaletteView.changeCallback = this::handleCustomPaletteSchemeChanged
+        binding.editContourView.activity = this
+        binding.editContourView.changeCallback = this::handleCustomContourSchemeChanged
         binding.effectPickerView.setEffects(effectRegistry.effectInfos)
         binding.effectPickerView.onEffectSelected = this::handleEffectSelected
 
@@ -349,18 +353,21 @@ class MainActivity : AppCompatActivity() {
             binding.editSchemeView.layoutParams = params
         }
         run {
-            // The permute editor is a small panel; put it at the bottom in portrait (above the
-            // shutter bar) and at the left in landscape (next to the icon bar).
-            val params = FrameLayout.LayoutParams(wrap, wrap)
-            val metrics = resources.displayMetrics
-            val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
-            val iconMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 54f, metrics)
-            params.gravity =
-                    if (isPortrait) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                    else Gravity.LEFT or Gravity.CENTER_VERTICAL
-            params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
-            params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
-            binding.editPermuteView.layoutParams = params
+            // The permute, palette, and contour editors are small panels; put them at the bottom
+            // in portrait (above the shutter bar) and at the left in landscape (next to the icon bar).
+            for (panel in listOf(binding.editPermuteView, binding.editPaletteView,
+                                 binding.editContourView)) {
+                val params = FrameLayout.LayoutParams(wrap, wrap)
+                val metrics = resources.displayMetrics
+                val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
+                val iconMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 54f, metrics)
+                params.gravity =
+                        if (isPortrait) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                        else Gravity.LEFT or Gravity.CENTER_VERTICAL
+                params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
+                params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
+                panel.layoutParams = params
+            }
         }
     }
 
@@ -603,6 +610,8 @@ class MainActivity : AppCompatActivity() {
         binding.controlLayout.visibility = View.GONE
         binding.editSchemeView.visibility = View.GONE
         binding.editPermuteView.visibility = View.GONE
+        binding.editPaletteView.visibility = View.GONE
+        binding.editContourView.visibility = View.GONE
         Log.i(TAG, "Showing effect picker")
     }
 
@@ -670,6 +679,16 @@ class MainActivity : AppCompatActivity() {
                 binding.editPermuteView.visibility = View.VISIBLE
                 customSchemeId = eff.customSchemeId
             }
+            is CustomPaletteEffect -> {
+                binding.editPaletteView.setScheme(eff.scheme)
+                binding.editPaletteView.visibility = View.VISIBLE
+                customSchemeId = eff.customSchemeId
+            }
+            is CustomContourEffect -> {
+                binding.editContourView.setScheme(eff.scheme)
+                binding.editContourView.visibility = View.VISIBLE
+                customSchemeId = eff.customSchemeId
+            }
             else -> customSchemeId = ""
         }
     }
@@ -715,6 +734,22 @@ class MainActivity : AppCompatActivity() {
             return
         }
         preferences.saveCustomScheme(customSchemeId, ps)
+        reloadCustomEffect()
+    }
+
+    private fun handleCustomPaletteSchemeChanged(ps: CustomPaletteScheme) {
+        if (customSchemeId.isEmpty()) {
+            return
+        }
+        preferences.saveCustomScheme(customSchemeId, ps)
+        reloadCustomEffect()
+    }
+
+    private fun handleCustomContourSchemeChanged(cs: CustomContourScheme) {
+        if (customSchemeId.isEmpty()) {
+            return
+        }
+        preferences.saveCustomScheme(customSchemeId, cs)
         reloadCustomEffect()
     }
 

@@ -4,6 +4,8 @@ import android.graphics.Color
 import android.util.Log
 import com.dozingcatsoftware.util.jsonStringToMap
 import com.dozingcatsoftware.vectorcamera.CustomColorScheme
+import com.dozingcatsoftware.vectorcamera.CustomContourScheme
+import com.dozingcatsoftware.vectorcamera.CustomPaletteScheme
 import com.dozingcatsoftware.vectorcamera.CustomPermuteScheme
 
 enum class EffectContext {
@@ -21,6 +23,21 @@ enum class EffectCategory(val displayName: String) {
     ARTISTIC("Artistic"),
     CUSTOM("Custom"),
 }
+
+// Black through purple, red and yellow to white, like a thermal camera's "ironbow" palette.
+private val IRONBOW_STOPS = listOf(
+        listOf(0, 0, 0), listOf(32, 0, 96), listOf(160, 0, 128), listOf(255, 64, 0),
+        listOf(255, 200, 0), listOf(255, 255, 255))
+
+// Map-style elevation colors: deep water, shallows, lowland green, tan, brown, snow.
+private val TERRAIN_STOPS = listOf(
+        listOf(20, 50, 120), listOf(80, 160, 200), listOf(60, 140, 60), listOf(200, 190, 110),
+        listOf(140, 90, 50), listOf(255, 255, 255))
+
+// Navy through blue, cyan, green and yellow to red.
+private val SPECTRUM_STOPS = listOf(
+        listOf(0, 0, 96), listOf(0, 0, 255), listOf(0, 255, 255), listOf(0, 255, 0),
+        listOf(255, 255, 0), listOf(255, 0, 0))
 
 /**
  * Describes an effect that the user can select. `id` is a stable identifier that is safe to
@@ -386,6 +403,36 @@ class EffectRegistry {
             EffectInfo("oil_painting", "Oil painting", EffectCategory.ARTISTIC) {prefsFn, context -> OilPaintingEffect.standard() },
 
             EffectInfo("stained_glass", "Stained glass", EffectCategory.ARTISTIC) {prefsFn, context -> StainedGlassEffect.defaultStainedGlass() },
+            EffectInfo("contour_map", "Contour map", EffectCategory.ARTISTIC) {prefsFn, context ->
+                ContourEffect.fromParameters(mapOf(
+                    "colors" to mapOf("fill" to TERRAIN_STOPS, "line" to listOf(40, 25, 10))
+                ))
+            },
+            EffectInfo("contour_lines", "Contour lines", EffectCategory.ARTISTIC) {prefsFn, context ->
+                ContourEffect.fromParameters(mapOf(
+                    "levels" to 12,
+                    "colors" to mapOf(
+                        "fill" to listOf(listOf(0, 0, 0), listOf(0, 40, 0)),
+                        "line" to listOf(0, 255, 0))
+                ))
+            },
+
+            // Multi-stop palettes applied to brightness or edge strength.
+            EffectInfo("thermal", "Thermal", EffectCategory.COLORS) {prefsFn, context ->
+                ColorMapEffect.solid(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
+                ))
+            },
+            EffectInfo("thermal_edges", "Thermal edges", EffectCategory.EDGES) {prefsFn, context ->
+                ColorMapEffect.edge(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
+                ))
+            },
+            EffectInfo("spectrum", "Spectrum", EffectCategory.COLORS) {prefsFn, context ->
+                ColorMapEffect.solid(mapOf(
+                    "colors" to mapOf("type" to "palette", "stops" to SPECTRUM_STOPS)
+                ))
+            },
 
             // Stippling: black, white, and colored dots.
             EffectInfo("stippling", "Stippling", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.blackOnWhite() },
@@ -409,6 +456,21 @@ class EffectRegistry {
                 createCustomPermuteEffect(prefsFn, "custom_permute",
                         CustomPermuteScheme(ColorComponentSource.BLUE,
                                 ColorComponentSource.GREEN, ColorComponentSource.RED))
+            },
+            // Custom multi-stop palette.
+            EffectInfo("custom_palette", "Custom palette", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomPaletteEffect(prefsFn, "custom_palette",
+                        CustomPaletteScheme(ColorMapMode.SOLID, listOf(
+                                Color.BLACK, Color.rgb(0, 0, 160), Color.rgb(255, 0, 128),
+                                Color.YELLOW, Color.WHITE)))
+            },
+            // Custom contour map.
+            EffectInfo("custom_contour", "Custom contour", EffectCategory.CUSTOM) {prefsFn, context ->
+                createCustomContourEffect(prefsFn, "custom_contour",
+                        CustomContourScheme(
+                                listOf(Color.rgb(0, 0, 96), Color.rgb(0, 160, 160), Color.rgb(255, 255, 0),
+                                       Color.rgb(255, 128, 0), Color.rgb(192, 0, 0)),
+                                Color.BLACK))
             },
     )
 
@@ -438,6 +500,7 @@ class EffectRegistry {
             PermuteColorEffect.EFFECT_NAME -> PermuteColorEffect.fromParameters(params)
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
             StainedGlassEffect.EFFECT_NAME -> StainedGlassEffect.fromParameters(params)
+            ContourEffect.EFFECT_NAME -> ContourEffect.fromParameters(params)
             StippleEffect.EFFECT_NAME -> StippleEffect.fromParameters(params)
             // Names used before the edge and solid color effects were merged.
             "edge" -> ColorMapEffect.edge(params)
@@ -509,6 +572,30 @@ private fun createCustomColorMapEffect(
     )
     val baseEffect = ColorMapEffect.fromParameters(scheme.mode, params)
     return CustomColorMapEffect(baseEffect, scheme, customEffectId)
+}
+
+private fun createCustomPaletteEffect(
+    prefsFn: (String, Any) -> Any,
+    customEffectId: String,
+    defaultScheme: CustomPaletteScheme): Effect {
+    val schemeJson =
+        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+        catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomPaletteScheme.fromMap(schemeJson, defaultScheme)
+    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, scheme.toEffectParameters())
+    return CustomPaletteEffect(baseEffect, scheme, customEffectId)
+}
+
+private fun createCustomContourEffect(
+    prefsFn: (String, Any) -> Any,
+    customEffectId: String,
+    defaultScheme: CustomContourScheme): Effect {
+    val schemeJson =
+        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+        catch (ex: Exception) {mapOf<String, Any>()}
+    val scheme = CustomContourScheme.fromMap(schemeJson, defaultScheme)
+    val baseEffect = ContourEffect.fromParameters(scheme.toEffectParameters())
+    return CustomContourEffect(baseEffect, scheme, customEffectId)
 }
 
 private fun createCustomPermuteEffect(

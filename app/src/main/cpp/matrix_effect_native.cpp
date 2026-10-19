@@ -1,111 +1,81 @@
-#include <jni.h>
-#include <android/log.h>
+// Native implementation of MatrixEffect's heavy parts: per-cell brightness averages, optional
+// edge detection on the brightness grid, and stamping the character template into the output
+// bitmap for every cell. Renders straight into the bitmap.
+//
+// Compiling with -DVC_NO_JNI leaves out the JNI entry points so the kernels can be unit tested
+// on the host (app/src/test/cpp/matrix_test.cpp).
+
 #include <algorithm>
 #include <cstdint>
-#include <cmath>
-#include <thread>
-#include <vector>
 
+#include "character_grid.h"
+#include "worker_pool.h"
+
+#ifndef VC_NO_JNI
+#include <jni.h>
+#include <android/log.h>
+#include "bitmap_output.h"
 #define LOG_TAG "MatrixEffectNative"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#endif
 
-// Force inline critical functions for performance
-#define FORCE_INLINE __attribute__((always_inline)) inline
+namespace matrix {
 
-// Clamp function for keeping values in bounds
-FORCE_INLINE int clamp(int value, int min_val, int max_val) {
+inline int clamp(int value, int min_val, int max_val) {
     return std::max(min_val, std::min(value, max_val));
 }
 
-/**
- * Compute average brightness for each character cell block.
- * This is the most performance-critical part of the Matrix effect.
- */
-void computeBlockBrightness(
-    const uint8_t* __restrict__ yData,
-    int imageWidth, 
-    int imageHeight,
-    int numCharColumns,
-    int numCharRows,
-    bool isPortrait,
-    uint8_t* __restrict__ blockAverages,
-    int startRow,
-    int endRow
-) {
+// Average brightness of each cell in block rows [startRow, endRow).
+void computeBlockBrightnessRows(const uint8_t* yData, int imageWidth, int imageHeight,
+                                int numCharColumns, int numCharRows, bool isPortrait,
+                                uint8_t* blockAverages, int startRow, int endRow) {
     for (int blockY = startRow; blockY < endRow; blockY++) {
         for (int blockX = 0; blockX < numCharColumns; blockX++) {
             const int blockIndex = blockY * numCharColumns + blockX;
-            
-            // Calculate input pixel region for this character cell
-            int xmin, xmax, ymin, ymax;
-            
-            if (isPortrait) {
-                const int inputPixelsPerCol = imageHeight / numCharColumns;
-                const int inputPixelsPerRow = imageWidth / numCharRows;
-                xmin = blockY * inputPixelsPerRow;
-                xmax = xmin + inputPixelsPerRow;
-                ymin = (numCharColumns - 1 - blockX) * inputPixelsPerCol;
-                ymax = ymin + inputPixelsPerCol;
-            } else {
-                const int inputPixelsPerCol = imageWidth / numCharColumns;
-                const int inputPixelsPerRow = imageHeight / numCharRows;
-                xmin = blockX * inputPixelsPerCol;
-                xmax = xmin + inputPixelsPerCol;
-                ymin = blockY * inputPixelsPerRow;
-                ymax = ymin + inputPixelsPerRow;
-            }
-            
-            // Average Y (brightness) values over the block
+
+            const vc::CellInputRect cell = vc::cellInputRect(
+                imageWidth, imageHeight, numCharColumns, numCharRows, isPortrait, blockX, blockY);
+
             uint32_t brightnessTotal = 0;
             int pixelCount = 0;
-            
-            for (int yy = ymin; yy < ymax; yy++) {
+            for (int yy = cell.ymin; yy < cell.ymax; yy++) {
                 if (yy < 0 || yy >= imageHeight) continue;
-                const uint8_t* rowPtr = yData + yy * imageWidth;
-                
-                for (int xx = xmin; xx < xmax; xx++) {
+                const uint8_t* rowPtr = yData + static_cast<size_t>(yy) * imageWidth;
+                for (int xx = cell.xmin; xx < cell.xmax; xx++) {
                     if (xx >= 0 && xx < imageWidth) {
                         brightnessTotal += rowPtr[xx];
                         pixelCount++;
                     }
                 }
             }
-            
-            blockAverages[blockIndex] = pixelCount > 0 ? 
+            blockAverages[blockIndex] = pixelCount > 0 ?
                 static_cast<uint8_t>(brightnessTotal / pixelCount) : 0;
         }
     }
 }
 
-/**
- * Apply edge detection to the brightness grid using Laplacian operator.
- */
-void applyEdgeDetection(
-    const uint8_t* __restrict__ input,
-    uint8_t* __restrict__ output,
-    int width,
-    int height,
-    int multiplier,
-    int startRow,
-    int endRow
-) {
-    for (int y = startRow; y < endRow; y++) {
+void computeBlockBrightness(const uint8_t* yData, int imageWidth, int imageHeight,
+                            int numCharColumns, int numCharRows, bool isPortrait,
+                            uint8_t* blockAverages, int numThreads) {
+    vc::parallelRows(numThreads, numCharRows, vc::kCharacterRowsPerChunk, [&](int start, int end) {
+        computeBlockBrightnessRows(yData, imageWidth, imageHeight, numCharColumns, numCharRows,
+                                   isPortrait, blockAverages, start, end);
+    });
+}
+
+// Laplacian edge detection on the brightness grid; border cells become 0.
+void applyEdgeDetection(const uint8_t* input, uint8_t* output, int width, int height,
+                        int multiplier) {
+    for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             const int index = y * width + x;
-            
             if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
                 const int center = input[index];
                 const int surroundingSum =
-                    input[(y - 1) * width + (x - 1)] +
-                    input[(y - 1) * width + x] +
-                    input[(y - 1) * width + (x + 1)] +
-                    input[y * width + (x - 1)] +
-                    input[y * width + (x + 1)] +
-                    input[(y + 1) * width + (x - 1)] +
-                    input[(y + 1) * width + x] +
-                    input[(y + 1) * width + (x + 1)];
-                
+                    input[(y - 1) * width + (x - 1)] + input[(y - 1) * width + x] +
+                    input[(y - 1) * width + (x + 1)] + input[y * width + (x - 1)] +
+                    input[y * width + (x + 1)] + input[(y + 1) * width + (x - 1)] +
+                    input[(y + 1) * width + x] + input[(y + 1) * width + (x + 1)];
                 const int edge = 8 * center - surroundingSum;
                 output[index] = static_cast<uint8_t>(clamp(multiplier * edge, 0, 255));
             } else {
@@ -115,13 +85,25 @@ void applyEdgeDetection(
     }
 }
 
+// Renders the character grid into bitmap pixels (see character_grid.h) on a black background.
+// `characterColors` are ARGB; characters are drawn where the template is non-black.
+void renderCharacterGrid(const uint32_t* templatePixels, int templateWidth, int templateHeight,
+                         int charWidth, int charHeight, const int32_t* characterIndices,
+                         const int32_t* characterColors, int numCharColumns, int numCharRows,
+                         bool isPortrait, bool xFlipped, bool yFlipped, int outputWidth,
+                         int outputHeight, uint32_t* outputPixels, int pixelStride,
+                         int numThreads) {
+    vc::renderCharacterGrid(templatePixels, templateWidth, templateHeight, charWidth, charHeight,
+                            characterIndices, characterColors, numCharColumns, numCharRows,
+                            isPortrait, xFlipped, yFlipped, outputWidth, outputHeight,
+                            outputPixels, pixelStride, /*backgroundColor=*/0xFF000000u, numThreads);
+}
 
+}  // namespace matrix
 
+#ifndef VC_NO_JNI
 extern "C" {
 
-/**
- * Compute block brightness averages from YUV data with multi-threading.
- */
 JNIEXPORT void JNICALL
 Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_computeBlockBrightnessNative(
     JNIEnv *env,
@@ -135,49 +117,23 @@ Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_computeBlockBrightne
     jbyteArray blockAverages,
     jint numThreads
 ) {
-    // Get native array pointers
     jbyte* yBytes = env->GetByteArrayElements(yData, nullptr);
     jbyte* blockBytes = env->GetByteArrayElements(blockAverages, nullptr);
-    
     if (!yBytes || !blockBytes) {
         LOGE("Failed to get array elements");
+        if (yBytes) env->ReleaseByteArrayElements(yData, yBytes, JNI_ABORT);
+        if (blockBytes) env->ReleaseByteArrayElements(blockAverages, blockBytes, JNI_ABORT);
         return;
     }
-    
-    const uint8_t* yDataPtr = reinterpret_cast<const uint8_t*>(yBytes);
-    uint8_t* blockPtr = reinterpret_cast<uint8_t*>(blockBytes);
-    
-    if (numThreads == 1) {
-        computeBlockBrightness(yDataPtr, imageWidth, imageHeight, 
-                              numCharColumns, numCharRows, isPortrait,
-                              blockPtr, 0, numCharRows);
-    } else {
-        std::vector<std::thread> threads;
-        const int rowsPerThread = numCharRows / numThreads;
-        
-        for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
-            const int startRow = threadIndex * rowsPerThread;
-            const int endRow = (threadIndex == numThreads - 1) ? 
-                numCharRows : (threadIndex + 1) * rowsPerThread;
-            
-            threads.emplace_back(computeBlockBrightness, yDataPtr, imageWidth, imageHeight,
-                               numCharColumns, numCharRows, isPortrait, blockPtr, startRow, endRow);
-        }
-        
-        // Wait for all threads to complete
-        for (auto& thread : threads) {
-            thread.join();
-        }
-    }
-    
-    // Release arrays
+    matrix::computeBlockBrightness(reinterpret_cast<const uint8_t*>(yBytes), imageWidth,
+                                   imageHeight, numCharColumns, numCharRows,
+                                   isPortrait == JNI_TRUE, reinterpret_cast<uint8_t*>(blockBytes),
+                                   std::max(1, static_cast<int>(numThreads)));
     env->ReleaseByteArrayElements(yData, yBytes, JNI_ABORT);
     env->ReleaseByteArrayElements(blockAverages, blockBytes, 0);
 }
 
-/**
- * Apply edge detection to brightness grid with multi-threading.
- */
+// The grid is a few thousand cells, so this runs single-threaded; numThreads is ignored.
 JNIEXPORT void JNICALL
 Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_applyEdgeDetectionNative(
     JNIEnv *env,
@@ -191,148 +147,22 @@ Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_applyEdgeDetectionNa
 ) {
     jbyte* inputBytes = env->GetByteArrayElements(input, nullptr);
     jbyte* outputBytes = env->GetByteArrayElements(output, nullptr);
-    
     if (!inputBytes || !outputBytes) {
         LOGE("Failed to get array elements for edge detection");
+        if (inputBytes) env->ReleaseByteArrayElements(input, inputBytes, JNI_ABORT);
+        if (outputBytes) env->ReleaseByteArrayElements(output, outputBytes, JNI_ABORT);
         return;
     }
-    
-    const uint8_t* inputPtr = reinterpret_cast<const uint8_t*>(inputBytes);
-    uint8_t* outputPtr = reinterpret_cast<uint8_t*>(outputBytes);
-    
-    if (numThreads == 1) {
-        applyEdgeDetection(inputPtr, outputPtr, width, height, multiplier, 0, height);
-    } else {
-        std::vector<std::thread> threads;
-        const int rowsPerThread = height / numThreads;
-        
-        for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
-            const int startRow = threadIndex * rowsPerThread;
-            const int endRow = (threadIndex == numThreads - 1) ? 
-                height : (threadIndex + 1) * rowsPerThread;
-            
-            threads.emplace_back(applyEdgeDetection, inputPtr, outputPtr, width, height, 
-                               multiplier, startRow, endRow);
-        }
-        
-        for (auto& thread : threads) {
-            thread.join();
-        }
-    }
-    
+    matrix::applyEdgeDetection(reinterpret_cast<const uint8_t*>(inputBytes),
+                               reinterpret_cast<uint8_t*>(outputBytes), width, height, multiplier);
     env->ReleaseByteArrayElements(input, inputBytes, JNI_ABORT);
     env->ReleaseByteArrayElements(output, outputBytes, 0);
 }
 
-
-
-/**
- * Check if native library is available.
- */
+// Renders the character grid into `bitmap` (RGBA_8888, outputWidth x outputHeight). Returns
+// false without touching the bitmap if it can't be used directly.
 JNIEXPORT jboolean JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_isNativeAvailable(
-    JNIEnv *env,
-    jobject /* this */
-) {
-    return JNI_TRUE;
-}
-
-/**
- * Render the entire character grid to a pixel buffer in parallel.
- * This replaces thousands of individual character rendering calls with one bulk operation.
- */
-void renderCharacterGrid(
-    const uint32_t* __restrict__ templatePixels,
-    int templateWidth,
-    int templateHeight,
-    int charWidth,
-    int charHeight,
-    const int* __restrict__ characterIndices,
-    const uint32_t* __restrict__ characterColors,
-    int numCharColumns,
-    int numCharRows,
-    bool isPortrait,
-    bool xFlipped,
-    bool yFlipped,
-    int outputWidth,
-    int outputHeight,
-    uint32_t* __restrict__ outputPixels,
-    int startRow,
-    int endRow
-) {
-    const uint32_t BLACK = 0xFF000000;
-    
-    for (int blockY = startRow; blockY < endRow; blockY++) {
-        for (int blockX = 0; blockX < numCharColumns; blockX++) {
-            const int cellIndex = blockY * numCharColumns + blockX;
-            const int charIndex = characterIndices[cellIndex];
-            const uint32_t color = characterColors[cellIndex];
-            
-            // Calculate source rectangle in character template
-            const int srcLeft = charIndex * charWidth;
-            const int srcRight = srcLeft + charWidth;
-            
-            // Calculate destination rectangle in output
-            int dstLeft, dstTop, dstWidth, dstHeight;
-            
-            if (isPortrait) {
-                // Portrait mode: characters are rotated
-                dstLeft = blockY * charHeight;
-                dstTop = (numCharColumns - 1 - blockX) * charWidth;
-                dstWidth = charHeight;
-                dstHeight = charWidth;
-            } else {
-                dstLeft = blockX * charWidth;
-                dstTop = blockY * charHeight;
-                dstWidth = charWidth;
-                dstHeight = charHeight;
-            }
-            
-            // Render character pixels
-            for (int dy = 0; dy < dstHeight; dy++) {
-                for (int dx = 0; dx < dstWidth; dx++) {
-                    int srcX, srcY;
-                    
-                    if (isPortrait) {
-                        // Portrait transformation: rotate -90 degrees
-                        srcX = srcLeft + (yFlipped ? dy : charWidth - 1 - dy);
-                        srcY = xFlipped ? charHeight - 1 - dx : dx;
-                    } else {
-                        // Landscape transformation: apply flipping
-                        srcX = srcLeft + (xFlipped ? charWidth - 1 - dx : dx);
-                        srcY = yFlipped ? charHeight - 1 - dy : dy;
-                    }
-                    
-                    // Bounds check for template
-                    if (srcX >= srcLeft && srcX < srcRight && srcY >= 0 && srcY < templateHeight) {
-                        const uint32_t templatePixel = templatePixels[srcY * templateWidth + srcX];
-                        
-                        // Check if template pixel is non-black
-                        const uint8_t red = (templatePixel >> 16) & 0xFF;
-                        const uint8_t green = (templatePixel >> 8) & 0xFF;
-                        const uint8_t blue = templatePixel & 0xFF;
-                        
-                        // Determine output pixel color
-                        const uint32_t outputColor = (red > 0 || green > 0 || blue > 0) ? color : BLACK;
-                        
-                        // Write to output buffer
-                        const int outX = dstLeft + dx;
-                        const int outY = dstTop + dy;
-                        if (outX >= 0 && outX < outputWidth && outY >= 0 && outY < outputHeight) {
-                            outputPixels[outY * outputWidth + outX] = outputColor;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Render all characters to output buffer with multi-threading.
- */
-JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_renderCharacterGridNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_renderCharacterGridNativeToBitmap(
     JNIEnv *env,
     jobject /* this */,
     jintArray templatePixels,
@@ -349,60 +179,34 @@ Java_com_dozingcatsoftware_vectorcamera_effect_MatrixEffect_renderCharacterGridN
     jboolean yFlipped,
     jint outputWidth,
     jint outputHeight,
-    jintArray outputPixels,
+    jobject bitmap,
     jint numThreads
 ) {
-    // Get native array pointers
+    vc::LockedBitmap locked(env, bitmap, outputWidth, outputHeight);
+    if (!locked.ok()) {
+        return JNI_FALSE;
+    }
     jint* templateInts = env->GetIntArrayElements(templatePixels, nullptr);
     jint* charIndices = env->GetIntArrayElements(characterIndices, nullptr);
     jint* charColors = env->GetIntArrayElements(characterColors, nullptr);
-    jint* outputInts = env->GetIntArrayElements(outputPixels, nullptr);
-    
-    if (!templateInts || !charIndices || !charColors || !outputInts) {
+    if (!templateInts || !charIndices || !charColors) {
         LOGE("Failed to get array elements for character grid rendering");
-        return;
+        if (templateInts) env->ReleaseIntArrayElements(templatePixels, templateInts, JNI_ABORT);
+        if (charIndices) env->ReleaseIntArrayElements(characterIndices, charIndices, JNI_ABORT);
+        if (charColors) env->ReleaseIntArrayElements(characterColors, charColors, JNI_ABORT);
+        return JNI_FALSE;
     }
-    
-    const uint32_t* templatePtr = reinterpret_cast<const uint32_t*>(templateInts);
-    const int* indicesPtr = reinterpret_cast<const int*>(charIndices);
-    const uint32_t* colorsPtr = reinterpret_cast<const uint32_t*>(charColors);
-    uint32_t* outputPtr = reinterpret_cast<uint32_t*>(outputInts);
-    
-    // Clear output buffer to black
-    const int totalPixels = outputWidth * outputHeight;
-    std::fill(outputPtr, outputPtr + totalPixels, 0xFF000000);
-    
-    if (numThreads == 1) {
-        renderCharacterGrid(templatePtr, templateWidth, templateHeight, charWidth, charHeight,
-                           indicesPtr, colorsPtr, numCharColumns, numCharRows,
-                           isPortrait, xFlipped, yFlipped, outputWidth, outputHeight,
-                           outputPtr, 0, numCharRows);
-    } else {
-        std::vector<std::thread> threads;
-        const int rowsPerThread = numCharRows / numThreads;
-        
-        for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
-            const int startRow = threadIndex * rowsPerThread;
-            const int endRow = (threadIndex == numThreads - 1) ? 
-                numCharRows : (threadIndex + 1) * rowsPerThread;
-            
-            threads.emplace_back(renderCharacterGrid, templatePtr, templateWidth, templateHeight,
-                               charWidth, charHeight, indicesPtr, colorsPtr, numCharColumns, numCharRows,
-                               isPortrait, xFlipped, yFlipped, outputWidth, outputHeight,
-                               outputPtr, startRow, endRow);
-        }
-        
-        // Wait for all threads to complete
-        for (auto& thread : threads) {
-            thread.join();
-        }
-    }
-    
-    // Release arrays
+    matrix::renderCharacterGrid(
+            reinterpret_cast<const uint32_t*>(templateInts), templateWidth, templateHeight,
+            charWidth, charHeight, charIndices, charColors, numCharColumns, numCharRows,
+            isPortrait == JNI_TRUE, xFlipped == JNI_TRUE, yFlipped == JNI_TRUE,
+            outputWidth, outputHeight, locked.pixels(), locked.stride(),
+            std::max(1, static_cast<int>(numThreads)));
     env->ReleaseIntArrayElements(templatePixels, templateInts, JNI_ABORT);
     env->ReleaseIntArrayElements(characterIndices, charIndices, JNI_ABORT);
     env->ReleaseIntArrayElements(characterColors, charColors, JNI_ABORT);
-    env->ReleaseIntArrayElements(outputPixels, outputInts, 0);
+    return JNI_TRUE;
 }
 
-} // extern "C" 
+}  // extern "C"
+#endif

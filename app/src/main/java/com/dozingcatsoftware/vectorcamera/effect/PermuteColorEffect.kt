@@ -83,22 +83,22 @@ class PermuteColorEffect(
         val nativeThreads = calculateOptimalNativeThreads(height)
         val kotlinThreads = calculateOptimalKotlinThreads(height)
 
-        val t1 = System.currentTimeMillis()
-        
-        // Try native implementation first
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
         if (nativeLibraryLoaded) {
             try {
-                val nativePixels = processImageNativeFromPlanes(
+                val done = processImageNativeToBitmap(
                     yData, uData, vData, width, height,
                     redSource.rsCode,  // Use rsCode values that match C++ expectations
                     greenSource.rsCode,
                     blueSource.rsCode,
                     flipUV,
+                    bitmap,
                     nativeThreads
                 )
-                if (nativePixels != null) {
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    bitmap.setPixels(nativePixels, 0, width, 0, 0, width, height)
+                if (done) {
                     return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
                 }
             } catch (e: Exception) {
@@ -107,11 +107,11 @@ class PermuteColorEffect(
         }
         
         // Fall back to Kotlin implementation using individual planes directly
-        val kotlinBitmap = createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads, t1)
-        return Triple(kotlinBitmap, kotlinThreads, CodeArchitecture.Kotlin)
+        createBitmapFromPlanesKotlin(yData, uData, vData, width, height, kotlinThreads, bitmap)
+        return Triple(bitmap, kotlinThreads, CodeArchitecture.Kotlin)
     }
     
-    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int, startTime: Long): Bitmap {
+    private fun createBitmapFromPlanesKotlin(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, numThreads: Int, bitmap: Bitmap) {
         val uvWidth = (width + 1) / 2
 
         val pixels = IntArray(width * height)
@@ -138,10 +138,7 @@ class PermuteColorEffect(
                 jobs.forEach { it.join() }
             }
         }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
     }
 
     private fun processRows(
@@ -220,7 +217,11 @@ class PermuteColorEffect(
             nativeLibraryLoaded = Effect.loadNativeLibrary()
         }
         
-        private external fun processImageNativeFromPlanes(
+        /**
+         * Renders into `bitmap` (ARGB_8888, width x height). Returns false without modifying
+         * the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             uData: ByteArray,
             vData: ByteArray,
@@ -230,8 +231,9 @@ class PermuteColorEffect(
             greenSource: Int,
             blueSource: Int,
             flipUV: Boolean,
+            bitmap: Bitmap,
             numThreads: Int
-        ): IntArray?
+        ): Boolean
         
         fun fromParameters(effectParams: Map<String, Any>): PermuteColorEffect {
             val redSource = ColorComponentSource.valueOf(effectParams["red"] as String)

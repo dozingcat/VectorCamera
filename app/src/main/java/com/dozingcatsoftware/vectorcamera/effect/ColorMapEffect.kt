@@ -84,23 +84,21 @@ class ColorMapEffect private constructor(
     }
 
     private fun createBitmapFromYBytes(yData: ByteArray, width: Int, height: Int, multiplier: Int): Triple<Bitmap, Int, CodeArchitecture> {
-        val pixels = IntArray(width * height)
-        val nativeThreads = calculateOptimalNativeThreads(height)
-        val kotlinThreads = calculateOptimalKotlinThreads(height)
-
-        val actualThreads: Int
-        val architecture: CodeArchitecture
-
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val lookupMap = colorMap ?: alphaMap!!
-        if (nativeLibraryLoaded) {
-            actualThreads = nativeThreads
-            architecture = CodeArchitecture.Native
-            processImageNative(yData, width, height, mode == ColorMapMode.EDGE, multiplier,
-                               lookupMap, pixels, actualThreads)
-        } else {
-            // Fallback to Kotlin implementation with coroutines
-            actualThreads = kotlinThreads
-            architecture = CodeArchitecture.Kotlin
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
+        val nativeThreads = calculateOptimalNativeThreads(height)
+        if (nativeLibraryLoaded && processImageNativeToBitmap(
+                        yData, width, height, mode == ColorMapMode.EDGE, multiplier, lookupMap,
+                        bitmap, nativeThreads)) {
+            return Triple(bitmap, nativeThreads, CodeArchitecture.Native)
+        }
+
+        // Kotlin implementation with coroutines.
+        val pixels = IntArray(width * height)
+        val actualThreads = calculateOptimalKotlinThreads(height)
+        run {
             if (actualThreads == 1) {
                 processRows(0, height, width, height, multiplier, yData, pixels, lookupMap)
             } else {
@@ -123,11 +121,8 @@ class ColorMapEffect private constructor(
                 }
             }
         }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        return Triple(bitmap, actualThreads, architecture)
+        return Triple(bitmap, actualThreads, CodeArchitecture.Kotlin)
     }
 
     private fun processRows(
@@ -179,17 +174,20 @@ class ColorMapEffect private constructor(
         const val EFFECT_NAME = "color_map"
         const val MODE_PARAM = "mode"
 
-        // Native method declaration
-        private external fun processImageNative(
+        /**
+         * Renders into `bitmap` (ARGB_8888, width x height). Returns false without modifying
+         * the bitmap if it can't be used directly.
+         */
+        private external fun processImageNativeToBitmap(
             yData: ByteArray,
             width: Int,
             height: Int,
             edgeMode: Boolean,
             multiplier: Int,
             colorMap: IntArray,
-            outputPixels: IntArray,
+            bitmap: Bitmap,
             numThreads: Int
-        )
+        ): Boolean
 
         // Load native library
         private var nativeLibraryLoaded = false
@@ -254,6 +252,13 @@ class ColorMapEffect private constructor(
                     val alphaMap = createAlphaMap(minColor)
                     return ColorMapEffect(mode, effectParams, alphaMap = alphaMap, backgroundFn = backgroundFn)
                 }
+                "palette" -> {
+                    // Evenly spaced color stops, e.g. a thermal camera palette.
+                    val stops = (colorParams["stops"] as List<List<Int>>).map {
+                        Color.argb(255, it[0], it[1], it[2])
+                    }
+                    return ColorMapEffect(mode, effectParams, colorMap = createPaletteColorMap(stops))
+                }
                 "grid_gradient" -> {
                     val minColor = parseColorFromList(colorParams, "minColor")
                     val gridColors = colorParams["grid"] as List<List<List<Int>>>
@@ -309,6 +314,27 @@ class ColorMapEffect private constructor(
                 colorMap[i] = Color.argb(255, r, g, b)
             }
 
+            return colorMap
+        }
+
+        /**
+         * Create a color map that interpolates through evenly spaced color stops.
+         */
+        fun createPaletteColorMap(stops: List<Int>): IntArray {
+            require(stops.size >= 2) { "Palette needs at least two colors" }
+            val colorMap = IntArray(256)
+            val lastSegment = stops.size - 2
+            for (i in 0 until 256) {
+                val position = i / 255f * (stops.size - 1)
+                val segment = minOf(lastSegment, position.toInt())
+                val fraction = position - segment
+                val c0 = stops[segment]
+                val c1 = stops[segment + 1]
+                colorMap[i] = Color.argb(255,
+                        Math.round(Color.red(c0) + (Color.red(c1) - Color.red(c0)) * fraction),
+                        Math.round(Color.green(c0) + (Color.green(c1) - Color.green(c0)) * fraction),
+                        Math.round(Color.blue(c0) + (Color.blue(c1) - Color.blue(c0)) * fraction))
+            }
             return colorMap
         }
 

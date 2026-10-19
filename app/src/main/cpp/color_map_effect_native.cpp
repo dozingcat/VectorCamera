@@ -1,93 +1,83 @@
-#include <jni.h>
-#include <android/log.h>
+// Native implementation of ColorMapEffect: each pixel's luminance (solid mode) or Laplacian edge
+// strength (edge mode) indexes a 256-entry color map. Renders straight into the bitmap.
+//
+// Compiling with -DVC_NO_JNI leaves out the JNI entry point so the kernels can be unit tested on
+// the host (app/src/test/cpp/effects_test.cpp).
+
 #include <algorithm>
 #include <cstdint>
-#include <cmath>
-#include <thread>
 #include <vector>
 
+#include "pixel_format.h"
+#include "worker_pool.h"
+
+#ifndef VC_NO_JNI
+#include <jni.h>
+#include <android/log.h>
+#include "bitmap_output.h"
 #define LOG_TAG "ColorMapEffectNative"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#endif
 
-// Clamp function for keeping values in bounds
-inline int clamp(int value, int min_val, int max_val) {
-    return std::max(min_val, std::min(value, max_val));
-}
+namespace colormap {
 
-// Calculate edge strength using Laplacian operator
-inline int calculateEdgeStrength(
-    const uint8_t* yData, 
-    int x, 
-    int y, 
-    int width, 
-    int height, 
-    int yRowStride, 
-    int multiplier
-) {
-    if (x <= 0 || x >= width - 1 || y <= 0 || y >= height - 1) {
-        return 0;
-    }
-    
-    // Get center pixel
-    int center = yData[y * yRowStride + x];
-    
-    // Calculate sum of 8 surrounding pixels
-    int surrounding = 
-        yData[(y - 1) * yRowStride + (x - 1)] +
-        yData[(y - 1) * yRowStride + x] +
-        yData[(y - 1) * yRowStride + (x + 1)] +
-        yData[y * yRowStride + (x - 1)] +
-        yData[y * yRowStride + (x + 1)] +
-        yData[(y + 1) * yRowStride + (x - 1)] +
-        yData[(y + 1) * yRowStride + x] +
-        yData[(y + 1) * yRowStride + (x + 1)];
-    
-    // Apply Laplacian operator
-    int edge = 8 * center - surrounding;
-    return clamp(multiplier * edge, 0, 255);
-}
-
-// Process a range of rows in solid mode: the luminance is the color map index.
-void processRowsSolid(
-    const uint8_t* yData,
-    int width,
-    const int* colorMap,
-    int* outputPixels,
-    int startRow,
-    int endRow
-) {
+// Solid mode for rows [startRow, endRow): the luminance is the color map index.
+void processRowsSolid(const uint8_t* yData, int width, const uint32_t* colorMap,
+                      uint32_t* pixels, int pixelStride, int startRow, int endRow) {
     for (int y = startRow; y < endRow; y++) {
-        const uint8_t* row = yData + y * width;
-        int* out = outputPixels + y * width;
+        const uint8_t* row = yData + static_cast<size_t>(y) * width;
+        uint32_t* out = pixels + static_cast<size_t>(y) * pixelStride;
         for (int x = 0; x < width; x++) {
             out[x] = colorMap[row[x]];
         }
     }
 }
 
-// Process a range of rows in edge mode: the edge strength is the color map index.
-void processRows(
-    const uint8_t* yData,
-    int yRowStride,
-    int width,
-    int height,
-    int multiplier,
-    const int* colorMap,
-    int* outputPixels,
-    int startRow,
-    int endRow
-) {
+// Edge mode for rows [startRow, endRow): the Laplacian edge strength, scaled by `multiplier`
+// and clamped to 0-255, is the color map index. Border pixels have edge strength 0.
+void processRowsEdge(const uint8_t* yData, int width, int height, int multiplier,
+                     const uint32_t* colorMap, uint32_t* pixels, int pixelStride,
+                     int startRow, int endRow) {
     for (int y = startRow; y < endRow; y++) {
-        for (int x = 0; x < width; x++) {
-            int edgeStrength = calculateEdgeStrength(yData, x, y, width, height, yRowStride, multiplier);
-            outputPixels[y * width + x] = colorMap[edgeStrength];
+        uint32_t* out = pixels + static_cast<size_t>(y) * pixelStride;
+        if (y == 0 || y == height - 1 || width < 3) {
+            std::fill(out, out + width, colorMap[0]);
+            continue;
         }
+        const uint8_t* prev = yData + static_cast<size_t>(y - 1) * width;
+        const uint8_t* curr = prev + width;
+        const uint8_t* next = curr + width;
+        out[0] = colorMap[0];
+        for (int x = 1; x < width - 1; x++) {
+            const int surrounding = prev[x - 1] + prev[x] + prev[x + 1] +
+                                    curr[x - 1] + curr[x + 1] +
+                                    next[x - 1] + next[x] + next[x + 1];
+            const int edge = multiplier * (8 * curr[x] - surrounding);
+            out[x] = colorMap[std::max(0, std::min(edge, 255))];
+        }
+        out[width - 1] = colorMap[0];
     }
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_ColorMapEffect_00024Companion_processImageNative(
+// Full effect into `pixels` (rows `pixelStride` uint32s apart), writing color map entries as
+// given. Row chunks are spread over `numThreads` threads.
+void processImage(const uint8_t* yData, int width, int height, bool edgeMode, int multiplier,
+                  const uint32_t* colorMap, uint32_t* pixels, int pixelStride, int numThreads) {
+    vc::parallelRows(numThreads, height, [&](int start, int end) {
+        if (edgeMode) {
+            processRowsEdge(yData, width, height, multiplier, colorMap, pixels, pixelStride,
+                            start, end);
+        } else {
+            processRowsSolid(yData, width, colorMap, pixels, pixelStride, start, end);
+        }
+    });
+}
+
+}  // namespace colormap
+
+#ifndef VC_NO_JNI
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_dozingcatsoftware_vectorcamera_effect_ColorMapEffect_00024Companion_processImageNativeToBitmap(
     JNIEnv* env,
     jobject thiz,
     jbyteArray yData,
@@ -96,52 +86,35 @@ Java_com_dozingcatsoftware_vectorcamera_effect_ColorMapEffect_00024Companion_pro
     jboolean edgeMode,
     jint multiplier,
     jintArray colorMap,
-    jintArray outputPixels,
+    jobject bitmap,
     jint numThreads
 ) {
-    // Get native arrays
+    if (env->GetArrayLength(colorMap) < 256) {
+        LOGE("Color map has fewer than 256 entries");
+        return JNI_FALSE;
+    }
+    vc::LockedBitmap locked(env, bitmap, width, height);
+    if (!locked.ok()) {
+        return JNI_FALSE;
+    }
     jbyte* yDataPtr = env->GetByteArrayElements(yData, nullptr);
-    jint* colorMapData = env->GetIntArrayElements(colorMap, nullptr);
-    jint* outputPixelsData = env->GetIntArrayElements(outputPixels, nullptr);
-    
-    if (!yDataPtr || !colorMapData || !outputPixelsData) {
+    jint* colorMapPtr = env->GetIntArrayElements(colorMap, nullptr);
+    if (!yDataPtr || !colorMapPtr) {
         LOGE("Failed to get native arrays");
-        return;
+        if (yDataPtr) env->ReleaseByteArrayElements(yData, yDataPtr, JNI_ABORT);
+        if (colorMapPtr) env->ReleaseIntArrayElements(colorMap, colorMapPtr, JNI_ABORT);
+        return JNI_FALSE;
     }
-    
-    // For YUV bytes, row stride equals width (no padding)
-    int yRowStride = width;
-
-    const uint8_t* yPtr = reinterpret_cast<const uint8_t*>(yDataPtr);
-    auto processBand = [=](int startRow, int endRow) {
-        if (edgeMode) {
-            processRows(yPtr, yRowStride, width, height, multiplier, colorMapData,
-                        outputPixelsData, startRow, endRow);
-        } else {
-            processRowsSolid(yPtr, width, colorMapData, outputPixelsData, startRow, endRow);
-        }
-    };
-
-    if (numThreads == 1) {
-        processBand(0, height);
-    } else {
-        std::vector<std::thread> threads;
-        int rowsPerThread = height / numThreads;
-
-        for (int i = 0; i < numThreads; i++) {
-            int startRow = i * rowsPerThread;
-            int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-            threads.emplace_back(processBand, startRow, endRow);
-        }
-
-        // Wait for all threads to complete
-        for (auto& thread : threads) {
-            thread.join();
-        }
+    // The map holds ARGB color ints; convert once so the per-pixel lookup writes bitmap pixels.
+    uint32_t bitmapColorMap[256];
+    for (int i = 0; i < 256; i++) {
+        bitmapColorMap[i] = vc::argbToRgba(static_cast<uint32_t>(colorMapPtr[i]));
     }
-
-    // Release native arrays
+    colormap::processImage(reinterpret_cast<const uint8_t*>(yDataPtr), width, height,
+                           edgeMode == JNI_TRUE, multiplier, bitmapColorMap, locked.pixels(),
+                           locked.stride(), std::max(1, static_cast<int>(numThreads)));
     env->ReleaseByteArrayElements(yData, yDataPtr, JNI_ABORT);
-    env->ReleaseIntArrayElements(colorMap, colorMapData, JNI_ABORT);
-    env->ReleaseIntArrayElements(outputPixels, outputPixelsData, 0);
-} 
+    env->ReleaseIntArrayElements(colorMap, colorMapPtr, JNI_ABORT);
+    return JNI_TRUE;
+}
+#endif
