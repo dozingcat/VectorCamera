@@ -18,6 +18,7 @@ add_library(vectorcamera_native SHARED
     oil_painting_effect_native.cpp
     stained_glass_effect_native.cpp
     contour_effect_native.cpp
+    stipple_effect_native.cpp
     worker_pool_jni.cpp)
 
 # Set C++17 standard

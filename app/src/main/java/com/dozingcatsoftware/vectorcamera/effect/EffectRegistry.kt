@@ -54,7 +54,6 @@ class EffectRegistry {
     companion object {
         const val TAG = "EffectRegistry"
     }
-
     // The effects available in the picker, in display order.
     // See Animated2dGradient.kt for description of gradient grids.
     val effectInfos = listOf<EffectInfo>(
@@ -435,6 +434,11 @@ class EffectRegistry {
                 ))
             },
 
+            // Stippling: black, white, and colored dots.
+            EffectInfo("stippling", "Stippling", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.blackOnWhite() },
+            EffectInfo("stippling_inverse", "Stippling (inverse)", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.whiteOnBlack() },
+            EffectInfo("stippling_color", "Stippling (color)", EffectCategory.ARTISTIC) {prefsFn, context -> StippleEffect.color() },
+
             // Custom edge.
             EffectInfo("custom1", "Custom colors 1", EffectCategory.CUSTOM) {prefsFn, context ->
                 createCustomColorMapEffect(prefsFn, context, "custom1",
@@ -497,6 +501,7 @@ class EffectRegistry {
             OilPaintingEffect.EFFECT_NAME -> OilPaintingEffect.fromParameters(params)
             StainedGlassEffect.EFFECT_NAME -> StainedGlassEffect.fromParameters(params)
             ContourEffect.EFFECT_NAME -> ContourEffect.fromParameters(params)
+            StippleEffect.EFFECT_NAME -> StippleEffect.fromParameters(params)
             // Names used before the edge and solid color effects were merged.
             "edge" -> ColorMapEffect.edge(params)
             "solid_color" -> ColorMapEffect.solid(params)
