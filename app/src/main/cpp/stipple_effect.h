@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "pixel_format.h"
+#include "worker_pool.h"
 #include "yuv.h"
 
 /**
@@ -24,6 +26,10 @@
  * with rank <= t has density approximately t times the maximum density, and is itself
  * approximately Poisson disk distributed. Rendering a frame is then just: for each point, look
  * up the local darkness d of the image and draw the dot if rank <= d.
+ *
+ * Rendering writes bitmap pixels (see pixel_format.h) and runs on the shared worker pool: the
+ * tone map and the per-point decisions are split across threads, and the dots are drawn in
+ * horizontal bands so that every output pixel is written by one thread, in point order.
  */
 namespace Stipple {
 
@@ -229,7 +235,7 @@ struct ToneMap {
     std::vector<float> vAvg;
 
     void build(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData,
-               int width, int height, int cell, bool includeChroma) {
+               int width, int height, int cell, bool includeChroma, int numThreads = 1) {
         cellSize = std::max(1, cell);
         mapWidth = (width + cellSize - 1) / cellSize;
         mapHeight = (height + cellSize - 1) / cellSize;
@@ -238,9 +244,23 @@ struct ToneMap {
         if (includeChroma) {
             uAvg.assign(n, 128.0f);
             vAvg.assign(n, 128.0f);
+        } else {
+            uAvg.clear();
+            vAvg.clear();
         }
+        vc::parallelRows(numThreads, mapHeight, kMapRowsPerChunk, [&](int start, int end) {
+            buildRows(yData, uData, vData, width, height, includeChroma, start, end);
+        });
+    }
+
+    // Map rows per work chunk; each covers cellSize image rows.
+    static constexpr int kMapRowsPerChunk = 8;
+
+    // Fills map rows [startRow, endRow).
+    void buildRows(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData,
+                   int width, int height, bool includeChroma, int startRow, int endRow) {
         const int uvWidth = (width + 1) / 2;
-        for (int my = 0; my < mapHeight; my++) {
+        for (int my = startRow; my < endRow; my++) {
             const int y0 = my * cellSize;
             const int y1 = std::min(height, y0 + cellSize);
             for (int mx = 0; mx < mapWidth; mx++) {
@@ -296,58 +316,63 @@ struct ToneMap {
     }
 };
 
-inline void blendDot(uint32_t* out, int width, int height, int cx, int cy,
-                     const DotMask& mask, uint32_t color) {
+// Blends a dot into bitmap pixels, clipped to columns [0, width) and rows [rowStart, rowEnd).
+// `color` is ARGB; its alpha is ignored (dots are opaque). Output rows are `pixelStride` apart.
+inline void blendDot(uint32_t* out, int pixelStride, int width, int rowStart, int rowEnd,
+                     int cx, int cy, const DotMask& mask, uint32_t color) {
     const int e = mask.extent;
     const int size = 2 * e + 1;
-    const int y0 = std::max(0, cy - e), y1 = std::min(height - 1, cy + e);
+    const int y0 = std::max(rowStart, cy - e), y1 = std::min(rowEnd - 1, cy + e);
     const int x0 = std::max(0, cx - e), x1 = std::min(width - 1, cx + e);
     const uint32_t cr = (color >> 16) & 0xFF;
     const uint32_t cg = (color >> 8) & 0xFF;
     const uint32_t cb = color & 0xFF;
+    const uint32_t opaque = vc::packRgba(cr, cg, cb);
     for (int y = y0; y <= y1; y++) {
         const uint8_t* maskRow = &mask.alpha[static_cast<size_t>(y - cy + e) * size];
-        uint32_t* outRow = out + static_cast<size_t>(y) * width;
+        uint32_t* outRow = out + static_cast<size_t>(y) * pixelStride;
         for (int x = x0; x <= x1; x++) {
             const uint32_t a = maskRow[x - cx + e];
             if (a == 0) {
                 continue;
             }
             if (a == 255) {
-                outRow[x] = 0xFF000000u | (cr << 16) | (cg << 8) | cb;
+                outRow[x] = opaque;
                 continue;
             }
             const uint32_t dst = outRow[x];
             const uint32_t ia = 255 - a;
-            const uint32_t r = (((dst >> 16) & 0xFF) * ia + cr * a + 127) / 255;
+            const uint32_t r = ((dst & 0xFF) * ia + cr * a + 127) / 255;
             const uint32_t g = (((dst >> 8) & 0xFF) * ia + cg * a + 127) / 255;
-            const uint32_t b = ((dst & 0xFF) * ia + cb * a + 127) / 255;
-            outRow[x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+            const uint32_t b = (((dst >> 16) & 0xFF) * ia + cb * a + 127) / 255;
+            outRow[x] = vc::packRgba(r, g, b);
         }
     }
 }
 
-/**
- * Renders the stipple image into `out` (width*height ARGB pixels).
- */
-inline void renderStipple(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData,
-                          int width, int height,
-                          const Point* points, int numPoints,
-                          const RenderParams& params, uint32_t* out) {
-    const size_t numPixels = static_cast<size_t>(width) * height;
-    std::fill(out, out + numPixels, params.backgroundColor | 0xFF000000u);
+// A point that is drawn this frame: its center pixel, dot mask, and ARGB color.
+struct Dot {
+    int32_t x;
+    int32_t y;
+    int32_t maskIndex;  // -1 if the point isn't drawn.
+    uint32_t color;
+};
 
-    ToneMap tone;
-    tone.build(yData, uData, vData, width, height, params.toneCellSize, params.colorFromImage);
+// Dot masks are cached per quantized radius, in steps of kRadiusStep pixels.
+constexpr float kRadiusStep = 0.25f;
+constexpr float kMinDotRadius = 0.5f;
 
-    // Dot masks are cached per quantized radius (quarter-pixel steps).
-    std::vector<DotMask> masks;
-    const float radiusStep = 0.25f;
-    const float minRadius = 0.5f;
+inline int radiusIndexFor(float radius) {
+    return static_cast<int>(std::max(kMinDotRadius, radius) / kRadiusStep + 0.5f);
+}
+
+// Decides which of points [start, end) are drawn, and with what size and color.
+inline void placeDots(const Point* points, const ToneMap& tone, const RenderParams& params,
+                      Dot* dots, int start, int end) {
     const bool applyGamma = std::fabs(params.gamma - 1.0f) > 1e-4f;
-
-    for (int i = 0; i < numPoints; i++) {
+    for (int i = start; i < end; i++) {
         const Point& p = points[i];
+        Dot& dot = dots[i];
         const float yValue = tone.sample(tone.yAvg, p.x, p.y);
         float darkness = params.invertTone ? yValue / 255.0f : 1.0f - yValue / 255.0f;
         darkness = std::clamp(darkness, 0.0f, 1.0f);
@@ -355,32 +380,114 @@ inline void renderStipple(const uint8_t* yData, const uint8_t* uData, const uint
             darkness = std::pow(darkness, params.gamma);
         }
         if (p.rank > darkness) {
+            dot.maskIndex = -1;
             continue;
         }
-        const float radius = std::max(minRadius,
-                params.dotRadius * (1.0f + params.dotSizeVariation * (darkness - 0.5f)));
-        const int radiusIndex = static_cast<int>(radius / radiusStep + 0.5f);
-        if (radiusIndex >= static_cast<int>(masks.size())) {
-            masks.resize(radiusIndex + 1);
-        }
-        DotMask& mask = masks[radiusIndex];
-        if (mask.alpha.empty()) {
-            mask.build(radiusIndex * radiusStep);
-        }
-
-        uint32_t color = params.dotColor;
+        const float radius =
+                params.dotRadius * (1.0f + params.dotSizeVariation * (darkness - 0.5f));
+        dot.x = static_cast<int32_t>(p.x + 0.5f);
+        dot.y = static_cast<int32_t>(p.y + 0.5f);
+        dot.maskIndex = radiusIndexFor(radius);
+        dot.color = params.dotColor;
         if (params.colorFromImage) {
             const float u = tone.sample(tone.uAvg, p.x, p.y);
             const float v = tone.sample(tone.vAvg, p.x, p.y);
             const int dy = static_cast<int>(yValue * params.dotLuminanceScale + 0.5f);
             const int du = static_cast<int>(128.0f + (u - 128.0f) * params.chromaBoost + 0.5f);
             const int dv = static_cast<int>(128.0f + (v - 128.0f) * params.chromaBoost + 0.5f);
-            color = YuvUtils::yuvToRgb(std::clamp(dy, 0, 255), std::clamp(du, 0, 255),
-                                       std::clamp(dv, 0, 255), true);
+            dot.color = YuvUtils::yuvToRgb(std::clamp(dy, 0, 255), std::clamp(du, 0, 255),
+                                           std::clamp(dv, 0, 255), true);
         }
-        blendDot(out, width, height, static_cast<int>(p.x + 0.5f), static_cast<int>(p.y + 0.5f),
-                 mask, color);
     }
+}
+
+// Per-frame scratch, kept between frames so the buffers aren't reallocated.
+struct RenderScratch {
+    ToneMap tone;
+    std::vector<DotMask> masks;
+    std::vector<Dot> dots;
+    // For each band of output rows, the indices of the dots that touch it, in point order.
+    std::vector<std::vector<int32_t>> bandDots;
+};
+
+/**
+ * Renders the stipple image into `out` as width x height bitmap pixels (see pixel_format.h),
+ * with rows `pixelStride` uint32s apart, using `numThreads` threads. The result doesn't depend
+ * on the thread count.
+ */
+inline void renderStipple(const uint8_t* yData, const uint8_t* uData, const uint8_t* vData,
+                          int width, int height,
+                          const Point* points, int numPoints,
+                          const RenderParams& params, uint32_t* out, int pixelStride,
+                          int numThreads) {
+    static thread_local RenderScratch scratchStorage;
+    RenderScratch& scratch = scratchStorage;
+    const uint32_t bg = params.backgroundColor;
+    const uint32_t backgroundPixel = vc::packRgba((bg >> 16) & 0xFF, (bg >> 8) & 0xFF, bg & 0xFF);
+
+    scratch.tone.build(yData, uData, vData, width, height, params.toneCellSize,
+                       params.colorFromImage, numThreads);
+
+    // The radius is largest at darkness 0 or 1, depending on the sign of the variation.
+    const float maxRadius = params.dotRadius * (1.0f + 0.5f * std::fabs(params.dotSizeVariation));
+    const int maxRadiusIndex = radiusIndexFor(maxRadius);
+    if (static_cast<int>(scratch.masks.size()) <= maxRadiusIndex) {
+        scratch.masks.resize(maxRadiusIndex + 1);
+    }
+    for (int i = 0; i <= maxRadiusIndex; i++) {
+        if (scratch.masks[i].alpha.empty()) {
+            scratch.masks[i].build(i * kRadiusStep);
+        }
+    }
+    const int maxExtent = scratch.masks[maxRadiusIndex].extent;
+
+    scratch.dots.resize(numPoints);
+    Dot* dots = scratch.dots.data();
+    const ToneMap& tone = scratch.tone;
+    constexpr int kPointsPerChunk = 4096;
+    vc::parallelRows(numThreads, numPoints, kPointsPerChunk, [&](int start, int end) {
+        placeDots(points, tone, params, dots, start, end);
+    });
+
+    // Bucket the dots by the bands of rows they touch. Bands are tall compared to a dot, so
+    // most dots land in one band, and a band's dots are drawn in point order, which keeps the
+    // blending of overlapping dots identical to drawing them all in sequence.
+    const int bandRows = std::max(vc::kDefaultChunkRows, 4 * maxExtent);
+    const int numBands = (height + bandRows - 1) / bandRows;
+    scratch.bandDots.resize(numBands);
+    for (auto& band : scratch.bandDots) {
+        band.clear();
+    }
+    for (int i = 0; i < numPoints; i++) {
+        const Dot& dot = dots[i];
+        if (dot.maskIndex < 0) {
+            continue;
+        }
+        const int e = scratch.masks[dot.maskIndex].extent;
+        const int firstBand = std::max(0, dot.y - e) / bandRows;
+        const int lastBand = std::min(height - 1, dot.y + e) / bandRows;
+        for (int band = firstBand; band <= lastBand; band++) {
+            scratch.bandDots[band].push_back(i);
+        }
+    }
+
+    const std::vector<DotMask>& masks = scratch.masks;
+    const std::vector<std::vector<int32_t>>& bandDots = scratch.bandDots;
+    vc::parallelRows(numThreads, numBands, 1, [&](int start, int end) {
+        for (int band = start; band < end; band++) {
+            const int rowStart = band * bandRows;
+            const int rowEnd = std::min(height, rowStart + bandRows);
+            for (int y = rowStart; y < rowEnd; y++) {
+                uint32_t* row = out + static_cast<size_t>(y) * pixelStride;
+                std::fill(row, row + width, backgroundPixel);
+            }
+            for (const int32_t i : bandDots[band]) {
+                const Dot& dot = dots[i];
+                blendDot(out, pixelStride, width, rowStart, rowEnd, dot.x, dot.y,
+                         masks[dot.maskIndex], dot.color);
+            }
+        }
+    });
 }
 
 }  // namespace Stipple

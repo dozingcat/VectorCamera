@@ -72,35 +72,51 @@ class StippleEffect private constructor(
         val toneCellSize = max(1, minSpacing.roundToInt())
 
         val points = pointsForSize(width, height, minSpacing, numLayers, seed)
-        val pixels = IntArray(width * height)
-
-        var architecture = CodeArchitecture.Kotlin
-        if (nativeLibraryLoaded) {
-            val ok = renderStippleNative(
-                cameraImage.getYBytes(), cameraImage.getUBytes(), cameraImage.getVBytes(),
-                width, height, points, dotRadius, dotSizeVariation.toFloat(), gamma.toFloat(),
-                toneCellSize, backgroundColor, dotColor, colorFromImage,
-                dotLuminanceScale.toFloat(), chromaBoost.toFloat(), invertTone, pixels)
-            if (ok) {
-                architecture = CodeArchitecture.Native
-            } else {
-                Log.w(EFFECT_NAME, "Native rendering failed, using Kotlin")
-            }
-        }
-        if (architecture == CodeArchitecture.Kotlin) {
-            renderStippleKotlin(
-                cameraImage.getYBytes(), cameraImage.getUBytes(), cameraImage.getVBytes(),
-                width, height, points, dotRadius, toneCellSize, pixels)
-        }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        val (bitmap, numThreads, architecture) = renderBitmap(
+            cameraImage, width, height, points, dotRadius, toneCellSize)
 
         val metadata = ProcessedBitmapMetadata(
             codeArchitecture = architecture,
-            numThreads = 1,
+            numThreads = numThreads,
             generationDurationNanos = System.nanoTime() - startTime)
         return ProcessedBitmap(this, cameraImage, bitmap, metadata)
+    }
+
+    private fun calculateOptimalNativeThreads(height: Int): Int {
+        val numCores = Runtime.getRuntime().availableProcessors()
+        val minRowsPerThread = 32
+        val maxThreads = minOf(numCores, height / minRowsPerThread, Effect.MAX_NATIVE_THREADS)
+        return maxOf(1, maxThreads)
+    }
+
+    /** Returns the bitmap, the number of threads used, and the implementation used. */
+    private fun renderBitmap(
+        cameraImage: CameraImage, width: Int, height: Int, points: FloatArray,
+        dotRadius: Float, toneCellSize: Int,
+    ): Triple<Bitmap, Int, CodeArchitecture> {
+        val yData = cameraImage.getYBytes()
+        val uData = cameraImage.getUBytes()
+        val vData = cameraImage.getVBytes()
+        // The native code renders straight into the bitmap, skipping the pixel array and the
+        // setPixels copy.
+        if (nativeLibraryLoaded) {
+            val numThreads = calculateOptimalNativeThreads(height)
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val ok = renderStippleNativeToBitmap(
+                yData, uData, vData, width, height, points, dotRadius,
+                dotSizeVariation.toFloat(), gamma.toFloat(), toneCellSize, backgroundColor,
+                dotColor, colorFromImage, dotLuminanceScale.toFloat(), chromaBoost.toFloat(),
+                invertTone, bitmap, numThreads)
+            if (ok) {
+                return Triple(bitmap, numThreads, CodeArchitecture.Native)
+            }
+            Log.w(EFFECT_NAME, "Native rendering failed, using Kotlin")
+        }
+        val pixels = IntArray(width * height)
+        renderStippleKotlin(yData, uData, vData, width, height, points, dotRadius, toneCellSize, pixels)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return Triple(bitmap, 1, CodeArchitecture.Kotlin)
     }
 
     /**
@@ -267,12 +283,14 @@ class StippleEffect private constructor(
         private external fun generatePoissonPointsNative(
             width: Int, height: Int, minSpacing: Float, numLayers: Int, seed: Int): FloatArray?
 
-        private external fun renderStippleNative(
+        /** Renders into `bitmap` (ARGB_8888, width x height). Returns false, leaving the
+         *  bitmap untouched, if it can't render directly into it. */
+        private external fun renderStippleNativeToBitmap(
             yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int,
             points: FloatArray, dotRadius: Float, dotSizeVariation: Float, gamma: Float,
             toneCellSize: Int, backgroundColor: Int, dotColor: Int, colorFromImage: Boolean,
             dotLuminanceScale: Float, chromaBoost: Float, invertTone: Boolean,
-            outputPixels: IntArray): Boolean
+            bitmap: Bitmap, numThreads: Int): Boolean
 
         private data class PointSetKey(
             val width: Int, val height: Int, val minSpacing: Float, val numLayers: Int, val seed: Int)

@@ -1,10 +1,16 @@
-#include <jni.h>
-#include <android/log.h>
+// JNI entry points for StippleEffect. The kernels are in stipple_effect.h so they can be
+// compiled and tested on the host (app/src/test/cpp/stipple_test.cpp); compiling with
+// -DVC_NO_JNI leaves out the JNI code.
+
 #include <cstdint>
 #include <vector>
 
 #include "stipple_effect.h"
 
+#ifndef VC_NO_JNI
+#include <jni.h>
+#include <android/log.h>
+#include "bitmap_output.h"
 #define LOG_TAG "StippleNative"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
@@ -41,11 +47,12 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StippleEffect_00024Companion_gene
 }
 
 /**
- * Renders the stipple image into outputPixels (ARGB). `points` is the array returned by
- * generatePoissonPointsNative.
+ * Renders the stipple image into `bitmap` (RGBA_8888, width x height). `points` is the array
+ * returned by generatePoissonPointsNative. Returns false without touching the bitmap if it
+ * can't be used directly, in which case Kotlin falls back to its own rendering.
  */
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_dozingcatsoftware_vectorcamera_effect_StippleEffect_00024Companion_renderStippleNative(
+Java_com_dozingcatsoftware_vectorcamera_effect_StippleEffect_00024Companion_renderStippleNativeToBitmap(
     JNIEnv* env,
     jobject thiz,
     jbyteArray yData,
@@ -64,19 +71,19 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StippleEffect_00024Companion_rend
     jfloat dotLuminanceScale,
     jfloat chromaBoost,
     jboolean invertTone,
-    jintArray outputPixels
+    jobject bitmap,
+    jint numThreads
 ) {
-    if (env->GetArrayLength(outputPixels) < width * height) {
-        LOGE("Output array too small");
+    vc::LockedBitmap locked(env, bitmap, width, height);
+    if (!locked.ok()) {
         return JNI_FALSE;
     }
     jbyte* yPtr = env->GetByteArrayElements(yData, nullptr);
     jbyte* uPtr = env->GetByteArrayElements(uData, nullptr);
     jbyte* vPtr = env->GetByteArrayElements(vData, nullptr);
     jfloat* pointsPtr = env->GetFloatArrayElements(points, nullptr);
-    jint* outPtr = env->GetIntArrayElements(outputPixels, nullptr);
 
-    bool ok = yPtr && uPtr && vPtr && pointsPtr && outPtr;
+    bool ok = yPtr && uPtr && vPtr && pointsPtr;
     if (ok) {
         Stipple::RenderParams params;
         params.dotRadius = dotRadius;
@@ -97,7 +104,8 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StippleEffect_00024Companion_rend
                 reinterpret_cast<const uint8_t*>(vPtr),
                 width, height,
                 reinterpret_cast<const Stipple::Point*>(pointsPtr), numPoints,
-                params, reinterpret_cast<uint32_t*>(outPtr));
+                params, locked.pixels(), locked.stride(),
+                std::max(1, static_cast<int>(numThreads)));
         } catch (const std::exception& e) {
             LOGE("Exception rendering stipple: %s", e.what());
             ok = false;
@@ -110,6 +118,6 @@ Java_com_dozingcatsoftware_vectorcamera_effect_StippleEffect_00024Companion_rend
     if (uPtr) env->ReleaseByteArrayElements(uData, uPtr, JNI_ABORT);
     if (vPtr) env->ReleaseByteArrayElements(vData, vPtr, JNI_ABORT);
     if (pointsPtr) env->ReleaseFloatArrayElements(points, pointsPtr, JNI_ABORT);
-    if (outPtr) env->ReleaseIntArrayElements(outputPixels, outPtr, ok ? 0 : JNI_ABORT);
     return ok ? JNI_TRUE : JNI_FALSE;
 }
+#endif  // VC_NO_JNI
