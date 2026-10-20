@@ -25,6 +25,20 @@ data class CustomPermuteScheme(
     fun toEffectParameters(): Map<String, Any> = toMap()
 
     companion object {
+        /** The scheme that toEffectParameters produced, or null if the parameters don't fit. */
+        fun fromEffectParameters(params: Map<String, Any>): CustomPermuteScheme? {
+            fun source(key: String): ColorComponentSource? {
+                val name = params[key] as? String ?: return null
+                return try {ColorComponentSource.valueOf(name)}
+                       catch (ex: IllegalArgumentException) {null}
+            }
+            return CustomPermuteScheme(
+                    source("red") ?: return null,
+                    source("green") ?: return null,
+                    source("blue") ?: return null,
+                    params["flipUV"] as? Boolean ?: false)
+        }
+
         fun fromMap(map: Map<String, Any>, defaultValues: CustomPermuteScheme): CustomPermuteScheme {
             fun source(key: String, default: ColorComponentSource): ColorComponentSource {
                 val name = map[key] as? String ?: return default

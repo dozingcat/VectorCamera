@@ -31,6 +31,15 @@ data class CustomPaletteScheme(val mode: ColorMapMode, val colors: List<Int>) {
         const val MIN_COLORS = 2
         const val MAX_COLORS = 8
 
+        /** The scheme that toEffectParameters produced, or null if the parameters don't fit. */
+        fun fromEffectParameters(params: Map<String, Any>): CustomPaletteScheme? {
+            val colors = params["colors"] as? Map<*, *> ?: return null
+            if (colors["type"] != "palette") return null
+            val stops = (colors["stops"] as? List<*>)?.map {colorFromRgbList(it) ?: return null} ?: return null
+            if (stops.size < MIN_COLORS || stops.size > MAX_COLORS) return null
+            return CustomPaletteScheme(ColorMapMode.fromParamValue(params["mode"]), stops)
+        }
+
         fun fromMap(map: Map<String, Any>, defaultValues: CustomPaletteScheme): CustomPaletteScheme {
             val modeName = map.getOrElse("type", {defaultValues.mode.name}) as String
             val mode = try {ColorMapMode.valueOf(modeName)}

@@ -26,6 +26,17 @@
             android:padding="10dp"
             android:src="@drawable/ic_share_white_36dp" />
 
+        <!-- Opens the editor panel when the image uses a custom effect. -->
+        <ImageButton
+            android:id="@+id/editEffectButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#00000000"
+            android:padding="10dp"
+            android:visibility="gone"
+            android:contentDescription="Edit effect"
+            android:src="@drawable/ic_tune_white_36dp" />
+
         <ImageButton
             android:id="@+id/switchEffectButton"
             android:layout_width="wrap_content"
@@ -49,6 +60,35 @@
             android:src="@drawable/ic_delete_white_36dp" />
 
     </LinearLayout>
+
+    <!-- Custom effect editors, kept above the control bar. -->
+    <com.dozingcatsoftware.vectorcamera.EditColorSchemeView
+        android:id="@+id/editSchemeView"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="62dp" />
+
+    <com.dozingcatsoftware.vectorcamera.EditPermuteSchemeView
+        android:id="@+id/editPermuteView"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="62dp" />
+
+    <com.dozingcatsoftware.vectorcamera.EditPaletteSchemeView
+        android:id="@+id/editPaletteView"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="62dp" />
+
+    <com.dozingcatsoftware.vectorcamera.EditContourSchemeView
+        android:id="@+id/editContourView"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="62dp" />
 
     <com.dozingcatsoftware.vectorcamera.EffectPickerView
         android:id="@+id/effectPickerView"

@@ -27,6 +27,15 @@ data class CustomContourScheme(val fillColors: List<Int>, val lineColor: Int) {
         const val MIN_COLORS = 2
         const val MAX_COLORS = 8
 
+        /** The scheme that toEffectParameters produced, or null if the parameters don't fit. */
+        fun fromEffectParameters(params: Map<String, Any>): CustomContourScheme? {
+            val colors = params["colors"] as? Map<*, *> ?: return null
+            val fill = (colors["fill"] as? List<*>)?.map {colorFromRgbList(it) ?: return null} ?: return null
+            if (fill.size < MIN_COLORS || fill.size > MAX_COLORS) return null
+            val line = colorFromRgbList(colors["line"]) ?: return null
+            return CustomContourScheme(fill, line)
+        }
+
         fun fromMap(map: Map<String, Any>, defaultValues: CustomContourScheme): CustomContourScheme {
             val colors = (map["fillColors"] as? List<*>)
                     ?.mapNotNull {(it as? Number)?.toInt()}
