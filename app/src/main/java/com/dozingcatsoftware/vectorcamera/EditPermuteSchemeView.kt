@@ -1,6 +1,7 @@
 package com.dozingcatsoftware.vectorcamera
 
 import android.content.Context
+import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
@@ -71,6 +72,7 @@ class EditPermuteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
         val adapter = ArrayAdapter(context, R.layout.permute_spinner_item, SOURCE_LABELS)
         adapter.setDropDownViewResource(R.layout.permute_spinner_dropdown_item)
         spinner.adapter = adapter
+        spinner.layoutParams.width = widestItemWidth(spinner, adapter)
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (updatingControls) {
@@ -83,6 +85,21 @@ class EditPermuteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
+    }
+
+    // The width of the spinner's widest item plus its background (the dropdown arrow), so the
+    // closed spinner and its dropdown keep one size whatever is selected.
+    private fun widestItemWidth(spinner: Spinner, adapter: ArrayAdapter<String>): Int {
+        val unspecified = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        var width = 0
+        for (i in 0 until adapter.count) {
+            val item = adapter.getView(i, null, spinner)
+            item.measure(unspecified, unspecified)
+            width = maxOf(width, item.measuredWidth)
+        }
+        val padding = Rect()
+        spinner.background?.getPadding(padding)
+        return width + padding.left + padding.right
     }
 
     private fun updateScheme(s: CustomPermuteScheme) {
