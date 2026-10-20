@@ -18,14 +18,6 @@
         android:background="#20000000"
         android:padding="3dp">
 
-        <ImageButton
-            android:id="@+id/shareButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="#00000000"
-            android:padding="10dp"
-            android:src="@drawable/ic_share_white_36dp" />
-
         <!-- Opens the editor panel when the image uses a custom effect. -->
         <ImageButton
             android:id="@+id/editEffectButton"
@@ -44,6 +36,14 @@
             android:background="#00000000"
             android:padding="10dp"
             android:src="@drawable/ic_color_lens_white_36dp" />
+
+        <ImageButton
+            android:id="@+id/shareButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#00000000"
+            android:padding="10dp"
+            android:src="@drawable/ic_share_white_36dp" />
 
         <!-- Spacer to put delete icon at right. -->
         <View
