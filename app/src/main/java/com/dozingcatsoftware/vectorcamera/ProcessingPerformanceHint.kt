@@ -56,11 +56,15 @@ class ProcessingPerformanceHint(context: Context) {
         sessionThreadIds = IntArray(0)
     }
 
-    // Native workers are created lazily, so the thread set can grow; rebuild the session when it does.
+    // Native workers are created lazily, so the thread set can grow; rebuild the session when it
+    // does. A session is attempted once per thread set: the API exists on every Android 12+
+    // device, but createHintSession returns null when the power HAL doesn't implement hint
+    // sessions (e.g. Pixel 3a), and retrying every frame would only repeat the warning.
     private fun updateThreads() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager == null) return
         val threadIds = intArrayOf(Process.myTid()) + Effect.workerThreadIds()
-        if (session != null && threadIds.contentEquals(sessionThreadIds)) return
+        if (threadIds.contentEquals(sessionThreadIds)) return
+        sessionThreadIds = threadIds
         try {
             val existing = session
             if (existing != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -70,12 +74,11 @@ class ProcessingPerformanceHint(context: Context) {
                 existing?.close()
                 session = manager.createHintSession(threadIds, TARGET_FRAME_NANOS)
                 if (session == null) {
-                    Log.w(TAG, "Performance hint session unavailable")
+                    Log.w(TAG, "Performance hint session unavailable; the power HAL doesn't support it")
                 } else {
                     Log.i(TAG, "Created hint session for threads ${threadIds.toList()}")
                 }
             }
-            sessionThreadIds = threadIds
         } catch (ex: Exception) {
             Log.w(TAG, "Failed to update performance hint session: ${ex.message}")
         }

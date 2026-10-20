@@ -20,6 +20,8 @@ class EditPaletteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
 
     lateinit var activity: FragmentActivity
     var changeCallback: ((CustomPaletteScheme) -> Unit)? = null
+    // Called after the Done button hides the view.
+    var doneCallback: (() -> Unit)? = null
 
     private var scheme = CustomPaletteScheme(ColorMapMode.SOLID, listOf(Color.BLACK, Color.WHITE))
     private val swatchRow: ColorSwatchRow
@@ -55,6 +57,7 @@ class EditPaletteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
         }
         contentView.findViewById<Button>(R.id.doneButton).setOnClickListener {
             visibility = View.GONE
+            doneCallback?.invoke()
         }
         updateControls()
     }

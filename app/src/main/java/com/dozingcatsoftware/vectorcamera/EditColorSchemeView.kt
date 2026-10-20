@@ -7,90 +7,83 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
-import android.widget.LinearLayout
+import android.widget.FrameLayout
 import androidx.fragment.app.FragmentActivity
-import com.jaredrummler.android.colorpicker.ColorPickerDialog
-import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 import com.dozingcatsoftware.vectorcamera.effect.ColorMapMode
 
-class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(context, attrs) {
+/**
+ * Panel for editing a CustomColorScheme: swatches for the four gradient corner colors in the
+ * panel's corners, and the background color swatch, the edge/solid checkbox, and the Done
+ * button in the middle. Swatches open the color picker. Calls `changeCallback` on every change.
+ */
+class EditColorSchemeView(context: Context, attrs: AttributeSet) : FrameLayout(context, attrs) {
 
     lateinit var activity: FragmentActivity
+    var changeCallback: ((CustomColorScheme) -> Unit)? = null
+    // Called after the Done button hides the view.
+    var doneCallback: (() -> Unit)? = null
+
     private var scheme = CustomColorScheme(ColorMapMode.EDGE, Color.BLACK,
             Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE)
-    var changeCallback: ((CustomColorScheme) -> Unit)? = null
-    private lateinit var contentView: View
+    private val solidCheckbox: CheckBox
+    // Each swatch with the scheme color it shows and how to replace that color.
+    private val swatches: List<Triple<View, (CustomColorScheme) -> Int, (CustomColorScheme, Int) -> CustomColorScheme>>
 
     init {
-        initView()
+        val contentView = LayoutInflater.from(context).inflate(
+                R.layout.customize_colors, this, false)
+        addView(contentView)
+        solidCheckbox = contentView.findViewById(R.id.solidCheckbox)
+        swatches = listOf(
+                Triple(contentView.findViewById(R.id.topLeftColor),
+                        {cs: CustomColorScheme -> cs.topLeftColor},
+                        {cs: CustomColorScheme, c: Int -> cs.copy(topLeftColor = c)}),
+                Triple(contentView.findViewById(R.id.topRightColor),
+                        {cs: CustomColorScheme -> cs.topRightColor},
+                        {cs: CustomColorScheme, c: Int -> cs.copy(topRightColor = c)}),
+                Triple(contentView.findViewById(R.id.bottomLeftColor),
+                        {cs: CustomColorScheme -> cs.bottomLeftColor},
+                        {cs: CustomColorScheme, c: Int -> cs.copy(bottomLeftColor = c)}),
+                Triple(contentView.findViewById(R.id.bottomRightColor),
+                        {cs: CustomColorScheme -> cs.bottomRightColor},
+                        {cs: CustomColorScheme, c: Int -> cs.copy(bottomRightColor = c)}),
+                Triple(contentView.findViewById(R.id.backgroundColor),
+                        {cs: CustomColorScheme -> cs.backgroundColor},
+                        {cs: CustomColorScheme, c: Int -> cs.copy(backgroundColor = c)}),
+        )
+        for ((swatch, getColor, setColor) in swatches) {
+            swatch.setOnClickListener {
+                ColorSwatchRow.showColorPicker(activity, getColor(scheme)) {color ->
+                    updateScheme(setColor(scheme, color))
+                }
+            }
+        }
+        solidCheckbox.setOnClickListener {
+            val mode = if (solidCheckbox.isChecked) ColorMapMode.SOLID else ColorMapMode.EDGE
+            updateScheme(scheme.copy(mode = mode))
+        }
+        contentView.findViewById<Button>(R.id.doneButton).setOnClickListener {
+            visibility = View.GONE
+            doneCallback?.invoke()
+        }
+        updateControls()
     }
 
     fun setScheme(s: CustomColorScheme) {
         scheme = s
-        findViewById<CheckBox>(R.id.solidCheckbox).isChecked = s.mode == ColorMapMode.SOLID
+        updateControls()
     }
 
-    private fun initView() {
-        val inflater = LayoutInflater.from(context)
-        contentView = inflater.inflate(R.layout.customize_colors, null, false)
-        val params = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        this.addView(contentView, params)
-
-        contentView.findViewById<Button>(R.id.topLeftColor).setOnClickListener {
-            handleColorButton(
-                    {cs: CustomColorScheme -> cs.topLeftColor},
-                    {cs: CustomColorScheme, color: Int -> cs.copy(topLeftColor=color)})
-        }
-        contentView.findViewById<Button>(R.id.topRightColor).setOnClickListener {
-            handleColorButton(
-                    {cs: CustomColorScheme -> cs.topRightColor},
-                    {cs: CustomColorScheme, color: Int -> cs.copy(topRightColor=color)})
-        }
-        contentView.findViewById<Button>(R.id.bottomLeftColor).setOnClickListener {
-            handleColorButton(
-                    {cs: CustomColorScheme -> cs.bottomLeftColor},
-                    {cs: CustomColorScheme, color: Int -> cs.copy(bottomLeftColor=color)})
-        }
-        contentView.findViewById<Button>(R.id.bottomRightColor).setOnClickListener {
-            handleColorButton(
-                    {cs: CustomColorScheme -> cs.bottomRightColor},
-                    {cs: CustomColorScheme, color: Int -> cs.copy(bottomRightColor=color)})
-        }
-        contentView.findViewById<Button>(R.id.backgroundColor).setOnClickListener {
-            handleColorButton(
-                    {cs: CustomColorScheme -> cs.backgroundColor},
-                    {cs: CustomColorScheme, color: Int -> cs.copy(backgroundColor=color)})
-        }
-        contentView.findViewById<CheckBox>(R.id.solidCheckbox).setOnClickListener {
-            handleTypeCheckbox(it as CheckBox)
-        }
-        contentView.findViewById<Button>(R.id.doneButton).setOnClickListener {
-            visibility = View.GONE
-        }
+    private fun updateScheme(s: CustomColorScheme) {
+        scheme = s
+        updateControls()
+        changeCallback?.invoke(s)
     }
 
-    private fun handleColorButton(
-            getColorFn: ((CustomColorScheme) -> Int),
-            setColorFn: ((CustomColorScheme, Int) -> CustomColorScheme)) {
-        // Make sure alpha is set.
-        val currentColor = (0xff000000 or getColorFn(this.scheme).toLong()).toInt()
-        val dlg = ColorPickerDialog.newBuilder()
-                .setColor(currentColor).create()
-
-        dlg.setColorPickerDialogListener(object: ColorPickerDialogListener {
-            override fun onDialogDismissed(dialogId: Int) {}
-
-            override fun onColorSelected(dialogId: Int, color: Int) {
-                scheme = setColorFn(scheme, color)
-                changeCallback?.invoke(scheme)
-            }
-        })
-        dlg.show(activity.supportFragmentManager, "color-picker-dialog")
-    }
-
-    private fun handleTypeCheckbox(cb: CheckBox) {
-        val newMode = if (cb.isChecked) ColorMapMode.SOLID else ColorMapMode.EDGE
-        scheme = scheme.copy(mode=newMode)
-        changeCallback?.invoke(scheme)
+    private fun updateControls() {
+        solidCheckbox.isChecked = scheme.mode == ColorMapMode.SOLID
+        for ((swatch, getColor, _) in swatches) {
+            swatch.background = ColorSwatchRow.swatchDrawable(context, getColor(scheme))
+        }
     }
 }

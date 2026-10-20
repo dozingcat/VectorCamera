@@ -15,8 +15,15 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import com.dozingcatsoftware.vectorcamera.effect.CustomEffect
+import com.dozingcatsoftware.vectorcamera.effect.Effect
+import com.dozingcatsoftware.vectorcamera.effect.EffectContext
 import com.dozingcatsoftware.vectorcamera.effect.EffectInfo
 import com.dozingcatsoftware.vectorcamera.effect.EffectRegistry
+import com.dozingcatsoftware.vectorcamera.effect.customColorMapEffect
+import com.dozingcatsoftware.vectorcamera.effect.customContourEffect
+import com.dozingcatsoftware.vectorcamera.effect.customPaletteEffect
+import com.dozingcatsoftware.vectorcamera.effect.customPermuteEffect
 import com.dozingcatsoftware.util.getLandscapeDisplaySize
 import com.dozingcatsoftware.util.grantUriPermissionForIntent
 import com.dozingcatsoftware.util.scanSavedMediaFile
@@ -75,6 +82,18 @@ class ViewVideoActivity: AppCompatActivity() {
 
         binding.shareButton.setOnClickListener(this::doShare)
         binding.switchEffectButton.setOnClickListener(this::toggleEffectSelectionMode)
+        binding.editEffectButton.setOnClickListener(this::showCustomEffectEditor)
+        binding.editSchemeView.activity = this
+        binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
+        binding.editSchemeView.doneCallback = this::handleCustomEffectEditorDone
+        binding.editPermuteView.changeCallback = this::handleCustomPermuteSchemeChanged
+        binding.editPermuteView.doneCallback = this::handleCustomEffectEditorDone
+        binding.editPaletteView.activity = this
+        binding.editPaletteView.changeCallback = this::handleCustomPaletteSchemeChanged
+        binding.editPaletteView.doneCallback = this::handleCustomEffectEditorDone
+        binding.editContourView.activity = this
+        binding.editContourView.changeCallback = this::handleCustomContourSchemeChanged
+        binding.editContourView.doneCallback = this::handleCustomEffectEditorDone
         binding.playPauseButton.setOnClickListener(this::togglePlay)
         binding.deleteButton.setOnClickListener(this::deleteVideo)
         binding.effectPickerView.setEffects(effectRegistry.effectInfos)
@@ -100,14 +119,19 @@ class ViewVideoActivity: AppCompatActivity() {
         })
         loadFrame(0)
 
+        // Back closes the effect picker or an open editor panel rather than leaving the activity.
         onBackPressedCallback = object: OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 if (inEffectSelectionMode) {
                     toggleEffectSelectionMode(null)
                 }
+                else if (visibleCustomEffectEditor() != null) {
+                    hideCustomEffectEditor()
+                }
             }
         }
         onBackPressedDispatcher.addCallback(onBackPressedCallback)
+        updateEditButton()
 
         val audioFile = photoLibrary.rawAudioRandomAccessFileForItemId(videoId)
         if (audioFile != null) {
@@ -142,7 +166,100 @@ class ViewVideoActivity: AppCompatActivity() {
 
     private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
         inEffectSelectionMode = inMode
-        onBackPressedCallback.isEnabled = inMode
+        updateBackPressedCallback()
+    }
+
+    private fun updateBackPressedCallback() {
+        onBackPressedCallback.isEnabled =
+                inEffectSelectionMode || visibleCustomEffectEditor() != null
+    }
+
+    // The video's effect as an editable custom effect, or null if it isn't one.
+    private fun customEffectForVideo(metadata: MediaMetadata): Effect? =
+            effectRegistry.customEffectForMetadata(
+                    metadata.effectId, metadata.effectMetadata, preferences.lookupFunction)
+
+    private fun customEffectEditors() = listOf(
+            binding.editSchemeView, binding.editPermuteView,
+            binding.editPaletteView, binding.editContourView)
+
+    private fun visibleCustomEffectEditor(): View? =
+            customEffectEditors().firstOrNull {it.visibility == View.VISIBLE}
+
+    // The edit button shows when the video uses a custom effect and its editor is closed.
+    private fun updateEditButton() {
+        val editable = customEffectForVideo(photoLibrary.metadataForItemId(videoId)) != null
+        binding.editEffectButton.visibility =
+                if (editable && visibleCustomEffectEditor() == null) View.VISIBLE else View.GONE
+    }
+
+    // Opens the editor panel for `effect` if it's a custom effect; otherwise closes any panel.
+    // Edits change this video's saved effect parameters, not the custom effect's preferences.
+    private fun showCustomEffectEditor(effect: Effect) {
+        hideCustomEffectEditor()
+        val editor: View? = when (val scheme = (effect as? CustomEffect<*>)?.scheme) {
+            is CustomColorScheme -> binding.editSchemeView.also {it.setScheme(scheme)}
+            is CustomPermuteScheme -> binding.editPermuteView.also {it.setScheme(scheme)}
+            is CustomPaletteScheme -> binding.editPaletteView.also {it.setScheme(scheme)}
+            is CustomContourScheme -> binding.editContourView.also {it.setScheme(scheme)}
+            else -> null
+        }
+        editor?.visibility = View.VISIBLE
+        updateBackPressedCallback()
+        updateEditButton()
+    }
+
+    // Opens the editor for the video's custom effect, from the edit button.
+    private fun showCustomEffectEditor(view: View?) {
+        val effect = customEffectForVideo(photoLibrary.metadataForItemId(videoId)) ?: return
+        showCustomEffectEditor(effect)
+    }
+
+    private fun hideCustomEffectEditor() {
+        for (editor in customEffectEditors()) {
+            editor.visibility = View.GONE
+        }
+        handleCustomEffectEditorDone()
+    }
+
+    private fun handleCustomEffectEditorDone() {
+        updateBackPressedCallback()
+        updateEditButton()
+    }
+
+    private fun handleCustomColorSchemeChanged(cs: CustomColorScheme) {
+        applyEditedEffect {id -> customColorMapEffect(cs, id, EffectContext.NORMAL)}
+    }
+
+    private fun handleCustomPermuteSchemeChanged(ps: CustomPermuteScheme) {
+        applyEditedEffect {id -> customPermuteEffect(ps, id)}
+    }
+
+    private fun handleCustomPaletteSchemeChanged(ps: CustomPaletteScheme) {
+        applyEditedEffect {id -> customPaletteEffect(ps, id)}
+    }
+
+    private fun handleCustomContourSchemeChanged(cs: CustomContourScheme) {
+        applyEditedEffect {id -> customContourEffect(cs, id)}
+    }
+
+    // Switches the video to the edited effect and saves it to the video's metadata and
+    // thumbnail, keeping the picker ID so the picker still highlights the custom effect.
+    private fun applyEditedEffect(effectForId: (String) -> Effect) {
+        val metadata = photoLibrary.metadataForItemId(videoId)
+        val effectId = metadata.effectId ?: return
+        saveEffect(effectForId(effectId), effectId)
+    }
+
+    // Makes `effect` the video's effect, in the reader and in the saved metadata and thumbnail.
+    private fun saveEffect(effect: Effect, effectId: String?) {
+        videoReader.effect = effect
+        val newMetadata = photoLibrary.metadataForItemId(videoId)
+                .withEffectMetadata(effect.effectMetadata(), effectId)
+        val firstFrame = videoReader.bitmapForFrame(0)
+        photoLibrary.writeMetadata(newMetadata, videoId)
+        photoLibrary.writeThumbnail(firstFrame, videoId)
+        loadFrame(frameIndex)
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
@@ -183,6 +300,7 @@ class ViewVideoActivity: AppCompatActivity() {
         picker.visibility = View.VISIBLE
         picker.scrollToEffect(effectId)
         binding.controlBar.visibility = View.GONE
+        hideCustomEffectEditor()
     }
 
     private fun hideEffectPicker() {
@@ -254,18 +372,11 @@ class ViewVideoActivity: AppCompatActivity() {
 
     private fun handleEffectSelected(info: EffectInfo) {
         val effect = effectRegistry.createEffect(info.id, preferences.lookupFunction)
-        videoReader.effect = effect
-
-        // Update thumbnail and metadata with effect.
-        val newMetadata = photoLibrary.metadataForItemId(videoId)
-                .withEffectMetadata(effect.effectMetadata(), info.id)
-        val firstFrame = videoReader.bitmapForFrame(0)
-        photoLibrary.writeMetadata(newMetadata, videoId)
-        photoLibrary.writeThumbnail(firstFrame, videoId)
-
-        loadFrame(frameIndex)
+        saveEffect(effect, info.id)
         updateInEffectSelectionModeFlag(false)
         hideEffectPicker()
+        // A newly chosen custom effect opens its editor, as in the camera activity.
+        showCustomEffectEditor(effect)
     }
 
     private fun doShare(view: View) {

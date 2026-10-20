@@ -514,6 +514,36 @@ class EffectRegistry {
      * metadata can't be read, e.g. because it was written by a version of the app that used a
      * different effect name, so that old media can still be opened.
      */
+    /**
+     * The custom effect that a saved image's metadata describes, with its scheme taken from the
+     * saved parameters rather than from preferences, so the image can be edited on its own.
+     * Null if `effectId` isn't a custom effect or the parameters aren't editable.
+     */
+    fun customEffectForMetadata(effectId: String?, metadata: EffectMetadata,
+                                prefsFn: (String, Any) -> Any): Effect? {
+        if (effectId == null || effectInfoForId(effectId) == null) return null
+        val template = createEffect(effectId, prefsFn)
+        if (template.effectName() != metadata.name) return null
+        val params = metadata.parameters
+        if (template !is CustomEffect<*>) return null
+        val id = template.customSchemeId
+        return when (template.scheme) {
+            is CustomColorScheme -> CustomColorScheme.fromEffectParameters(params)?.let {
+                customColorMapEffect(it, id, EffectContext.NORMAL)
+            }
+            is CustomPaletteScheme -> CustomPaletteScheme.fromEffectParameters(params)?.let {
+                customPaletteEffect(it, id)
+            }
+            is CustomContourScheme -> CustomContourScheme.fromEffectParameters(params)?.let {
+                customContourEffect(it, id)
+            }
+            is CustomPermuteScheme -> CustomPermuteScheme.fromEffectParameters(params)?.let {
+                customPermuteEffect(it, id)
+            }
+            else -> null
+        }
+    }
+
     fun effectForMetadata(metadata: EffectMetadata): Effect {
         return try {
             effectForNameAndParameters(metadata.name, metadata.parameters)
@@ -542,70 +572,62 @@ private fun matrixTextColor(prefsFn: (String, Any) -> Any, default: Int): Int {
     return prefsFn("matrixTextColor", default) as Int
 }
 
-private fun rgbComponents(vararg colors: Int): List<Int> {
-    val result = mutableListOf<Int>()
-    for (color in colors) {
-        result.add(Color.red(color))
-        result.add(Color.green(color))
-        result.add(Color.blue(color))
-    }
-    return result
+// The custom effects, built from their user-editable schemes.
+
+fun customColorMapEffect(scheme: CustomColorScheme, customEffectId: String,
+                         ctx: EffectContext): CustomEffect<CustomColorScheme> {
+    val params = scheme.toEffectParameters(gradientPixelsPerCell(ctx))
+    return CustomEffect(ColorMapEffect.fromParameters(scheme.mode, params), scheme, customEffectId)
 }
+
+fun customPaletteEffect(scheme: CustomPaletteScheme, customEffectId: String): CustomEffect<CustomPaletteScheme> {
+    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, scheme.toEffectParameters())
+    return CustomEffect(baseEffect, scheme, customEffectId)
+}
+
+fun customContourEffect(scheme: CustomContourScheme, customEffectId: String): CustomEffect<CustomContourScheme> {
+    return CustomEffect(ContourEffect.fromParameters(scheme.toEffectParameters()), scheme, customEffectId)
+}
+
+fun customPermuteEffect(scheme: CustomPermuteScheme, customEffectId: String): CustomEffect<CustomPermuteScheme> {
+    return CustomEffect(PermuteColorEffect.fromParameters(scheme.toEffectParameters()), scheme, customEffectId)
+}
+
+// The custom effects as selected in the picker, with their schemes read from preferences.
+
+private fun customSchemeJson(prefsFn: (String, Any) -> Any, customEffectId: String): Map<String, Any> =
+    try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
+    catch (ex: Exception) {mapOf()}
 
 private fun createCustomColorMapEffect(
     prefsFn: (String, Any) -> Any,
     ctx: EffectContext,
     customEffectId: String,
     defaultScheme: CustomColorScheme): Effect {
-    val schemeJson =
-        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
-        catch (ex: Exception) {mapOf<String, Any>()}
-    val scheme = CustomColorScheme.fromMap(schemeJson, defaultScheme)
-    // Construct a gradient grid from the CustomColorScheme colors.
-    val params = mapOf(
-        "type" to "grid_gradient",
-        "minColor" to rgbComponents(scheme.backgroundColor),
-        "grid" to listOf(listOf(rgbComponents(
-            scheme.topLeftColor, scheme.topRightColor,
-            scheme.bottomLeftColor, scheme.bottomRightColor))),
-        "pixelsPerCell" to gradientPixelsPerCell(ctx)
-    )
-    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, params)
-    return CustomColorMapEffect(baseEffect, scheme, customEffectId)
+    val scheme = CustomColorScheme.fromMap(customSchemeJson(prefsFn, customEffectId), defaultScheme)
+    return customColorMapEffect(scheme, customEffectId, ctx)
 }
 
 private fun createCustomPaletteEffect(
     prefsFn: (String, Any) -> Any,
     customEffectId: String,
     defaultScheme: CustomPaletteScheme): Effect {
-    val schemeJson =
-        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
-        catch (ex: Exception) {mapOf<String, Any>()}
-    val scheme = CustomPaletteScheme.fromMap(schemeJson, defaultScheme)
-    val baseEffect = ColorMapEffect.fromParameters(scheme.mode, scheme.toEffectParameters())
-    return CustomPaletteEffect(baseEffect, scheme, customEffectId)
+    val scheme = CustomPaletteScheme.fromMap(customSchemeJson(prefsFn, customEffectId), defaultScheme)
+    return customPaletteEffect(scheme, customEffectId)
 }
 
 private fun createCustomContourEffect(
     prefsFn: (String, Any) -> Any,
     customEffectId: String,
     defaultScheme: CustomContourScheme): Effect {
-    val schemeJson =
-        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
-        catch (ex: Exception) {mapOf<String, Any>()}
-    val scheme = CustomContourScheme.fromMap(schemeJson, defaultScheme)
-    val baseEffect = ContourEffect.fromParameters(scheme.toEffectParameters())
-    return CustomContourEffect(baseEffect, scheme, customEffectId)
+    val scheme = CustomContourScheme.fromMap(customSchemeJson(prefsFn, customEffectId), defaultScheme)
+    return customContourEffect(scheme, customEffectId)
 }
 
 private fun createCustomPermuteEffect(
     prefsFn: (String, Any) -> Any,
     customEffectId: String,
     defaultScheme: CustomPermuteScheme): Effect {
-    val schemeJson =
-        try {jsonStringToMap(prefsFn(customEffectId, "{}") as String)}
-        catch (ex: Exception) {mapOf<String, Any>()}
-    val scheme = CustomPermuteScheme.fromMap(schemeJson, defaultScheme)
-    val baseEffect = PermuteColorEffect.fromParameters(scheme.toEffectParameters())
-    return CustomPermuteEffect(baseEffect, scheme, customEffectId)
+    val scheme = CustomPermuteScheme.fromMap(customSchemeJson(prefsFn, customEffectId), defaultScheme)
+    return customPermuteEffect(scheme, customEffectId)
 }
