@@ -61,6 +61,15 @@
                     android:src="@drawable/ic_library_add_white_36dp" />
 
                 <ImageButton
+                    android:id="@+id/libraryButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#00000000"
+                    android:padding="8dp"
+                    android:layout_weight="1"
+                    android:src="@drawable/ic_photo_library_white_36dp" />
+
+                <ImageButton
                     android:id="@+id/helpButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -132,16 +141,6 @@
                     android:visibility="gone"
                     android:contentDescription="Edit effect"
                     android:src="@drawable/ic_tune_white_36dp" />
-
-                <ImageButton
-                    android:id="@+id/libraryButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:background="#00000000"
-                    android:paddingTop="16dp"
-                    android:layout_weight="1"
-                    android:src="@drawable/ic_photo_library_white_36dp" />
             </LinearLayout>
 
         </FrameLayout>
