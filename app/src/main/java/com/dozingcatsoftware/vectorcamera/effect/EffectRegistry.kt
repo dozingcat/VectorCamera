@@ -525,18 +525,20 @@ class EffectRegistry {
         val template = createEffect(effectId, prefsFn)
         if (template.effectName() != metadata.name) return null
         val params = metadata.parameters
-        return when (template) {
-            is CustomColorMapEffect -> CustomColorScheme.fromEffectParameters(params)?.let {
-                customColorMapEffect(it, template.customSchemeId, EffectContext.NORMAL)
+        if (template !is CustomEffect<*>) return null
+        val id = template.customSchemeId
+        return when (template.scheme) {
+            is CustomColorScheme -> CustomColorScheme.fromEffectParameters(params)?.let {
+                customColorMapEffect(it, id, EffectContext.NORMAL)
             }
-            is CustomPaletteEffect -> CustomPaletteScheme.fromEffectParameters(params)?.let {
-                customPaletteEffect(it, template.customSchemeId)
+            is CustomPaletteScheme -> CustomPaletteScheme.fromEffectParameters(params)?.let {
+                customPaletteEffect(it, id)
             }
-            is CustomContourEffect -> CustomContourScheme.fromEffectParameters(params)?.let {
-                customContourEffect(it, template.customSchemeId)
+            is CustomContourScheme -> CustomContourScheme.fromEffectParameters(params)?.let {
+                customContourEffect(it, id)
             }
-            is CustomPermuteEffect -> CustomPermuteScheme.fromEffectParameters(params)?.let {
-                customPermuteEffect(it, template.customSchemeId)
+            is CustomPermuteScheme -> CustomPermuteScheme.fromEffectParameters(params)?.let {
+                customPermuteEffect(it, id)
             }
             else -> null
         }
@@ -573,22 +575,22 @@ private fun matrixTextColor(prefsFn: (String, Any) -> Any, default: Int): Int {
 // The custom effects, built from their user-editable schemes.
 
 fun customColorMapEffect(scheme: CustomColorScheme, customEffectId: String,
-                         ctx: EffectContext): CustomColorMapEffect {
+                         ctx: EffectContext): CustomEffect<CustomColorScheme> {
     val params = scheme.toEffectParameters(gradientPixelsPerCell(ctx))
-    return CustomColorMapEffect(ColorMapEffect.fromParameters(scheme.mode, params), scheme, customEffectId)
+    return CustomEffect(ColorMapEffect.fromParameters(scheme.mode, params), scheme, customEffectId)
 }
 
-fun customPaletteEffect(scheme: CustomPaletteScheme, customEffectId: String): CustomPaletteEffect {
+fun customPaletteEffect(scheme: CustomPaletteScheme, customEffectId: String): CustomEffect<CustomPaletteScheme> {
     val baseEffect = ColorMapEffect.fromParameters(scheme.mode, scheme.toEffectParameters())
-    return CustomPaletteEffect(baseEffect, scheme, customEffectId)
+    return CustomEffect(baseEffect, scheme, customEffectId)
 }
 
-fun customContourEffect(scheme: CustomContourScheme, customEffectId: String): CustomContourEffect {
-    return CustomContourEffect(ContourEffect.fromParameters(scheme.toEffectParameters()), scheme, customEffectId)
+fun customContourEffect(scheme: CustomContourScheme, customEffectId: String): CustomEffect<CustomContourScheme> {
+    return CustomEffect(ContourEffect.fromParameters(scheme.toEffectParameters()), scheme, customEffectId)
 }
 
-fun customPermuteEffect(scheme: CustomPermuteScheme, customEffectId: String): CustomPermuteEffect {
-    return CustomPermuteEffect(PermuteColorEffect.fromParameters(scheme.toEffectParameters()), scheme, customEffectId)
+fun customPermuteEffect(scheme: CustomPermuteScheme, customEffectId: String): CustomEffect<CustomPermuteScheme> {
+    return CustomEffect(PermuteColorEffect.fromParameters(scheme.toEffectParameters()), scheme, customEffectId)
 }
 
 // The custom effects as selected in the picker, with their schemes read from preferences.

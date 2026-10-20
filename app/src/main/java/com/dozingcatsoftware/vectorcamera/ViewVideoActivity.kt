@@ -15,10 +15,7 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import com.dozingcatsoftware.vectorcamera.effect.CustomColorMapEffect
-import com.dozingcatsoftware.vectorcamera.effect.CustomContourEffect
-import com.dozingcatsoftware.vectorcamera.effect.CustomPaletteEffect
-import com.dozingcatsoftware.vectorcamera.effect.CustomPermuteEffect
+import com.dozingcatsoftware.vectorcamera.effect.CustomEffect
 import com.dozingcatsoftware.vectorcamera.effect.Effect
 import com.dozingcatsoftware.vectorcamera.effect.EffectContext
 import com.dozingcatsoftware.vectorcamera.effect.EffectInfo
@@ -200,25 +197,14 @@ class ViewVideoActivity: AppCompatActivity() {
     // Edits change this video's saved effect parameters, not the custom effect's preferences.
     private fun showCustomEffectEditor(effect: Effect) {
         hideCustomEffectEditor()
-        when (effect) {
-            is CustomColorMapEffect -> {
-                binding.editSchemeView.setScheme(effect.scheme)
-                binding.editSchemeView.visibility = View.VISIBLE
-            }
-            is CustomPermuteEffect -> {
-                binding.editPermuteView.setScheme(effect.scheme)
-                binding.editPermuteView.visibility = View.VISIBLE
-            }
-            is CustomPaletteEffect -> {
-                binding.editPaletteView.setScheme(effect.scheme)
-                binding.editPaletteView.visibility = View.VISIBLE
-            }
-            is CustomContourEffect -> {
-                binding.editContourView.setScheme(effect.scheme)
-                binding.editContourView.visibility = View.VISIBLE
-            }
-            else -> {}
+        val editor: View? = when (val scheme = (effect as? CustomEffect<*>)?.scheme) {
+            is CustomColorScheme -> binding.editSchemeView.also {it.setScheme(scheme)}
+            is CustomPermuteScheme -> binding.editPermuteView.also {it.setScheme(scheme)}
+            is CustomPaletteScheme -> binding.editPaletteView.also {it.setScheme(scheme)}
+            is CustomContourScheme -> binding.editContourView.also {it.setScheme(scheme)}
+            else -> null
         }
+        editor?.visibility = View.VISIBLE
         updateBackPressedCallback()
         updateEditButton()
     }

@@ -679,13 +679,8 @@ class MainActivity : AppCompatActivity() {
     private fun customSchemeIdForSelectedEffect(): String {
         val effectId = selectedEffectId ?: return ""
         if (effectRegistry.effectInfoForId(effectId) == null) return ""
-        return when (val eff = effectRegistry.createEffect(effectId, preferences.lookupFunction)) {
-            is CustomColorMapEffect -> eff.customSchemeId
-            is CustomPermuteEffect -> eff.customSchemeId
-            is CustomPaletteEffect -> eff.customSchemeId
-            is CustomContourEffect -> eff.customSchemeId
-            else -> ""
-        }
+        val eff = effectRegistry.createEffect(effectId, preferences.lookupFunction)
+        return (eff as? CustomEffect<*>)?.customSchemeId ?: ""
     }
 
     private fun customEffectEditors() = listOf(
@@ -699,29 +694,16 @@ class MainActivity : AppCompatActivity() {
     // any open panel and the edit button.
     private fun showCustomEffectEditor(eff: Effect) {
         hideCustomEffectEditor()
-        when (eff) {
-            is CustomColorMapEffect -> {
-                binding.editSchemeView.setScheme(eff.scheme)
-                binding.editSchemeView.visibility = View.VISIBLE
-                customSchemeId = eff.customSchemeId
-            }
-            is CustomPermuteEffect -> {
-                binding.editPermuteView.setScheme(eff.scheme)
-                binding.editPermuteView.visibility = View.VISIBLE
-                customSchemeId = eff.customSchemeId
-            }
-            is CustomPaletteEffect -> {
-                binding.editPaletteView.setScheme(eff.scheme)
-                binding.editPaletteView.visibility = View.VISIBLE
-                customSchemeId = eff.customSchemeId
-            }
-            is CustomContourEffect -> {
-                binding.editContourView.setScheme(eff.scheme)
-                binding.editContourView.visibility = View.VISIBLE
-                customSchemeId = eff.customSchemeId
-            }
-            else -> customSchemeId = ""
+        val custom = eff as? CustomEffect<*>
+        customSchemeId = custom?.customSchemeId ?: ""
+        val editor: View? = when (val scheme = custom?.scheme) {
+            is CustomColorScheme -> binding.editSchemeView.also {it.setScheme(scheme)}
+            is CustomPermuteScheme -> binding.editPermuteView.also {it.setScheme(scheme)}
+            is CustomPaletteScheme -> binding.editPaletteView.also {it.setScheme(scheme)}
+            is CustomContourScheme -> binding.editContourView.also {it.setScheme(scheme)}
+            else -> null
         }
+        editor?.visibility = View.VISIBLE
         updateBackPressedCallback()
         updateControls()
     }
@@ -809,7 +791,7 @@ class MainActivity : AppCompatActivity() {
     private fun reloadCustomEffect() {
         // Keeping customSchemeId and selectedEffectId as instance variables is ugly. The problem
         // is that when the user selects a custom effect, `currentEffect` gets set to the
-        // underlying effect rather than the "wrapper" CustomColorMapEffect.
+        // underlying effect rather than the wrapping CustomEffect.
         val effectId = selectedEffectId ?: return
         val newEffect = effectRegistry.createEffect(effectId, preferences.lookupFunction)
         // Save the resulting effect so that it will restore correctly.
