@@ -355,30 +355,18 @@ class MainActivity : AppCompatActivity() {
             binding.rightBottomControlBar.layoutDirection = direction
         }
         run {
-            val params = FrameLayout.LayoutParams(match, match)
-            val metrics = resources.displayMetrics
-            val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
-            val iconMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 54f, metrics)
-            params.topMargin = if (isPortrait) iconMargin.toInt() else 0
-            params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
-            params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
-            params.rightMargin = if (isPortrait) 0 else shutterMargin.toInt()
-            binding.editSchemeView.layoutParams = params
-        }
-        run {
-            // The permute, palette, and contour editors are small panels; put them at the bottom
-            // in portrait (above the shutter bar) and at the left in landscape (next to the icon bar).
-            for (panel in listOf(binding.editPermuteView, binding.editPaletteView,
-                                 binding.editContourView)) {
+            // The custom effect editor panels sit next to the shutter bar, which holds the
+            // button that opens them: centered above it in portrait, centered left of it in
+            // landscape.
+            val shutterMargin = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 72f, resources.displayMetrics).toInt()
+            for (panel in customEffectEditors()) {
                 val params = FrameLayout.LayoutParams(wrap, wrap)
-                val metrics = resources.displayMetrics
-                val shutterMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72f, metrics)
-                val iconMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 54f, metrics)
                 params.gravity =
                         if (isPortrait) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                        else Gravity.LEFT or Gravity.CENTER_VERTICAL
-                params.bottomMargin = if (isPortrait) shutterMargin.toInt() else 0
-                params.leftMargin = if (isPortrait) 0 else iconMargin.toInt()
+                        else Gravity.RIGHT or Gravity.CENTER_VERTICAL
+                params.bottomMargin = if (isPortrait) shutterMargin else 0
+                params.rightMargin = if (isPortrait) 0 else shutterMargin
                 panel.layoutParams = params
             }
         }

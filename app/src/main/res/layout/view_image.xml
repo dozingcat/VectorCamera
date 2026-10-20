@@ -61,12 +61,13 @@
 
     </LinearLayout>
 
-    <!-- Custom effect editors, kept above the control bar. -->
+    <!-- Custom effect editors, centered above the control bar that opens them. -->
     <com.dozingcatsoftware.vectorcamera.EditColorSchemeView
         android:id="@+id/editSchemeView"
         android:visibility="gone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="62dp" />
 
     <com.dozingcatsoftware.vectorcamera.EditPermuteSchemeView
@@ -74,6 +75,7 @@
         android:visibility="gone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="62dp" />
 
     <com.dozingcatsoftware.vectorcamera.EditPaletteSchemeView
@@ -81,6 +83,7 @@
         android:visibility="gone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="62dp" />
 
     <com.dozingcatsoftware.vectorcamera.EditContourSchemeView
@@ -88,6 +91,7 @@
         android:visibility="gone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="62dp" />
 
     <com.dozingcatsoftware.vectorcamera.EffectPickerView
