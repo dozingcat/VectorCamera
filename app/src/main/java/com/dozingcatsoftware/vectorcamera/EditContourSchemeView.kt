@@ -18,6 +18,8 @@ class EditContourSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
 
     lateinit var activity: FragmentActivity
     var changeCallback: ((CustomContourScheme) -> Unit)? = null
+    // Called after the Done button hides the view.
+    var doneCallback: (() -> Unit)? = null
 
     private var scheme = CustomContourScheme(listOf(Color.BLACK, Color.WHITE), Color.BLACK)
     private val fillSwatches: ColorSwatchRow
@@ -54,6 +56,7 @@ class EditContourSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
         }
         contentView.findViewById<Button>(R.id.doneButton).setOnClickListener {
             visibility = View.GONE
+            doneCallback?.invoke()
         }
         updateControls()
     }

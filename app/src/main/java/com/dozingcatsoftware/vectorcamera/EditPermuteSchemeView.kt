@@ -21,6 +21,8 @@ class EditPermuteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
     private var scheme = CustomPermuteScheme(
             ColorComponentSource.RED, ColorComponentSource.GREEN, ColorComponentSource.BLUE)
     var changeCallback: ((CustomPermuteScheme) -> Unit)? = null
+    // Called after the Done button hides the view.
+    var doneCallback: (() -> Unit)? = null
 
     private lateinit var redSpinner: Spinner
     private lateinit var greenSpinner: Spinner
@@ -49,6 +51,7 @@ class EditPermuteSchemeView(context: Context, attrs: AttributeSet) : FrameLayout
         }
         contentView.findViewById<Button>(R.id.doneButton).setOnClickListener {
             visibility = View.GONE
+            doneCallback?.invoke()
         }
     }
 

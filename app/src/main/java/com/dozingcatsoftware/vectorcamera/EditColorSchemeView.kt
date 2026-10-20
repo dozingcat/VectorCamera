@@ -19,6 +19,8 @@ class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(
     private var scheme = CustomColorScheme(ColorMapMode.EDGE, Color.BLACK,
             Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE)
     var changeCallback: ((CustomColorScheme) -> Unit)? = null
+    // Called after the Done button hides the view.
+    var doneCallback: (() -> Unit)? = null
     private lateinit var contentView: View
 
     init {
@@ -66,6 +68,7 @@ class EditColorSchemeView(context: Context, attrs: AttributeSet) : LinearLayout(
         }
         contentView.findViewById<Button>(R.id.doneButton).setOnClickListener {
             visibility = View.GONE
+            doneCallback?.invoke()
         }
     }
 

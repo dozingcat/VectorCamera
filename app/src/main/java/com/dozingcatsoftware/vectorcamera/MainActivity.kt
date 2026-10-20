@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity() {
 
         currentEffect = effectFromPreferences()
         selectedEffectId = preferences.effectId()
+        customSchemeId = customSchemeIdForSelectedEffect()
         preferredImageSize =
                 if (preferences.useHighQualityPreview()) ImageSize.FULL_SCREEN
                 else ImageSize.HALF_SCREEN
@@ -104,6 +105,7 @@ class MainActivity : AppCompatActivity() {
         binding.overlayView.touchEventHandler = this::handleOverlayViewTouchEvent
         binding.cameraActionButton.onShutterButtonClick = this::handleShutterClick
         binding.cameraActionButton.onShutterButtonFocus = this::handleShutterFocus
+        binding.editEffectButton.setOnClickListener(this::showCustomEffectEditor)
         binding.editSchemeView.activity = this
         binding.editSchemeView.changeCallback = this::handleCustomColorSchemeChanged
         binding.editPermuteView.changeCallback = this::handleCustomPermuteSchemeChanged
@@ -111,15 +113,22 @@ class MainActivity : AppCompatActivity() {
         binding.editPaletteView.changeCallback = this::handleCustomPaletteSchemeChanged
         binding.editContourView.activity = this
         binding.editContourView.changeCallback = this::handleCustomContourSchemeChanged
+        binding.editSchemeView.doneCallback = this::handleCustomEffectEditorDone
+        binding.editPermuteView.doneCallback = this::handleCustomEffectEditorDone
+        binding.editPaletteView.doneCallback = this::handleCustomEffectEditorDone
+        binding.editContourView.doneCallback = this::handleCustomEffectEditorDone
         binding.effectPickerView.setEffects(effectRegistry.effectInfos)
         binding.effectPickerView.onEffectSelected = this::handleEffectSelected
 
-        // If the effect selection grid is visible, a back navigation should hide
-        // the grid without changing the effect, and should remain in this activity.
+        // If the effect selection grid or a custom effect editor is visible, a back navigation
+        // should hide it without changing the effect, and should remain in this activity.
         onBackPressedCallback = object: OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 if (inEffectSelectionMode) {
                     toggleEffectSelectionMode(null)
+                }
+                else if (visibleCustomEffectEditor() != null) {
+                    hideCustomEffectEditor()
                 }
             }
         }
@@ -311,6 +320,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.switchResolutionButton.alpha =
                 if (preferredImageSize == ImageSize.FULL_SCREEN) 1.0f else 0.5f
+
+        binding.editEffectButton.visibility =
+                if (customSchemeId.isNotEmpty() && visibleCustomEffectEditor() == null) View.VISIBLE
+                else View.GONE
     }
 
     private fun updateLayout(isPortrait: Boolean) {
@@ -562,10 +575,15 @@ class MainActivity : AppCompatActivity() {
         updateControls()
     }
 
-    // Override back navigation handling only if the effect grid is visible.
+    // Override back navigation handling only if the effect grid or an editor is visible.
     private fun updateInEffectSelectionModeFlag(inMode: Boolean) {
         inEffectSelectionMode = inMode
-        onBackPressedCallback.isEnabled = inMode
+        updateBackPressedCallback()
+    }
+
+    private fun updateBackPressedCallback() {
+        onBackPressedCallback.isEnabled =
+                inEffectSelectionMode || visibleCustomEffectEditor() != null
     }
 
     private fun toggleEffectSelectionMode(view: View?) {
@@ -608,10 +626,7 @@ class MainActivity : AppCompatActivity() {
         picker.scrollToEffect(selectedEffectId)
         preferredImageSize = ImageSize.EFFECT_GRID
         binding.controlLayout.visibility = View.GONE
-        binding.editSchemeView.visibility = View.GONE
-        binding.editPermuteView.visibility = View.GONE
-        binding.editPaletteView.visibility = View.GONE
-        binding.editContourView.visibility = View.GONE
+        hideCustomEffectEditor()
         Log.i(TAG, "Showing effect picker")
     }
 
@@ -621,6 +636,7 @@ class MainActivity : AppCompatActivity() {
         binding.effectPickerView.clearThumbnails()
         binding.controlLayout.visibility = View.VISIBLE
         preferredImageSize = previewImageSizeFromPrefs()
+        updateControls()
         Log.i(TAG, "Hiding effect picker")
     }
 
@@ -667,7 +683,34 @@ class MainActivity : AppCompatActivity() {
         hideEffectPicker()
         // This reads the new effect from preferences.
         restartCameraImageGenerator()
+        showCustomEffectEditor(eff)
+    }
 
+    // The preferences ID of the selected effect's custom scheme, or "" if it's not a custom
+    // effect. Used at startup, when the editor isn't opened but the edit button should show.
+    private fun customSchemeIdForSelectedEffect(): String {
+        val effectId = selectedEffectId ?: return ""
+        if (effectRegistry.effectInfoForId(effectId) == null) return ""
+        return when (val eff = effectRegistry.createEffect(effectId, preferences.lookupFunction)) {
+            is CustomColorMapEffect -> eff.customSchemeId
+            is CustomPermuteEffect -> eff.customSchemeId
+            is CustomPaletteEffect -> eff.customSchemeId
+            is CustomContourEffect -> eff.customSchemeId
+            else -> ""
+        }
+    }
+
+    private fun customEffectEditors() = listOf(
+            binding.editSchemeView, binding.editPermuteView,
+            binding.editPaletteView, binding.editContourView)
+
+    private fun visibleCustomEffectEditor(): View? =
+            customEffectEditors().firstOrNull {it.visibility == View.VISIBLE}
+
+    // Opens the editor panel for the selected effect, if it's a custom effect. Otherwise hides
+    // any open panel and the edit button.
+    private fun showCustomEffectEditor(eff: Effect) {
+        hideCustomEffectEditor()
         when (eff) {
             is CustomColorMapEffect -> {
                 binding.editSchemeView.setScheme(eff.scheme)
@@ -691,6 +734,27 @@ class MainActivity : AppCompatActivity() {
             }
             else -> customSchemeId = ""
         }
+        updateBackPressedCallback()
+        updateControls()
+    }
+
+    // Reopens the editor panel for the selected custom effect, from the edit button.
+    private fun showCustomEffectEditor(view: View?) {
+        val effectId = selectedEffectId ?: return
+        showCustomEffectEditor(effectRegistry.createEffect(effectId, preferences.lookupFunction))
+    }
+
+    private fun hideCustomEffectEditor() {
+        for (editor in customEffectEditors()) {
+            editor.visibility = View.GONE
+        }
+        updateBackPressedCallback()
+        updateControls()
+    }
+
+    private fun handleCustomEffectEditorDone() {
+        updateBackPressedCallback()
+        updateControls()
     }
 
     private fun handleShutterClick() {
