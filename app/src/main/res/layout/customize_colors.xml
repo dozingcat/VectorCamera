@@ -4,7 +4,7 @@
      sit in the middle. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
-    android:layout_width="280dp"
+    android:layout_width="300dp"
     android:layout_height="wrap_content"
     android:background="#C0000000"
     android:paddingLeft="16dp"
@@ -31,10 +31,13 @@
             android:contentDescription="Top right color" />
     </RelativeLayout>
 
+    <!-- The margins keep the background swatch clear of the corner swatch columns. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginLeft="52dp"
+        android:layout_marginRight="52dp"
         android:orientation="horizontal"
         android:gravity="center">
 
@@ -43,7 +46,7 @@
             android:layout_height="wrap_content"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
-            android:text="Background color" />
+            android:text="Background" />
 
         <View
             android:id="@+id/backgroundColor"
@@ -77,7 +80,7 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp">
+        android:layout_marginTop="12dp">
 
         <View
             android:id="@+id/bottomLeftColor"
