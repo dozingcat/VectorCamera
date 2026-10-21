@@ -299,10 +299,8 @@ class EffectRegistry {
                 ))
             },
 
-            EffectInfo("permute_brg", "Swapped colors RGB->BRG", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
-            EffectInfo("permute_gbr", "Swapped colors RGB->GBR", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToGbr() },
-            EffectInfo("flip_uv", "Complementary colors", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.flipUV() },
             EffectInfo("color_negative", "Color negative", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.colorNegative() },
+            EffectInfo("permute_brg", "RGB to BRG", EffectCategory.COLORS) {prefsFn, context -> PermuteColorEffect.rgbToBrg() },
 
             // Cyan background, purple/red/yellow foreground.
             EffectInfo("solid_warm_on_cyan", "Warm on cyan", EffectCategory.COLORS) {prefsFn, context ->
@@ -420,11 +418,6 @@ class EffectRegistry {
             // Multi-stop palettes applied to brightness or edge strength.
             EffectInfo("thermal", "Thermal", EffectCategory.COLORS) {prefsFn, context ->
                 ColorMapEffect.solid(mapOf(
-                    "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
-                ))
-            },
-            EffectInfo("thermal_edges", "Thermal edges", EffectCategory.EDGES) {prefsFn, context ->
-                ColorMapEffect.edge(mapOf(
                     "colors" to mapOf("type" to "palette", "stops" to IRONBOW_STOPS)
                 ))
             },
