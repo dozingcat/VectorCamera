@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 apply plugin: 'com.android.application'
 
 android {
@@ -6,8 +8,8 @@ android {
         applicationId "com.dozingcatsoftware.vectorcamera"
         minSdk 23
         targetSdk 37
-        versionCode 15
-        versionName "2.0.0"
+        versionCode 16
+        versionName "2.1.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         
         ndk {
@@ -55,13 +57,13 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        jvmTarget = JvmTarget.JVM_21
     }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
     implementation "androidx.preference:preference-ktx:1.2.1"
     implementation "androidx.recyclerview:recyclerview:1.4.0"
     testImplementation 'junit:junit:4.13.2'
@@ -69,9 +71,9 @@ dependencies {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0"
     // Avoids duplicate class errors: https://stackoverflow.com/questions/69817925/problem-duplicate-class-androidx-lifecycle-viewmodel-found-in-modules
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.3'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0'
     implementation 'com.jaredrummler:colorpicker:1.1.0'
     // The xiph.org Vorbis encoding library is included as source, in src/main/java/org/xiph.
     // It was downloaded from https://xiph.org/downloads/

@@ -1,0 +1,3 @@
+- New effects: stippling, contour map, thermal palette, color permutation.
+- User-editable parameters for several effects.
+- Significantly improved performance.
