@@ -1,11 +1,13 @@
 package com.dozingcatsoftware.vectorcamera
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import com.dozingcatsoftware.util.adjustPaddingForSystemUi
@@ -42,11 +44,11 @@ class AboutActivity: AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                 // Go to email for mailto: and default browser for http/https URLs.
                 if (url.startsWith("mailto:")) {
-                    startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(url)))
+                    launchExternal(Intent(Intent.ACTION_SENDTO, Uri.parse(url)))
                     return true
                 }
                 if (url.startsWith("http:") || url.startsWith("https:")) {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    launchExternal(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     return true
                 }
                 // Load file URLs in the same WebView.
@@ -54,6 +56,14 @@ class AboutActivity: AppCompatActivity() {
                     return false
                 }
                 return super.shouldOverrideUrlLoading(view, url)
+            }
+
+            private fun launchExternal(intent: Intent) {
+                try {
+                    startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(this@AboutActivity, R.string.no_app_to_open_link, Toast.LENGTH_SHORT).show()
+                }
             }
 
             // Selectively enable the back navigation callback depending on
